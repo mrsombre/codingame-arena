@@ -37,6 +37,7 @@ func NewBaseFlagSet(name string) *pflag.FlagSet {
 	fs.SortFlags = false
 	fs.SetOutput(io.Discard)
 	fs.BoolP("help", "h", false, "Show this help")
+	fs.String("game", "", "Active game (auto-detected when only one is registered)")
 	return fs
 }
 
@@ -242,9 +243,9 @@ func MergeConfigGameOptions(v *viper.Viper, fs *pflag.FlagSet, gameOptions map[s
 	}
 }
 
-// Usage returns the top-level help text, including the bundled game name.
-func Usage(factory GameFactory) string {
-	return strings.TrimSpace(fmt.Sprintf(`Bundled game: %s
+// Usage returns the top-level help text, including available games.
+func Usage(games []string) string {
+	return strings.TrimSpace(fmt.Sprintf(`Available games: %s
 
 Usage: arena <command> [OPTIONS]
 
@@ -277,15 +278,17 @@ arena serve - Serve the embedded web viewer.
   --host <HOST>        Bind host (default: localhost)
   --trace-dir <PATH>   Directory with match trace JSON files (powers /api/matches)
   --bin-dir <PATH>     Directory to scan for bot binaries (default: ./bin)
-  API: GET /api/game, GET /api/bots, GET /api/matches, GET /api/matches/{id}, POST /api/run
+  API: GET /api/game, GET /api/games, GET /api/bots, GET /api/matches, GET /api/matches/{id}, POST /api/run
   Stdin keys: o<enter> open in default browser   q<enter> quit
 
 Common options:
+  --game <NAME>        Active game (auto-detected when only one is registered)
   -h, --help           Show this help
 
-Env vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_SEED, ARENA_MAX_TURNS).
+Env vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_GAME, ARENA_SEED).
+Config: arena.yml in current directory (e.g. game: winter-2026).
 
-Unknown --key value flags are passed as game options to the engine factory.`, factory.Name()))
+Unknown --key value flags are passed as game options to the engine factory.`, strings.Join(games, ", ")))
 }
 
 func ParseSeed(value string) (int64, error) {

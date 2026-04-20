@@ -31,7 +31,7 @@ func Replay(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfla
 	}
 
 	if v.GetBool("help") {
-		_, err := fmt.Fprintln(stdout, arena.Usage(factory))
+		_, err := fmt.Fprintln(stdout, arena.Usage(arena.Games()))
 		return err
 	}
 

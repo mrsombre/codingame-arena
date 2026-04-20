@@ -39,6 +39,7 @@ func New(opts Options) http.Handler {
 		_, _ = w.Write([]byte("ok"))
 	})
 
+	mux.HandleFunc("GET /api/games", handleGames())
 	mux.HandleFunc("GET /api/game", handleGame(opts.Factory))
 	mux.HandleFunc("GET /api/serialize", handleSerialize(opts.Factory))
 	mux.HandleFunc("GET /api/bots", handleBots(opts.Bots))
@@ -53,6 +54,12 @@ func New(opts Options) http.Handler {
 type gameInfo struct {
 	Name     string `json:"name"`
 	MaxTurns int    `json:"maxTurns"`
+}
+
+func handleGames() http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, arena.Games())
+	}
 }
 
 func handleGame(factory arena.GameFactory) http.HandlerFunc {

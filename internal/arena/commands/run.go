@@ -42,7 +42,7 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 	}
 
 	if parsed.Help {
-		_, err = fmt.Fprintln(stdout, arena.Usage(factory))
+		_, err = fmt.Fprintln(stdout, arena.Usage(arena.Games()))
 		return err
 	}
 
