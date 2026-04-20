@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Edit the stub generator</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.17.1/themes/prism-tomorrow.css" rel="stylesheet" />
+  <link rel="stylesheet" type="text/css" href="stub.css">
+
+  <script src="./lib/cginput.js"></script>
+  <script src="stub.js"></script>
+</head>
+
+<body onload="load()">
+  <div class="edit">
+    <div class="edit-title">Edit stub</div>
+    <textarea id="stubInput" onkeyup="handleChangeStubInput()" spellcheck="false"></textarea>
+    <button id="save" onclick="save()" disabled>Saved</button>
+  </div>
+
+  <div class="preview">
+    <div class="preview-title">Preview</div>
+    <select id="language" onchange="refreshStub()">
+      <option>Bash</option>
+      <option>Clojure</option>
+      <option>C++</option>
+      <option>C#</option>
+      <option>C</option>
+      <option>D</option>
+      <option>Dart</option>
+      <option>F#</option>
+      <option>Go</option>
+      <option>Groovy</option>
+      <option>Haskell</option>
+      <option>JavaScript</option>
+      <option selected="selected">Java</option>
+      <option>Kotlin</option>
+      <option>Lua</option>
+      <option>ObjectiveC</option>
+      <option>OCaml</option>
+      <option>Pascal</option>
+      <option>Perl</option>
+      <option>PHP</option>
+      <option>Python3</option>
+      <option>Ruby</option>
+      <option>Rust</option>
+      <option>Scala</option>
+      <option>Swift</option>
+      <option>TypeScript</option>
+      <option>VB.net</option>
+    </select>
+    <div id="error"></div>
+    <pre class="preview-code"><code id="result"></code></pre>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.17.1/components/prism-core.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.17.1/plugins/autoloader/prism-autoloader.js"
+    data-autoloader-path="https://cdnjs.cloudflare.com/ajax/libs/prism/1.17.1/components/"></script>
+</body>
+
+</html>

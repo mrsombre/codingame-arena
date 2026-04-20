@@ -1,0 +1,1 @@
+Guidelines and best practices for coding games can be found in the documentation ["Contributing to CodinGame"](https://www.codingame.com/playgrounds/40701/contribute---help/coding-games#guidelines)

@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,600,700,800,900" rel="stylesheet" type="text/css">
+  <link href='https://fonts.googleapis.com/css?family=Lato:300,400,900' rel='stylesheet' type='text/css'>
+  <link href="https://fonts.googleapis.com/css?family=Inconsolata:400,700" rel="stylesheet" type="text/css">
+  <link rel="stylesheet" type="text/css" href="./statement.css">
+
+  <script src="https://unpkg.com/monaco-editor@0.20.0/min/vs/loader.js"></script>
+</head>
+
+<body>
+  <div class="StatementMaker">
+
+    <div class="StatementMaker-languages">
+      <button class="active" onclick="changeLanguage(event, 'EN')">English</button>
+      <button onclick="changeLanguage(event, 'FR')">Français</button>
+    </div>
+
+    <div class="StatementMaker-content">
+      <div class="StatementMaker-editor">
+        <div class="StatementMaker-editor-title">HTML Source</div>
+        <code id="StatementMaker-input"></code>
+        <button id="StatementMaker-save" onclick="save()">Save</button>
+      </div>
+
+      <div class="StatementMaker-preview">
+        <div class="StatementMaker-preview-title">Preview</div>
+        <div id="StatementMaker-preview-error"></div>
+        <code id="StatementMaker-preview-result"></code>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="statement.js"></script>
+</body>
+
+</html>
