@@ -26,7 +26,7 @@ const LABEL_STYLE: TextStyleOptions = {
 
 let app: Application | null = null;
 
-export async function renderMap(container: HTMLElement, data: MapData): Promise<void> {
+export async function renderGame(container: HTMLElement, data: MapData): Promise<void> {
 	const { width, height, walls, apples, birds, myBirdIds } = data;
 
 	const step = CELL + GAP;

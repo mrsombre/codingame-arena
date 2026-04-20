@@ -1,11 +1,11 @@
 import { parseSerializeResponse } from "./parser.ts";
-import { renderMap } from "./renderer.ts";
+import { renderGame } from "./renderer.ts";
 
 export function render(root: HTMLElement): void {
 	root.innerHTML = `
 		<div class="app">
 			<nav class="app-nav" role="tablist">
-				<button class="tab is-active" type="button" data-pane="map" role="tab" aria-selected="true">Map</button>
+				<button class="tab is-active" type="button" data-pane="map" role="tab" aria-selected="true">Game</button>
 			</nav>
 
 			<section class="pane" data-pane="map">
@@ -71,7 +71,7 @@ export function render(root: HTMLElement): void {
 			}
 
 			const data = parseSerializeResponse(text);
-			await renderMap(container, data);
+			await renderGame(container, data);
 
 			status.textContent = `seed=${seed}  ${data.width}x${data.height}  apples=${data.apples.length}  birds=${data.birds.length}`;
 			container.hidden = false;

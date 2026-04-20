@@ -73,6 +73,7 @@ func AddFrontFlags(fs *pflag.FlagSet) {
 	fs.Int("port", 5757, "HTTP port")
 	fs.String("host", "localhost", "Bind host")
 	fs.String("trace-dir", "", "Directory with match trace JSON files (powers /api/matches)")
+	fs.String("bin-dir", "./bin", "Directory to scan for bot binaries (powers /api/bots)")
 }
 
 func ParseRunArgs(args []string, fs *pflag.FlagSet, v *viper.Viper) (ParsedArgs, error) {
@@ -275,7 +276,8 @@ arena front - Serve the embedded web viewer.
   --port <N>           HTTP port (default: 5757)
   --host <HOST>        Bind host (default: localhost)
   --trace-dir <PATH>   Directory with match trace JSON files (powers /api/matches)
-  API: GET /api/game, GET /api/matches, GET /api/matches/{id}, POST /api/run
+  --bin-dir <PATH>     Directory to scan for bot binaries (default: ./bin)
+  API: GET /api/game, GET /api/bots, GET /api/matches, GET /api/matches/{id}, POST /api/run
   Stdin keys: o<enter> open in default browser   q<enter> quit
 
 Common options:

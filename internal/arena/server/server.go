@@ -22,6 +22,7 @@ type Options struct {
 	Factory  arena.GameFactory
 	Assets   fs.FS
 	TraceDir string
+	Bots     []string
 }
 
 // New returns an http.Handler that serves the embedded viewer bundle and the
@@ -40,6 +41,7 @@ func New(opts Options) http.Handler {
 
 	mux.HandleFunc("GET /api/game", handleGame(opts.Factory))
 	mux.HandleFunc("GET /api/serialize", handleSerialize(opts.Factory))
+	mux.HandleFunc("GET /api/bots", handleBots(opts.Bots))
 	mux.HandleFunc("GET /api/matches", handleMatchList(opts.TraceDir))
 	mux.HandleFunc("GET /api/matches/{id}", handleMatchGet(opts.TraceDir))
 	mux.HandleFunc("POST /api/run", handleRun(opts.Factory, opts.TraceDir))
@@ -59,6 +61,24 @@ func handleGame(factory arena.GameFactory) http.HandlerFunc {
 			Name:     factory.Name(),
 			MaxTurns: factory.MaxTurns(),
 		})
+	}
+}
+
+func handleBots(bots []string) http.HandlerFunc {
+	// Extract just the filenames for the response.
+	type botEntry struct {
+		Name string `json:"name"`
+		Path string `json:"path"`
+	}
+	entries := make([]botEntry, 0, len(bots))
+	for _, b := range bots {
+		entries = append(entries, botEntry{
+			Name: filepath.Base(b),
+			Path: b,
+		})
+	}
+	return func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, entries)
 	}
 }
 

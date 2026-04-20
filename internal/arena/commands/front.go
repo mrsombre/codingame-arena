@@ -12,11 +12,13 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -44,9 +46,12 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 	port := v.GetInt("port")
 	host := v.GetString("host")
 	traceDir := v.GetString("trace-dir")
+	binDir := v.GetString("bin-dir")
 	if port < 1 || port > 65535 {
 		return fmt.Errorf("--port must be in 1..65535")
 	}
+
+	bots := scanBots(binDir)
 
 	assets, err := fs.Sub(viewer.Assets, "dist")
 	if err != nil {
@@ -56,6 +61,7 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 		Factory:  factory,
 		Assets:   assets,
 		TraceDir: traceDir,
+		Bots:     bots,
 	})
 
 	addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
@@ -86,6 +92,7 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 
 	printFrontUsage(stdout, url, traceDir)
 
+	binaryChanged := watchBinary(ctx, stdout)
 	stdinCmds := readStdinCommands(ctx)
 
 	for {
@@ -99,6 +106,11 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 				return fmt.Errorf("server: %w", err)
 			}
 			return nil
+
+		case <-binaryChanged:
+			fmt.Fprintln(stdout, "\nbinary changed — restarting...")
+			_ = shutdown(httpServer)
+			return reexec()
 
 		case cmd, ok := <-stdinCmds:
 			if !ok {
@@ -159,6 +171,118 @@ func printFrontUsage(w io.Writer, url, traceDir string) {
   trace-dir: %s
   keys:      o<enter> open in browser   q<enter> quit
 `, url, traceInfo)
+}
+
+// watchBinary watches the current executable for changes and signals on the
+// returned channel. It watches the parent directory (not the file itself)
+// because `go build` replaces the file atomically (delete + rename), which
+// would remove fsnotify's inode watch.
+func watchBinary(ctx context.Context, log io.Writer) <-chan struct{} {
+	ch := make(chan struct{}, 1)
+
+	exe, err := os.Executable()
+	if err != nil {
+		fmt.Fprintf(log, "watch: cannot resolve executable: %v\n", err)
+		return ch
+	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		fmt.Fprintf(log, "watch: cannot resolve symlinks: %v\n", err)
+		return ch
+	}
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		fmt.Fprintf(log, "watch: cannot create watcher: %v\n", err)
+		return ch
+	}
+
+	dir := filepath.Dir(exe)
+	base := filepath.Base(exe)
+	if err := watcher.Add(dir); err != nil {
+		fmt.Fprintf(log, "watch: cannot watch %s: %v\n", dir, err)
+		_ = watcher.Close()
+		return ch
+	}
+
+	fmt.Fprintf(log, "  watching:  %s\n", exe)
+
+	go func() {
+		defer watcher.Close()
+		// Debounce: builds may fire multiple events in quick succession.
+		var debounce *time.Timer
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case ev, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if filepath.Base(ev.Name) != base {
+					continue
+				}
+				if ev.Op&(fsnotify.Create|fsnotify.Write) == 0 {
+					continue
+				}
+				if debounce != nil {
+					debounce.Stop()
+				}
+				debounce = time.AfterFunc(300*time.Millisecond, func() {
+					select {
+					case ch <- struct{}{}:
+					default:
+					}
+				})
+			case _, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+			}
+		}
+	}()
+
+	return ch
+}
+
+// reexec replaces the current process with a fresh instance of the same binary.
+func reexec() error {
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("reexec: %w", err)
+	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		return fmt.Errorf("reexec: %w", err)
+	}
+	return syscall.Exec(exe, os.Args, os.Environ())
+}
+
+// scanBots reads binDir and returns absolute paths of executable files
+// whose name contains "bot".
+func scanBots(binDir string) []string {
+	if binDir == "" {
+		return nil
+	}
+	entries, err := os.ReadDir(binDir)
+	if err != nil {
+		return nil
+	}
+	var bots []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if !strings.Contains(strings.ToLower(e.Name()), "bot") {
+			continue
+		}
+		abs, err := filepath.Abs(filepath.Join(binDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		bots = append(bots, abs)
+	}
+	return bots
 }
 
 func openBrowser(url string) error {
