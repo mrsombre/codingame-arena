@@ -68,6 +68,13 @@ func AddReplayFlags(fs *pflag.FlagSet) {
 	fs.StringP("out", "o", "", "Output path. Empty → ./replays/replay-<id>.json. Trailing '/' or existing directory → replay-<id>.json inside. Otherwise → a file at that path.")
 }
 
+// AddFrontFlags registers flags used by the "front" subcommand on fs.
+func AddFrontFlags(fs *pflag.FlagSet) {
+	fs.Int("port", 5757, "HTTP port")
+	fs.String("host", "localhost", "Bind host")
+	fs.String("trace-dir", "", "Directory with match trace JSON files (powers /api/matches)")
+}
+
 func ParseRunArgs(args []string, fs *pflag.FlagSet, v *viper.Viper) (ParsedArgs, error) {
 	knownArgs, gameOptions, err := SplitArgs(args, fs)
 	if err != nil {
@@ -263,6 +270,13 @@ arena replay <url|id> - Download raw replay JSON from codingame.com.
   -o, --out <PATH>     Output path. Default: ./replays/replay-<id>.json.
                        Trailing "/" or existing dir → replay-<id>.json inside.
                        Otherwise treated as a file path (created/overwritten).
+
+arena front - Serve the embedded web viewer.
+  --port <N>           HTTP port (default: 5757)
+  --host <HOST>        Bind host (default: localhost)
+  --trace-dir <PATH>   Directory with match trace JSON files (powers /api/matches)
+  API: GET /api/game, GET /api/matches, GET /api/matches/{id}, POST /api/run
+  Stdin keys: o<enter> open in default browser   q<enter> quit
 
 Common options:
   -h, --help           Show this help

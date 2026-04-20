@@ -3,3 +3,6 @@
 
 replays/
 replay*.json
+
+/viewer/node_modules/
+/viewer/dist/

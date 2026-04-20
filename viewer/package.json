@@ -1,0 +1,20 @@
+{
+  "name": "codingame-arena-viewer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun run scripts/build.ts",
+    "check": "biome check --write games scripts shared dev-server.ts",
+    "dev": "bun --hot dev-server.ts",
+    "format": "biome format --write games scripts shared dev-server.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.12",
+    "@types/bun": "^1.3.12",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "pixi.js": "^8.18.1"
+  }
+}

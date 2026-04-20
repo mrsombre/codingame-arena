@@ -9,9 +9,9 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	_ "github.com/mrsombre/codingame-arena/games"
 	"github.com/mrsombre/codingame-arena/internal/arena"
 	"github.com/mrsombre/codingame-arena/internal/arena/commands"
-	_ "github.com/mrsombre/codingame-arena/games"
 )
 
 type handlerFunc func(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error
@@ -48,6 +48,9 @@ func main() {
 	case "run":
 		arena.AddRunFlags(fs)
 		handler = commands.Run
+	case "front":
+		arena.AddFrontFlags(fs)
+		handler = commands.Front
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q; run `arena --help` for usage\n", command)
 		os.Exit(1)
