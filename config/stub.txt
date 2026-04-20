@@ -1,0 +1,16 @@
+read myId:int
+read width:int
+read height:int
+loop height read row:string(width)
+read snakebotsPerPlayer:int
+loop snakebotsPerPlayer read mySnakebotId:int
+loop snakebotsPerPlayer read oppSnakebotId:int
+
+gameloop
+
+read powerSourceCount:int
+loop powerSourceCount read x:int y:int
+read snakebotCount:int
+loop snakebotCount read snakebotId:int body:word(512)
+
+write WAIT

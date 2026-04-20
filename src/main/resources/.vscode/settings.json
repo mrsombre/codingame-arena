@@ -1,0 +1,17 @@
+{
+  "files.associations": {
+    "*.html.tpl": "html",
+    "array": "cpp",
+    "hash_map": "cpp",
+    "bitset": "cpp",
+    "string_view": "cpp",
+    "initializer_list": "cpp",
+    "ranges": "cpp",
+    "span": "cpp",
+    "regex": "cpp",
+    "utility": "cpp",
+    "valarray": "cpp",
+    "chrono": "cpp",
+    "thread": "cpp"
+  }
+}
