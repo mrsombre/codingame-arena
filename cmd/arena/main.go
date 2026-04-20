@@ -48,7 +48,7 @@ func main() {
 	case "run":
 		arena.AddRunFlags(fs)
 		handler = commands.Run
-	case "front":
+	case "serve":
 		arena.AddFrontFlags(fs)
 		handler = commands.Front
 	default:

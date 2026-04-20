@@ -1,9 +1,7 @@
 @import "../../shared/reset.css";
 
 .app {
-	max-width: 1024px;
-	margin: 0 auto;
-	padding: 1.25rem 1rem;
+	padding: 1.25rem 1.5rem;
 }
 
 .app-nav {
@@ -30,13 +28,24 @@
 	border-bottom-color: #fff;
 }
 
-.pane {
-	padding: 0.25rem 0;
+.pane-layout {
+	display: flex;
+	gap: 1.5rem;
+}
+
+.col-map {
+	flex: 7;
+	min-width: 0;
+}
+
+.col-controls {
+	flex: 3;
+	min-width: 200px;
 }
 
 .controls {
 	display: flex;
-	align-items: flex-end;
+	flex-direction: column;
 	gap: 0.5rem;
 }
 
@@ -53,7 +62,7 @@
 	letter-spacing: 0.05em;
 }
 
-.controls input,
+.controls input[type="text"],
 .controls select {
 	padding: 0.5rem 0.75rem;
 	border: 1px solid #d4d4d4;
@@ -63,11 +72,12 @@
 	background: #fff;
 }
 
-.controls input {
-	width: 16rem;
+.controls input[type="text"],
+.controls select {
+	width: 100%;
 }
 
-.controls input:focus,
+.controls input[type="text"]:focus,
 .controls select:focus {
 	outline: none;
 	border-color: #111;
@@ -75,12 +85,13 @@
 }
 
 .btn-action {
-	width: 2.25rem;
-	height: 2.25rem;
+	width: 100%;
+	padding: 0.5rem;
 	border-radius: 4px;
 	background: #111;
 	color: #fff;
 	font-weight: 600;
+	font-size: 0.875rem;
 	border: 1px solid #111;
 }
 
@@ -90,6 +101,11 @@
 
 .btn-action:active {
 	transform: translateY(1px);
+}
+
+.btn-action:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 
 .map-status {
@@ -107,4 +123,50 @@
 .map-container canvas {
 	display: block;
 	border-radius: 6px;
+}
+
+/* Turn navigation */
+.turn-nav {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-top: 0.75rem;
+}
+
+.turn-nav[hidden] {
+	display: none;
+}
+
+.btn-nav {
+	width: 2rem;
+	height: 2rem;
+	border-radius: 4px;
+	border: 1px solid #d4d4d4;
+	font-size: 1.2rem;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.btn-nav:hover {
+	background: #f5f5f5;
+}
+
+.btn-nav:active {
+	transform: translateY(1px);
+}
+
+#turn-slider {
+	flex: 1;
+	min-width: 120px;
+	max-width: 400px;
+	accent-color: #111;
+}
+
+.turn-label {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+	font-size: 0.8125rem;
+	color: #666;
+	white-space: nowrap;
 }

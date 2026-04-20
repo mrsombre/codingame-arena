@@ -29,6 +29,7 @@ build-winter2026-arena:
 
 build-winter2026-agents:
 	mkdir -p $(BIN_DIR)
+	rm -f $(BIN_DIR)/*bot*
 	g++ -std=c++17 -O2 -o $(WINTER2026_CPPBOT) $(WINTER2026_AGENTS)/bot.cpp
 	cp -f $(WINTER2026_AGENTS)/bot.py $(WINTER2026_PYBOT)
 

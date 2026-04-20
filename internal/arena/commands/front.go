@@ -166,7 +166,7 @@ func printFrontUsage(w io.Writer, url, traceDir string) {
 	if traceDir != "" {
 		traceInfo = traceDir
 	}
-	fmt.Fprintf(w, `arena front — viewer server
+	fmt.Fprintf(w, `arena serve — viewer server
   url:       %s
   trace-dir: %s
   keys:      o<enter> open in browser   q<enter> quit

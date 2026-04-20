@@ -22,6 +22,79 @@ export interface Bird {
 	body: Coord[];
 }
 
+/** Dynamic per-turn state (apples + birds). */
+export interface FrameData {
+	apples: Coord[];
+	birds: Bird[];
+}
+
+/** Trace JSON from GET /api/matches/{id}. */
+export interface TraceMatch {
+	match_id: number;
+	seed: number;
+	winner: number;
+	scores: [number, number];
+	turns: TraceTurn[];
+}
+
+export interface TraceTurn {
+	turn: number;
+	game_input: { p0: string[]; p1: string[] };
+	p0_output: string;
+	p1_output: string;
+}
+
+/**
+ * Parse frame lines (apple positions + bird bodies) from a string array.
+ * Used both by parseSerializeResponse and for per-turn trace game_input.
+ *
+ * Format:
+ *   <appleCount>
+ *   <x> <y>  (per apple)
+ *   <birdCount>
+ *   <id> <x0,y0>:<x1,y1>:...  (per bird, head first)
+ */
+export function parseFrameLines(lines: string[]): FrameData {
+	let i = 0;
+	const next = (): string => {
+		const line = lines[i];
+		if (i >= lines.length || line === undefined) {
+			throw new Error(`unexpected end of frame input at line ${i}`);
+		}
+		i++;
+		return line;
+	};
+
+	const appleCount = Number.parseInt(next(), 10);
+	const apples: Coord[] = [];
+	for (let a = 0; a < appleCount; a++) {
+		const parts = next().split(" ");
+		apples.push({
+			x: Number.parseInt(parts[0] ?? "0", 10),
+			y: Number.parseInt(parts[1] ?? "0", 10),
+		});
+	}
+
+	const birdCount = Number.parseInt(next(), 10);
+	const birds: Bird[] = [];
+	for (let b = 0; b < birdCount; b++) {
+		const line = next();
+		const spaceIdx = line.indexOf(" ");
+		const id = Number.parseInt(line.slice(0, spaceIdx), 10);
+		const segments = line.slice(spaceIdx + 1).split(":");
+		const body: Coord[] = segments.map((s) => {
+			const parts = s.split(",");
+			return {
+				x: Number.parseInt(parts[0] ?? "0", 10),
+				y: Number.parseInt(parts[1] ?? "0", 10),
+			};
+		});
+		birds.push({ id, body });
+	}
+
+	return { apples, birds };
+}
+
 /**
  * Parse the plain-text response from `/api/serialize` which concatenates
  * global info and first-frame info.
@@ -75,33 +148,8 @@ export function parseSerializeResponse(text: string): MapData {
 		oppBirdIds.push(Number.parseInt(next(), 10));
 	}
 
-	// Frame data
-	const appleCount = Number.parseInt(next(), 10);
-	const apples: Coord[] = [];
-	for (let a = 0; a < appleCount; a++) {
-		const parts = next().split(" ");
-		apples.push({
-			x: Number.parseInt(parts[0] ?? "0", 10),
-			y: Number.parseInt(parts[1] ?? "0", 10),
-		});
-	}
+	// Delegate frame parsing to parseFrameLines
+	const frame = parseFrameLines(lines.slice(i));
 
-	const birdCount = Number.parseInt(next(), 10);
-	const birds: Bird[] = [];
-	for (let b = 0; b < birdCount; b++) {
-		const line = next();
-		const spaceIdx = line.indexOf(" ");
-		const id = Number.parseInt(line.slice(0, spaceIdx), 10);
-		const segments = line.slice(spaceIdx + 1).split(":");
-		const body: Coord[] = segments.map((s) => {
-			const parts = s.split(",");
-			return {
-				x: Number.parseInt(parts[0] ?? "0", 10),
-				y: Number.parseInt(parts[1] ?? "0", 10),
-			};
-		});
-		birds.push({ id, body });
-	}
-
-	return { myId, width, height, walls, birdsPerPlayer, myBirdIds, oppBirdIds, apples, birds };
+	return { myId, width, height, walls, birdsPerPlayer, myBirdIds, oppBirdIds, ...frame };
 }

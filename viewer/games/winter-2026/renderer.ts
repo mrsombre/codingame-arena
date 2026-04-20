@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, Text, type TextStyleOptions } from "pixi.js";
-import type { MapData } from "./parser.ts";
+import type { FrameData, MapData } from "./parser.ts";
 
 const CELL = 24;
 const GAP = 1;
@@ -24,16 +24,23 @@ const LABEL_STYLE: TextStyleOptions = {
 	align: "center",
 };
 
+// Module-level state
 let app: Application | null = null;
+let appleLayer: Container | null = null;
+let birdLayer: Container | null = null;
 
-export async function renderGame(container: HTMLElement, data: MapData): Promise<void> {
-	const { width, height, walls, apples, birds, myBirdIds } = data;
+/**
+ * Initialize the PixiJS application, draw static geometry (grid + walls),
+ * and create empty dynamic layers (apples, birds). Must be called once
+ * before updateFrame.
+ */
+export async function initRenderer(container: HTMLElement, data: MapData): Promise<void> {
+	const { width, height, walls } = data;
 
 	const step = CELL + GAP;
 	const cw = step * width + GAP;
 	const ch = step * height + GAP;
 
-	// Reuse or create application
 	if (app) {
 		app.destroy(true, { children: true });
 	}
@@ -49,7 +56,7 @@ export async function renderGame(container: HTMLElement, data: MapData): Promise
 	container.innerHTML = "";
 	container.appendChild(app.canvas);
 
-	// Grid layer
+	// Grid lines (static)
 	const gridLayer = new Container();
 	app.stage.addChild(gridLayer);
 
@@ -63,7 +70,7 @@ export async function renderGame(container: HTMLElement, data: MapData): Promise
 	}
 	gridLayer.addChild(gridLines);
 
-	// Cells layer
+	// Cells / walls (static)
 	const cellLayer = new Container();
 	app.stage.addChild(cellLayer);
 
@@ -73,9 +80,7 @@ export async function renderGame(container: HTMLElement, data: MapData): Promise
 			const isWall = walls[y * width + x];
 			const px = x * step + GAP;
 			const py = y * step + GAP;
-
 			if (isWall) {
-				// Wall with top highlight for depth
 				cellGfx.rect(px, py, CELL, CELL).fill({ color: COLOR_WALL });
 				cellGfx.rect(px, py, CELL, 3).fill({ color: COLOR_WALL_TOP, alpha: 0.5 });
 			} else {
@@ -85,95 +90,14 @@ export async function renderGame(container: HTMLElement, data: MapData): Promise
 	}
 	cellLayer.addChild(cellGfx);
 
-	// Apples layer
-	const appleLayer = new Container();
+	// Dynamic layers (populated by updateFrame)
+	appleLayer = new Container();
 	app.stage.addChild(appleLayer);
 
-	for (const a of apples) {
-		const cx = a.x * step + GAP + CELL / 2;
-		const cy = a.y * step + GAP + CELL / 2;
-
-		const glow = new Graphics();
-		glow.circle(cx, cy, CELL * 0.45).fill({ color: COLOR_APPLE_GLOW, alpha: 0.15 });
-		appleLayer.addChild(glow);
-
-		const dot = new Graphics();
-		dot.circle(cx, cy, CELL * 0.3).fill({ color: COLOR_APPLE });
-		// Small shine highlight
-		dot.circle(cx - 2, cy - 2, CELL * 0.12).fill({ color: 0xffffff, alpha: 0.4 });
-		appleLayer.addChild(dot);
-	}
-
-	// Birds layer
-	const birdLayer = new Container();
+	birdLayer = new Container();
 	app.stage.addChild(birdLayer);
 
-	const myIdSet = new Set(myBirdIds);
-
-	for (const bird of birds) {
-		const playerIdx = myIdSet.has(bird.id) ? 0 : 1;
-		const colors = PLAYER_COLORS[playerIdx] ?? PLAYER_COLORS[0];
-		if (!colors) continue;
-
-		const birdContainer = new Container();
-		birdLayer.addChild(birdContainer);
-
-		// Draw body segments (tail to head so head is on top)
-		for (let s = bird.body.length - 1; s >= 0; s--) {
-			const seg = bird.body[s];
-			if (!seg) continue;
-			const isHead = s === 0;
-
-			const px = seg.x * step + GAP;
-			const py = seg.y * step + GAP;
-			const pad = isHead ? 1 : 3;
-
-			const segGfx = new Graphics();
-
-			// Outline
-			segGfx
-				.roundRect(
-					px + pad - 1,
-					py + pad - 1,
-					CELL - pad * 2 + 2,
-					CELL - pad * 2 + 2,
-					isHead ? 4 : 2,
-				)
-				.fill({ color: colors.outline });
-
-			// Fill
-			segGfx
-				.roundRect(px + pad, py + pad, CELL - pad * 2, CELL - pad * 2, isHead ? 3 : 2)
-				.fill({ color: isHead ? colors.head : colors.body });
-
-			if (isHead) {
-				// Eyes
-				const ecx = seg.x * step + GAP + CELL / 2;
-				const ecy = seg.y * step + GAP + CELL / 2 + 1;
-				segGfx.circle(ecx - 4, ecy, 2.5).fill({ color: 0xffffff });
-				segGfx.circle(ecx + 4, ecy, 2.5).fill({ color: 0xffffff });
-				segGfx.circle(ecx - 4, ecy, 1.2).fill({ color: COLOR_BG });
-				segGfx.circle(ecx + 4, ecy, 1.2).fill({ color: COLOR_BG });
-			}
-
-			birdContainer.addChild(segGfx);
-		}
-
-		// Bird ID label above head
-		const head = bird.body[0];
-		if (head) {
-			const label = new Text({
-				text: String(bird.id),
-				style: { ...LABEL_STYLE, fontSize: CELL * 0.38 },
-			});
-			label.anchor.set(0.5, 1);
-			label.x = head.x * step + GAP + CELL / 2;
-			label.y = head.y * step + GAP - 1;
-			birdContainer.addChild(label);
-		}
-	}
-
-	// Hover coordinate label
+	// Hover overlay (always on top)
 	const coordLabel = new Text({
 		text: "",
 		style: {
@@ -214,19 +138,15 @@ export async function renderGame(container: HTMLElement, data: MapData): Promise
 		prevCellX = cellX;
 		prevCellY = cellY;
 
-		// Cell highlight
 		const px = cellX * step + GAP;
 		const py = cellY * step + GAP;
 		highlight.clear();
 		highlight.rect(px, py, CELL, CELL).fill({ color: 0xffffff, alpha: 0.08 });
 		highlight.visible = true;
 
-		// Coord label to the right of the cell
 		coordLabel.text = `${cellX},${cellY}`;
 		coordLabel.x = px + CELL + 4;
 		coordLabel.y = py + (CELL - coordLabel.height) / 2;
-
-		// If label overflows right edge, show to the left instead
 		if (coordLabel.x + coordLabel.width > cw) {
 			coordLabel.x = px - coordLabel.width - 4;
 		}
@@ -241,9 +161,107 @@ export async function renderGame(container: HTMLElement, data: MapData): Promise
 	});
 }
 
+/**
+ * Redraw dynamic content (apples + birds) for a specific turn.
+ * Requires initRenderer to have been called first.
+ */
+export function updateFrame(frame: FrameData, myBirdIds: number[]): void {
+	if (!appleLayer || !birdLayer) return;
+
+	const step = CELL + GAP;
+
+	// Clear dynamic layers
+	appleLayer.removeChildren();
+	birdLayer.removeChildren();
+
+	// Apples
+	for (const a of frame.apples) {
+		const cx = a.x * step + GAP + CELL / 2;
+		const cy = a.y * step + GAP + CELL / 2;
+
+		const glow = new Graphics();
+		glow.circle(cx, cy, CELL * 0.45).fill({ color: COLOR_APPLE_GLOW, alpha: 0.15 });
+		appleLayer.addChild(glow);
+
+		const dot = new Graphics();
+		dot.circle(cx, cy, CELL * 0.3).fill({ color: COLOR_APPLE });
+		dot.circle(cx - 2, cy - 2, CELL * 0.12).fill({ color: 0xffffff, alpha: 0.4 });
+		appleLayer.addChild(dot);
+	}
+
+	// Birds
+	const myIdSet = new Set(myBirdIds);
+
+	for (const bird of frame.birds) {
+		const playerIdx = myIdSet.has(bird.id) ? 0 : 1;
+		const colors = PLAYER_COLORS[playerIdx] ?? PLAYER_COLORS[0];
+		if (!colors) continue;
+
+		const birdContainer = new Container();
+		birdLayer.addChild(birdContainer);
+
+		for (let s = bird.body.length - 1; s >= 0; s--) {
+			const seg = bird.body[s];
+			if (!seg) continue;
+			const isHead = s === 0;
+
+			const px = seg.x * step + GAP;
+			const py = seg.y * step + GAP;
+			const pad = isHead ? 1 : 3;
+
+			const segGfx = new Graphics();
+
+			segGfx
+				.roundRect(
+					px + pad - 1,
+					py + pad - 1,
+					CELL - pad * 2 + 2,
+					CELL - pad * 2 + 2,
+					isHead ? 4 : 2,
+				)
+				.fill({ color: colors.outline });
+
+			segGfx
+				.roundRect(px + pad, py + pad, CELL - pad * 2, CELL - pad * 2, isHead ? 3 : 2)
+				.fill({ color: isHead ? colors.head : colors.body });
+
+			if (isHead) {
+				const ecx = seg.x * step + GAP + CELL / 2;
+				const ecy = seg.y * step + GAP + CELL / 2 + 1;
+				segGfx.circle(ecx - 4, ecy, 2.5).fill({ color: 0xffffff });
+				segGfx.circle(ecx + 4, ecy, 2.5).fill({ color: 0xffffff });
+				segGfx.circle(ecx - 4, ecy, 1.2).fill({ color: COLOR_BG });
+				segGfx.circle(ecx + 4, ecy, 1.2).fill({ color: COLOR_BG });
+			}
+
+			birdContainer.addChild(segGfx);
+		}
+
+		const head = bird.body[0];
+		if (head) {
+			const label = new Text({
+				text: String(bird.id),
+				style: { ...LABEL_STYLE, fontSize: CELL * 0.38 },
+			});
+			label.anchor.set(0.5, 1);
+			label.x = head.x * step + GAP + CELL / 2;
+			label.y = head.y * step + GAP - 1;
+			birdContainer.addChild(label);
+		}
+	}
+}
+
+/** Convenience wrapper: init + render first frame. */
+export async function renderGame(container: HTMLElement, data: MapData): Promise<void> {
+	await initRenderer(container, data);
+	updateFrame({ apples: data.apples, birds: data.birds }, data.myBirdIds);
+}
+
 export function destroyRenderer(): void {
 	if (app) {
 		app.destroy(true, { children: true });
 		app = null;
 	}
+	appleLayer = null;
+	birdLayer = null;
 }

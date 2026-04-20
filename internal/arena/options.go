@@ -72,7 +72,7 @@ func AddReplayFlags(fs *pflag.FlagSet) {
 func AddFrontFlags(fs *pflag.FlagSet) {
 	fs.Int("port", 5757, "HTTP port")
 	fs.String("host", "localhost", "Bind host")
-	fs.String("trace-dir", "", "Directory with match trace JSON files (powers /api/matches)")
+	fs.String("trace-dir", "./matches", "Directory with match trace JSON files (powers /api/matches)")
 	fs.String("bin-dir", "./bin", "Directory to scan for bot binaries (powers /api/bots)")
 }
 
@@ -272,7 +272,7 @@ arena replay <url|id> - Download raw replay JSON from codingame.com.
                        Trailing "/" or existing dir → replay-<id>.json inside.
                        Otherwise treated as a file path (created/overwritten).
 
-arena front - Serve the embedded web viewer.
+arena serve - Serve the embedded web viewer.
   --port <N>           HTTP port (default: 5757)
   --host <HOST>        Bind host (default: localhost)
   --trace-dir <PATH>   Directory with match trace JSON files (powers /api/matches)
