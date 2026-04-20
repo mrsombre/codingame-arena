@@ -1,0 +1,5 @@
+/bin/
+/tmp/
+
+replays/
+replay*.json
