@@ -1,0 +1,8 @@
+/bin/
+/tmp/
+
+replays/
+replay*.json
+matches/
+
+**/skills
