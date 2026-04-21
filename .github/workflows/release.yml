@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: viewer/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: viewer
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: viewer
+        run: pnpm run build
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build arena binaries
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p bin
+          GOOS=darwin  GOARCH=arm64 go build -ldflags="-w -s" -o bin/arena-darwin-arm64      ./cmd/arena
+          GOOS=linux   GOARCH=amd64 go build -ldflags="-w -s" -o bin/arena-linux-amd64       ./cmd/arena
+          GOOS=windows GOARCH=amd64 go build -ldflags="-w -s" -o bin/arena-windows-amd64.exe ./cmd/arena
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            bin/arena-darwin-arm64 \
+            bin/arena-linux-amd64 \
+            bin/arena-windows-amd64.exe \
+            --clobber
