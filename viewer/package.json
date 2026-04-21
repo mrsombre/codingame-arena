@@ -11,6 +11,7 @@
     "build": "pnpm exec vite build",
     "dev": "pnpm exec vite",
     "format": "pnpm exec biome format --write .",
+    "lint": "pnpm exec biome check --fix .",
     "type-check": "pnpm exec tsc --noEmit"
   },
   "dependencies": {

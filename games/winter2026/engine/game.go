@@ -8,6 +8,7 @@ import (
 
 	"github.com/mrsombre/codingame-arena/games/winter2026/engine/grid"
 
+	"github.com/mrsombre/codingame-arena/internal/arena"
 	"github.com/mrsombre/codingame-arena/internal/util/sha1prng"
 )
 
@@ -19,6 +20,7 @@ type Game struct {
 	losses        [2]int
 	ended         bool
 	summary       []string
+	events        []arena.TurnEvent
 }
 
 func NewGame(seed int64, leagueLevel int) *Game {
@@ -131,15 +133,26 @@ func (g *Game) doBeheadings() {
 			}
 		}
 
-		isInBird := false
+		isInEnemy, isInSelf := false, false
 		for _, b := range intersectingBirds {
-			if b.ID != bird.ID || coordSliceContainsWinter(b.Body[1:], b.HeadPos()) {
-				isInBird = true
-				break
+			if b.ID != bird.ID {
+				isInEnemy = true
+			} else if coordSliceContainsWinter(b.Body[1:], b.HeadPos()) {
+				isInSelf = true
 			}
 		}
 
-		if isInWall || isInBird {
+		if isInWall {
+			g.emit(EventHitWall, eventBirdCoordPayload(bird.ID, bird.HeadPos()))
+		}
+		if isInEnemy {
+			g.emit(EventHitEnemy, eventBirdCoordPayload(bird.ID, bird.HeadPos()))
+		}
+		if isInSelf {
+			g.emit(EventHitSelf, eventBirdCoordPayload(bird.ID, bird.HeadPos()))
+		}
+
+		if isInWall || isInEnemy || isInSelf {
 			birdsToBehead = append(birdsToBehead, bird)
 		}
 	}
@@ -148,6 +161,7 @@ func (g *Game) doBeheadings() {
 		if len(b.Body) <= 3 {
 			b.Alive = false
 			g.losses[b.Owner.GetIndex()] += len(b.Body)
+			g.emit(EventDead, eventBirdPayload(b.ID))
 		} else {
 			b.Body = b.Body[1:]
 			g.losses[b.Owner.GetIndex()]++
@@ -160,6 +174,7 @@ func (g *Game) doEats() {
 	for _, p := range g.players {
 		for _, bird := range p.birds {
 			if bird.Alive && coordSliceContainsWinter(g.grid.Apples, bird.HeadPos()) {
+				g.emit(EventEat, eventBirdCoordPayload(bird.ID, bird.HeadPos()))
 				eaten[bird.HeadPos()] = struct{}{}
 			}
 		}
@@ -260,6 +275,7 @@ func (g *Game) doFalls() {
 			if allOut {
 				bird.Alive = false
 				outOfBounds = append(outOfBounds, bird)
+				g.emit(EventFall, eventBirdPayload(bird.ID))
 			}
 		}
 		for _, bird := range outOfBounds {
@@ -387,6 +403,7 @@ func (g *Game) birdByID(birdID int) *Bird {
 
 func (g *Game) PerformGameUpdate(turn int) {
 	g.turn = turn
+	g.events = g.events[:0]
 	g.doMoves()
 	g.doEats()
 	g.doBeheadings()

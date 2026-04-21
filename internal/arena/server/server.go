@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -46,6 +47,7 @@ func New(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/matches", handleMatchList(opts.TraceDir))
 	mux.HandleFunc("GET /api/matches/{id}", handleMatchGet(opts.TraceDir))
 	mux.HandleFunc("POST /api/run", handleRun(opts.Factory, opts.TraceDir))
+	mux.HandleFunc("POST /api/batch", handleBatch(opts.Factory, opts.TraceDir))
 
 	mux.Handle("/", http.FileServer(http.FS(opts.Assets)))
 	return mux
@@ -216,7 +218,7 @@ func handleMatchGet(traceDir string) http.HandlerFunc {
 type runRequest struct {
 	P0Bin       string            `json:"p0Bin"`
 	P1Bin       string            `json:"p1Bin"`
-	Seed        *int64            `json:"seed,omitempty"`
+	Seed        *int64            `json:"seed,string,omitempty"`
 	MaxTurns    int               `json:"maxTurns,omitempty"`
 	NoSwap      bool              `json:"noSwap,omitempty"`
 	GameOptions map[string]string `json:"gameOptions,omitempty"`
@@ -251,6 +253,191 @@ func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(result.RenderMatch()))
 	}
+}
+
+type batchRequest struct {
+	P0Bin       string            `json:"p0Bin"`
+	P1Bin       string            `json:"p1Bin"`
+	Seed        *int64            `json:"seed,string,omitempty"`
+	Simulations int               `json:"simulations,omitempty"`
+	MaxTurns    int               `json:"maxTurns,omitempty"`
+	NoSwap      bool              `json:"noSwap,omitempty"`
+	GameOptions map[string]string `json:"gameOptions,omitempty"`
+}
+
+// batchMatchSummary describes one match from the batch. Fields with a "p0"/"p1"
+// suffix are relative to the in-match side (left side of the map is p0); under
+// random swap that may be the user's P1 bot. Aggregate counters at the top of
+// batchResponse stay on the user-selected bot perspective.
+type batchMatchSummary struct {
+	ID      int    `json:"id"`
+	Seed    int64  `json:"seed,string"`
+	Winner  int    `json:"winner"`
+	ScoreP0 int    `json:"score_p0"`
+	ScoreP1 int    `json:"score_p1"`
+	Turns   int    `json:"turns"`
+	P0Bot   string `json:"p0_bot"`
+	P1Bot   string `json:"p1_bot"`
+}
+
+type batchResponse struct {
+	Simulations int                 `json:"simulations"`
+	WinsP0      int                 `json:"wins_p0"`
+	WinsP1      int                 `json:"wins_p1"`
+	Draws       int                 `json:"draws"`
+	AvgScoreP0  float64             `json:"avg_score_p0"`
+	AvgScoreP1  float64             `json:"avg_score_p1"`
+	AvgTurns    float64             `json:"avg_turns"`
+	Seed        int64               `json:"seed,string"`
+	P0Bot       string              `json:"p0_bot"`
+	P1Bot       string              `json:"p1_bot"`
+	Matches     []batchMatchSummary `json:"matches"`
+}
+
+func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		var req batchRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid json: "+err.Error())
+			return
+		}
+		if req.P0Bin == "" || req.P1Bin == "" {
+			writeError(w, http.StatusBadRequest, "p0Bin and p1Bin are required")
+			return
+		}
+		sims := req.Simulations
+		if sims <= 0 {
+			sims = 50
+		}
+		if sims > 500 {
+			writeError(w, http.StatusBadRequest, "simulations cannot exceed 500")
+			return
+		}
+		seed := time.Now().UnixNano()
+		if req.Seed != nil {
+			seed = *req.Seed
+		}
+		if traceDir == "" {
+			writeError(w, http.StatusBadRequest, "no trace-dir configured; start arena front with --trace-dir <path>")
+			return
+		}
+		if err := cleanupTraceDir(traceDir); err != nil {
+			writeError(w, http.StatusInternalServerError, "cleanup trace dir: "+err.Error())
+			return
+		}
+		runner := arena.NewRunner(factory, arena.MatchOptions{
+			MaxTurns:    req.MaxTurns,
+			P0Bin:       req.P0Bin,
+			P1Bin:       req.P1Bin,
+			NoSwap:      req.NoSwap,
+			TraceWriter: arena.NewTraceWriter(traceDir),
+			GameOptions: req.GameOptions,
+		})
+		parallel := runtime.NumCPU()
+		if parallel > 4 {
+			parallel = 4
+		}
+		results := arena.RunMatches(arena.BatchOptions{
+			Simulations: sims,
+			Parallel:    parallel,
+			Seed:        seed,
+		}, runner.RunMatch)
+
+		userP0 := filepath.Base(req.P0Bin)
+		userP1 := filepath.Base(req.P1Bin)
+		resp := batchResponse{
+			Simulations: len(results),
+			Seed:        seed,
+			P0Bot:       userP0,
+			P1Bot:       userP1,
+			Matches:     make([]batchMatchSummary, 0, len(results)),
+		}
+		var totalScoreP0, totalScoreP1, totalTurns float64
+		for _, res := range results {
+			// Prefer raw scores (sum of alive bird segments) over the
+			// referee's tie-break-adjusted Scores so displayed values can't
+			// go negative and match what the viewer computes from bird bodies.
+			userScores := res.Scores
+			userWinner := res.Winner
+			if res.HaveRawScores {
+				userScores = res.RawScores
+				switch {
+				case userScores[0] > userScores[1]:
+					userWinner = 0
+				case userScores[1] > userScores[0]:
+					userWinner = 1
+				default:
+					userWinner = -1
+				}
+			}
+
+			// Aggregate counters follow user-selected bots.
+			switch userWinner {
+			case 0:
+				resp.WinsP0++
+			case 1:
+				resp.WinsP1++
+			default:
+				resp.Draws++
+			}
+			totalScoreP0 += float64(userScores[0])
+			totalScoreP1 += float64(userScores[1])
+			totalTurns += float64(res.Turns)
+
+			// Per-match row reports from the in-match side perspective so the
+			// replay map (blue = p0, red = p1) lines up with the numbers.
+			matchScoreP0, matchScoreP1 := userScores[0], userScores[1]
+			matchWinner := userWinner
+			matchP0Bot, matchP1Bot := userP0, userP1
+			if res.Swapped {
+				matchScoreP0, matchScoreP1 = matchScoreP1, matchScoreP0
+				if matchWinner != -1 {
+					matchWinner = 1 - matchWinner
+				}
+				matchP0Bot, matchP1Bot = userP1, userP0
+			}
+			resp.Matches = append(resp.Matches, batchMatchSummary{
+				ID:      res.ID,
+				Seed:    res.Seed,
+				Winner:  matchWinner,
+				ScoreP0: matchScoreP0,
+				ScoreP1: matchScoreP1,
+				Turns:   res.Turns,
+				P0Bot:   matchP0Bot,
+				P1Bot:   matchP1Bot,
+			})
+		}
+		if n := float64(len(results)); n > 0 {
+			resp.AvgScoreP0 = round2(totalScoreP0 / n)
+			resp.AvgScoreP1 = round2(totalScoreP1 / n)
+			resp.AvgTurns = round2(totalTurns / n)
+		}
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+func cleanupTraceDir(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, entry.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func round2(v float64) float64 {
+	return float64(int64(v*100+0.5)) / 100
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

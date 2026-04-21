@@ -106,10 +106,26 @@ func FindWorstLosses(results []MatchResult, limit int) []int {
 }
 
 // RenderMatch serializes a MatchResult to JSON for verbose output.
+// Scores and Winner prefer raw alive-segment sums when the engine provides
+// them, so the viewer's single-match status never shows the negative values
+// that referees like winter-2026 emit after tie-break adjustments.
 func (r MatchResult) RenderMatch() string {
+	scores := r.Scores
+	winner := r.Winner
+	if r.HaveRawScores {
+		scores = r.RawScores
+		switch {
+		case scores[0] > scores[1]:
+			winner = 0
+		case scores[1] > scores[0]:
+			winner = 1
+		default:
+			winner = -1
+		}
+	}
 	payload := struct {
 		ID           int        `json:"id"`
-		Seed         int64      `json:"seed"`
+		Seed         int64      `json:"seed,string"`
 		Turns        int        `json:"turns"`
 		Winner       int        `json:"winner"`
 		LossReasonP0 LossReason `json:"loss_reason_p0"`
@@ -122,11 +138,11 @@ func (r MatchResult) RenderMatch() string {
 		ID:           r.ID,
 		Seed:         r.Seed,
 		Turns:        r.Turns,
-		Winner:       r.Winner,
+		Winner:       winner,
 		LossReasonP0: r.LossReasons[0],
 		LossReasonP1: r.LossReasons[1],
-		ScoreP0:      r.Scores[0],
-		ScoreP1:      r.Scores[1],
+		ScoreP0:      scores[0],
+		ScoreP1:      scores[1],
 		Metrics:      r.Metrics,
 		Swapped:      r.Swapped,
 	}

@@ -9,11 +9,18 @@ import (
 )
 
 // TraceMatch is the per-match trace file structure.
+//
+// Everything is reported from the in-match side perspective (index 0 = left
+// side of the map, index 1 = right). Bots[i] is the bot basename that played
+// on side i; Scores[i] is that side's final score; Winner is 0, 1, or -1 for
+// draw. Random side-swap is intentionally not recorded — the bot→side mapping
+// here is ground truth for downstream trace consumers (e.g. training).
 type TraceMatch struct {
 	MatchID int         `json:"match_id"`
-	Seed    int64       `json:"seed"`
+	Seed    int64       `json:"seed,string"`
 	Winner  int         `json:"winner"`
 	Scores  [2]int      `json:"scores"`
+	Bots    [2]string   `json:"bots"`
 	Turns   []TraceTurn `json:"turns"`
 }
 

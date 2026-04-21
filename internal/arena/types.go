@@ -25,11 +25,20 @@ const (
 )
 
 // MatchResult holds the outcome of a single match simulation.
+//
+// Scores are the referee's reported final values (may include tie-break
+// adjustments and therefore be negative). RawScores is populated when the
+// Referee implements RawScoresProvider and reflects the intrinsic game state
+// (e.g. sum of alive bird segments). Both arrays follow the user-selected bot
+// perspective — Scores[0]/RawScores[0] belong to the bot the user chose as P0
+// even when sides were randomly swapped during the match.
 type MatchResult struct {
 	ID                int
 	Seed              int64
 	Turns             int
 	Scores            [2]int
+	RawScores         [2]int
+	HaveRawScores     bool
 	Winner            int // 0, 1, or -1 for draw
 	LossReasons       [2]LossReason
 	BadCommands       []BadCommandInfo

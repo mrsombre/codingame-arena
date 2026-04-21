@@ -78,6 +78,35 @@ func (r *Referee) ActivePlayers(players []arena.Player) int {
 	return active
 }
 
+func (r *Referee) TurnEvents(_ int, _ []arena.Player) []arena.TurnEvent {
+	if len(r.game.events) == 0 {
+		return nil
+	}
+	out := make([]arena.TurnEvent, len(r.game.events))
+	copy(out, r.game.events)
+	return out
+}
+
+// RawScores returns each player's score as the sum of alive bird segments.
+// This is the intrinsic game metric before OnEnd applies its tie-breaking
+// adjustment (subtracting losses when raw scores tie) that can produce
+// negative values in Player.GetScore.
+func (r *Referee) RawScores() [2]int {
+	var scores [2]int
+	for _, p := range r.game.players {
+		idx := p.GetIndex()
+		if idx < 0 || idx >= len(scores) {
+			continue
+		}
+		for _, b := range p.birds {
+			if b.Alive {
+				scores[idx] += len(b.Body)
+			}
+		}
+	}
+	return scores
+}
+
 func (r *Referee) Metrics() []arena.Metric {
 	return []arena.Metric{
 		{Label: "apples_remaining", Value: float64(len(r.game.grid.Apples))},

@@ -33,6 +33,9 @@ let app: Application | null = null
 let appleLayer: Container | null = null
 let birdLayer: Container | null = null
 let labelLayer: Container | null = null
+// Token increments on each init/destroy so concurrent async inits (e.g. under
+// React StrictMode's double-invoke) can detect they're stale and self-destroy.
+let appToken = 0
 
 /**
  * Initialize the PixiJS application, draw static geometry (grid + walls),
@@ -40,6 +43,8 @@ let labelLayer: Container | null = null
  * before updateFrame.
  */
 export async function initRenderer(container: HTMLElement, data: MapData): Promise<void> {
+  const myToken = ++appToken
+
   const { width, height, walls } = data
 
   // Fit canvas to container width
@@ -52,10 +57,16 @@ export async function initRenderer(container: HTMLElement, data: MapData): Promi
   const ch = step * height + GAP
 
   if (app) {
-    app.destroy(true, { children: true })
+    const oldApp = app
+    app = null
+    appleLayer = null
+    birdLayer = null
+    labelLayer = null
+    oldApp.destroy(true, { children: true })
   }
-  app = new Application()
-  await app.init({
+
+  const next = new Application()
+  await next.init({
     width: cw,
     height: ch,
     background: COLOR_BG,
@@ -63,6 +74,14 @@ export async function initRenderer(container: HTMLElement, data: MapData): Promi
     resolution: window.devicePixelRatio || 1,
     autoDensity: true,
   })
+
+  // If a concurrent init or destroy ran while we were awaiting, drop this one.
+  if (appToken !== myToken) {
+    next.destroy(true, { children: true })
+    return
+  }
+
+  app = next
   container.innerHTML = ""
   app.canvas.style.maxWidth = "100%"
   app.canvas.style.height = "auto"
@@ -176,33 +195,42 @@ export async function initRenderer(container: HTMLElement, data: MapData): Promi
   })
 }
 
+export interface UpdateFrameOptions {
+  /** Skip rebuilding the apple layer. Use during interpolation when the
+   *  apple set is frozen and rebuilding ~100 Graphics per frame is the
+   *  main cost. */
+  skipApples?: boolean
+}
+
 /**
  * Redraw dynamic content (apples + birds) for a specific turn.
  * Requires initRenderer to have been called first.
  */
-export function updateFrame(frame: FrameData, myBirdIds: number[]): void {
+export function updateFrame(frame: FrameData, myBirdIds: number[], options?: UpdateFrameOptions): void {
   if (!appleLayer || !birdLayer || !labelLayer) return
 
   const step = CELL + GAP
 
   // Clear dynamic layers
-  appleLayer.removeChildren()
   birdLayer.removeChildren()
   labelLayer.removeChildren()
 
-  // Apples
-  for (const a of frame.apples) {
-    const cx = a.x * step + GAP + CELL / 2
-    const cy = a.y * step + GAP + CELL / 2
+  if (!options?.skipApples) {
+    appleLayer.removeChildren()
+    // Apples
+    for (const a of frame.apples) {
+      const cx = a.x * step + GAP + CELL / 2
+      const cy = a.y * step + GAP + CELL / 2
 
-    const glow = new Graphics()
-    glow.circle(cx, cy, CELL * 0.45).fill({ color: COLOR_APPLE_GLOW, alpha: 0.15 })
-    appleLayer.addChild(glow)
+      const glow = new Graphics()
+      glow.circle(cx, cy, CELL * 0.45).fill({ color: COLOR_APPLE_GLOW, alpha: 0.15 })
+      appleLayer.addChild(glow)
 
-    const dot = new Graphics()
-    dot.circle(cx, cy, CELL * 0.3).fill({ color: COLOR_APPLE })
-    dot.circle(cx - CELL * 0.08, cy - CELL * 0.08, CELL * 0.12).fill({ color: 0xffffff, alpha: 0.4 })
-    appleLayer.addChild(dot)
+      const dot = new Graphics()
+      dot.circle(cx, cy, CELL * 0.3).fill({ color: COLOR_APPLE })
+      dot.circle(cx - CELL * 0.08, cy - CELL * 0.08, CELL * 0.12).fill({ color: 0xffffff, alpha: 0.4 })
+      appleLayer.addChild(dot)
+    }
   }
 
   // Birds
@@ -279,9 +307,12 @@ export async function renderGame(container: HTMLElement, data: MapData): Promise
 }
 
 export function destroyRenderer(): void {
+  // Invalidate any still-pending init so it self-destroys when it resolves.
+  appToken++
   if (app) {
-    app.destroy(true, { children: true })
+    const oldApp = app
     app = null
+    oldApp.destroy(true, { children: true })
   }
   appleLayer = null
   birdLayer = null

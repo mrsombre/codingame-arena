@@ -3,6 +3,7 @@ package arena
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -108,16 +109,14 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			}
 		}
 
-		// Trace snapshot (pre-parse).
+		// Trace snapshot (pre-parse). Events are attached after PerformGameUpdate,
+		// since they describe outcomes of this turn's moves.
 		if tracing {
 			tt := TraceTurn{
 				Turn:      turn,
 				GameInput: turnInput,
 				P0Output:  playerOutputs[0],
 				P1Output:  playerOutputs[1],
-			}
-			if tep, ok := referee.(TurnEventProvider); ok {
-				tt.Events = tep.TurnEvents(turn, players)
 			}
 			if tp, ok := referee.(TraceProvider); ok {
 				tt.GameState = tp.SnapshotTurn(turn, players)
@@ -146,15 +145,36 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		}
 
 		referee.PerformGameUpdate(turn)
+
+		if tracing {
+			if tep, ok := referee.(TurnEventProvider); ok {
+				traceTurns[len(traceTurns)-1].Events = tep.TurnEvents(turn, players)
+			}
+		}
 	}
 
 	if !referee.Ended() {
 		referee.EndGame()
 	}
+
+	// Capture raw in-match scores before OnEnd so the trace records the
+	// intrinsic sum (e.g. alive bird segments) rather than the tie-break-
+	// adjusted values Player.GetScore returns afterward.
+	var rawScores [2]int
+	var haveRawScores bool
+	if rsp, ok := referee.(RawScoresProvider); ok {
+		rawScores = rsp.RawScores()
+		haveRawScores = true
+	}
+
 	referee.OnEnd()
 
 	result := buildMatchResult(simulationID, seed, turn, players, controllers)
 	result.BadCommands = badCommands
+	if haveRawScores {
+		result.RawScores = rawScores
+		result.HaveRawScores = true
+	}
 
 	// Collect game-specific metrics.
 	if mp, ok := referee.(MetricsProvider); ok {
@@ -167,11 +187,39 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	}
 
 	if tracing {
+		// Trace uses in-match side perspective (p0 = left of the map).
+		// result fields are user-perspective after the potential swap-back;
+		// un-swap to restore the in-match view.
+		traceScores := result.Scores
+		if haveRawScores {
+			traceScores = result.RawScores
+		}
+		traceWinner := result.Winner
+		if result.Swapped {
+			traceScores[0], traceScores[1] = traceScores[1], traceScores[0]
+			if traceWinner != -1 {
+				traceWinner = 1 - traceWinner
+			}
+		}
+		// Derive winner from raw scores so traces stay self-consistent even
+		// when tie-break adjustments made result.Winner differ from the raw
+		// outcome.
+		if haveRawScores {
+			switch {
+			case traceScores[0] > traceScores[1]:
+				traceWinner = 0
+			case traceScores[1] > traceScores[0]:
+				traceWinner = 1
+			default:
+				traceWinner = -1
+			}
+		}
 		traceMatch := TraceMatch{
 			MatchID: simulationID,
 			Seed:    seed,
-			Winner:  result.Winner,
-			Scores:  result.Scores,
+			Winner:  traceWinner,
+			Scores:  traceScores,
+			Bots:    [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
 			Turns:   traceTurns,
 		}
 		if err := runner.Options.TraceWriter.WriteMatch(traceMatch); err != nil {
@@ -283,6 +331,7 @@ func buildMatchResult(simulationID int, seed int64, turns int, players []Player,
 
 func swapMatchSides(r MatchResult) MatchResult {
 	r.Scores[0], r.Scores[1] = r.Scores[1], r.Scores[0]
+	r.RawScores[0], r.RawScores[1] = r.RawScores[1], r.RawScores[0]
 	r.LossReasons[0], r.LossReasons[1] = r.LossReasons[1], r.LossReasons[0]
 	r.TimeToFirstAnswer[0], r.TimeToFirstAnswer[1] = r.TimeToFirstAnswer[1], r.TimeToFirstAnswer[0]
 	r.TimeToTurnP99[0], r.TimeToTurnP99[1] = r.TimeToTurnP99[1], r.TimeToTurnP99[0]
