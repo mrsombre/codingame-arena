@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@shared/components/ui/
 import { LoaderIcon } from "lucide-react"
 import { PlayView } from "./PlayView.tsx"
 import { MassView } from "./MassView.tsx"
+import { ReplaysView } from "./ReplaysView.tsx"
 
-type Tab = "play" | "mass"
+type Tab = "play" | "mass" | "replays"
 
 export default function App() {
   const [bots, setBots] = useState<BotEntry[] | null>(null)
@@ -61,10 +62,19 @@ export default function App() {
           >
             Mass
           </Button>
+          <Button
+            variant={tab === "replays" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setTab("replays")}
+          >
+            Replays
+          </Button>
         </div>
       </div>
 
-      {tab === "play" ? <PlayView bots={bots} /> : <MassView bots={bots} />}
+      {tab === "play" && <PlayView bots={bots} />}
+      {tab === "mass" && <MassView bots={bots} />}
+      {tab === "replays" && <ReplaysView />}
     </div>
   )
 }

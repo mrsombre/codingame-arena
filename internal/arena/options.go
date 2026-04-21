@@ -74,6 +74,7 @@ func AddFrontFlags(fs *pflag.FlagSet) {
 	fs.Int("port", 5757, "HTTP port")
 	fs.String("host", "localhost", "Bind host")
 	fs.String("trace-dir", "./matches", "Directory with match trace JSON files (powers /api/matches)")
+	fs.String("replay-dir", "./replays", "Directory with CodinGame replay JSON files (powers /api/replays)")
 	fs.String("bin-dir", "./bin", "Directory to scan for bot binaries (powers /api/bots)")
 }
 
@@ -277,8 +278,9 @@ arena serve - Serve the embedded web viewer.
   --port <N>           HTTP port (default: 5757)
   --host <HOST>        Bind host (default: localhost)
   --trace-dir <PATH>   Directory with match trace JSON files (powers /api/matches)
+  --replay-dir <PATH>  Directory with CodinGame replay JSON files (powers /api/replays)
   --bin-dir <PATH>     Directory to scan for bot binaries (default: ./bin)
-  API: GET /api/game, GET /api/games, GET /api/bots, GET /api/matches, GET /api/matches/{id}, POST /api/run
+  API: GET /api/game, GET /api/games, GET /api/bots, GET /api/matches, GET /api/matches/{id}, GET /api/replays, GET /api/replays/{id}, POST /api/run
   Stdin keys: o<enter> open in default browser   q<enter> quit
 
 Common options:

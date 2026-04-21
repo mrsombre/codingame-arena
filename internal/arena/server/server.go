@@ -20,10 +20,11 @@ import (
 
 // Options configures a Handler built by New.
 type Options struct {
-	Factory  arena.GameFactory
-	Assets   fs.FS
-	TraceDir string
-	Bots     []string
+	Factory   arena.GameFactory
+	Assets    fs.FS
+	TraceDir  string
+	ReplayDir string
+	Bots      []string
 }
 
 // New returns an http.Handler that serves the embedded viewer bundle and the
@@ -46,6 +47,8 @@ func New(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/bots", handleBots(opts.Bots))
 	mux.HandleFunc("GET /api/matches", handleMatchList(opts.TraceDir))
 	mux.HandleFunc("GET /api/matches/{id}", handleMatchGet(opts.TraceDir))
+	mux.HandleFunc("GET /api/replays", handleReplayList(opts.ReplayDir))
+	mux.HandleFunc("GET /api/replays/{id}", handleReplayGet(opts.ReplayDir, opts.Factory))
 	mux.HandleFunc("POST /api/run", handleRun(opts.Factory, opts.TraceDir))
 	mux.HandleFunc("POST /api/batch", handleBatch(opts.Factory, opts.TraceDir))
 

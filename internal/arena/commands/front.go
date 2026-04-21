@@ -46,6 +46,7 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 	port := v.GetInt("port")
 	host := v.GetString("host")
 	traceDir := v.GetString("trace-dir")
+	replayDir := v.GetString("replay-dir")
 	binDir := v.GetString("bin-dir")
 	if port < 1 || port > 65535 {
 		return fmt.Errorf("--port must be in 1..65535")
@@ -58,10 +59,11 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 		return fmt.Errorf("sub dist: %w", err)
 	}
 	handler := server.New(server.Options{
-		Factory:  factory,
-		Assets:   assets,
-		TraceDir: traceDir,
-		Bots:     bots,
+		Factory:   factory,
+		Assets:    assets,
+		TraceDir:  traceDir,
+		ReplayDir: replayDir,
+		Bots:      bots,
 	})
 
 	addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
