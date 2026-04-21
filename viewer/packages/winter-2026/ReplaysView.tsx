@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react"
 import { Button } from "@shared/components/ui/button.tsx"
 import { ArrowLeftIcon, LoaderIcon } from "lucide-react"
+import { useEffect, useState } from "react"
 import { type MapData, parseSerializeResponse, type TraceMatch } from "./parser.ts"
 import { ReplayViewer } from "./ReplayViewer.tsx"
 
@@ -93,9 +93,7 @@ export function ReplaysView() {
       <div className="min-w-0 flex-1 overflow-hidden">
         {status && <p className="mb-3 font-mono text-xs text-muted-foreground">{status}</p>}
         {listError && <p className="mb-3 font-mono text-xs text-destructive">{listError}</p>}
-        {list === null && !listError && (
-          <p className="font-mono text-xs text-muted-foreground">loading…</p>
-        )}
+        {list === null && !listError && <p className="font-mono text-xs text-muted-foreground">loading…</p>}
         {list !== null && list.length === 0 && (
           <p className="font-mono text-xs text-muted-foreground">
             No replays. Use <code>arena replay &lt;url|id&gt;</code> to download.
@@ -116,14 +114,8 @@ export function ReplaysView() {
               </thead>
               <tbody>
                 {list.map((r) => {
-                  const winnerLabel =
-                    r.winner === 0 ? (r.p0_name ?? "p0") :
-                    r.winner === 1 ? (r.p1_name ?? "p1") :
-                    "draw"
-                  const winnerClass =
-                    r.winner === 0 ? "text-sky-400" :
-                    r.winner === 1 ? "text-red-400" :
-                    "text-muted-foreground"
+                  const winnerLabel = r.winner === 0 ? (r.p0_name ?? "p0") : r.winner === 1 ? (r.p1_name ?? "p1") : "draw"
+                  const winnerClass = r.winner === 0 ? "text-sky-400" : r.winner === 1 ? "text-red-400" : "text-muted-foreground"
                   return (
                     <tr key={r.id} className="border-t hover:bg-accent/40">
                       <td className="px-3 py-1.5">{r.id}</td>
@@ -138,16 +130,9 @@ export function ReplaysView() {
                         <span className="text-muted-foreground">:</span>
                         <span className="text-red-400">{r.score_p1}</span>
                       </td>
-                      <td className="px-3 py-1.5 text-muted-foreground">
-                        {new Date(r.mtime).toLocaleString()}
-                      </td>
+                      <td className="px-3 py-1.5 text-muted-foreground">{new Date(r.mtime).toLocaleString()}</td>
                       <td className="px-3 py-1.5 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={loadingId !== null}
-                          onClick={() => openReplay(r)}
-                        >
+                        <Button variant="outline" size="sm" disabled={loadingId !== null} onClick={() => openReplay(r)}>
                           {loadingId === r.id ? <LoaderIcon className="size-3 animate-spin" /> : "Replay"}
                         </Button>
                       </td>

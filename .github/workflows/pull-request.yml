@@ -1,0 +1,63 @@
+name: Pull Request
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Arena)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Stub viewer dist for embed
+        run: mkdir -p viewer/dist && touch viewer/dist/.gitkeep
+
+      - name: Lint
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./internal/...
+
+  frontend:
+    name: Frontend (Viewer)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: viewer
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: viewer/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm exec biome check .
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Type check
+        run: pnpm run type-check
