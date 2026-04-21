@@ -1,4 +1,3 @@
-import { useState } from "react"
 import type { BotEntry } from "@shared/api.ts"
 import { Button } from "@shared/components/ui/button.tsx"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@shared/components/ui/card.tsx"
@@ -6,6 +5,7 @@ import { Input } from "@shared/components/ui/input.tsx"
 import { Label } from "@shared/components/ui/label.tsx"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@shared/components/ui/select.tsx"
 import { ArrowLeftIcon, LoaderIcon, PlayIcon } from "lucide-react"
+import { useState } from "react"
 import { type MapData, parseSerializeResponse, type TraceMatch } from "./parser.ts"
 import { ReplayViewer } from "./ReplayViewer.tsx"
 
@@ -113,10 +113,7 @@ export function MassView({ bots }: MassViewProps) {
     setLoadingMatch(m.id)
     setStatus(`loading match ${m.id}\u2026`)
     try {
-      const [serRes, traceRes] = await Promise.all([
-        fetch(`/api/serialize?seed=${encodeURIComponent(m.seed)}&league=${encodeURIComponent(league)}`),
-        fetch(`/api/matches/${m.id}`),
-      ])
+      const [serRes, traceRes] = await Promise.all([fetch(`/api/serialize?seed=${encodeURIComponent(m.seed)}&league=${encodeURIComponent(league)}`), fetch(`/api/matches/${m.id}`)])
       if (!serRes.ok) {
         setStatus(`serialize error ${serRes.status}: ${await serRes.text()}`)
         return
@@ -152,15 +149,7 @@ export function MassView({ bots }: MassViewProps) {
           <div className="flex gap-4">
             <div className="flex flex-1 flex-col gap-1.5">
               <Label htmlFor="mass-seed">Start seed</Label>
-              <Input
-                id="mass-seed"
-                inputMode="numeric"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="random"
-                value={seed}
-                onChange={(e) => setSeed(e.target.value)}
-              />
+              <Input id="mass-seed" inputMode="numeric" autoComplete="off" spellCheck={false} placeholder="random" value={seed} onChange={(e) => setSeed(e.target.value)} />
             </div>
             <div className="flex w-28 flex-col gap-1.5">
               <Label>League</Label>
@@ -190,7 +179,9 @@ export function MassView({ bots }: MassViewProps) {
                 <SelectContent>
                   <SelectGroup>
                     {bots.map((b) => (
-                      <SelectItem key={b.path} value={b.path}>{b.name}</SelectItem>
+                      <SelectItem key={b.path} value={b.path}>
+                        {b.name}
+                      </SelectItem>
                     ))}
                   </SelectGroup>
                 </SelectContent>
@@ -205,7 +196,9 @@ export function MassView({ bots }: MassViewProps) {
                 <SelectContent>
                   <SelectGroup>
                     {bots.map((b) => (
-                      <SelectItem key={b.path} value={b.path}>{b.name}</SelectItem>
+                      <SelectItem key={b.path} value={b.path}>
+                        {b.name}
+                      </SelectItem>
                     ))}
                   </SelectGroup>
                 </SelectContent>
@@ -216,69 +209,65 @@ export function MassView({ bots }: MassViewProps) {
           <div className="flex gap-4">
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <Label htmlFor="mass-sims">Matches</Label>
-              <Input
-                id="mass-sims"
-                inputMode="numeric"
-                autoComplete="off"
-                spellCheck={false}
-                value={simulations}
-                onChange={(e) => setSimulations(e.target.value)}
-              />
+              <Input id="mass-sims" inputMode="numeric" autoComplete="off" spellCheck={false} value={simulations} onChange={(e) => setSimulations(e.target.value)} />
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <Label htmlFor="mass-turns">Turns</Label>
-              <Input
-                id="mass-turns"
-                inputMode="numeric"
-                autoComplete="off"
-                spellCheck={false}
-                value={maxTurns}
-                onChange={(e) => setMaxTurns(e.target.value)}
-              />
+              <Input id="mass-turns" inputMode="numeric" autoComplete="off" spellCheck={false} value={maxTurns} onChange={(e) => setMaxTurns(e.target.value)} />
             </div>
           </div>
         </form>
       </CardContent>
       <CardFooter className="border-t">
         <Button type="submit" form="mass-form" className="w-full" disabled={running}>
-          {running ? (
-            <LoaderIcon data-icon="inline-start" className="animate-spin" />
-          ) : (
-            <PlayIcon data-icon="inline-start" />
-          )}
+          {running ? <LoaderIcon data-icon="inline-start" className="animate-spin" /> : <PlayIcon data-icon="inline-start" />}
           {running ? "Simulating\u2026" : "Simulate"}
         </Button>
       </CardFooter>
     </Card>
   )
 
-  const summary = batch && (() => {
-    const n = batch.simulations || 1
-    const winPct = (v: number) => `${((v / n) * 100).toFixed(1)}%`
-    return (
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle className="text-xs">Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
-            <dt>Matches</dt><dd>{batch.simulations}</dd>
-            <dt className="text-sky-400">{batch.p0_bot} wins</dt>
-            <dd>{batch.wins_p0} ({winPct(batch.wins_p0)})</dd>
-            <dt className="text-red-400">{batch.p1_bot} wins</dt>
-            <dd>{batch.wins_p1} ({winPct(batch.wins_p1)})</dd>
-            <dt>Draws</dt><dd>{batch.draws} ({winPct(batch.draws)})</dd>
-            <dt className="text-sky-400">{batch.p0_bot} avg</dt>
-            <dd>{batch.avg_score_p0.toFixed(2)}</dd>
-            <dt className="text-red-400">{batch.p1_bot} avg</dt>
-            <dd>{batch.avg_score_p1.toFixed(2)}</dd>
-            <dt>Avg turns</dt><dd>{batch.avg_turns.toFixed(1)}</dd>
-            <dt>Seed</dt><dd className="truncate" title={String(batch.seed)}>{batch.seed}</dd>
-          </dl>
-        </CardContent>
-      </Card>
-    )
-  })()
+  const summary =
+    batch &&
+    (() => {
+      const n = batch.simulations || 1
+      const winPct = (v: number) => `${((v / n) * 100).toFixed(1)}%`
+      return (
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle className="text-xs">Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
+              <dt>Matches</dt>
+              <dd>{batch.simulations}</dd>
+              <dt className="text-sky-400">{batch.p0_bot} wins</dt>
+              <dd>
+                {batch.wins_p0} ({winPct(batch.wins_p0)})
+              </dd>
+              <dt className="text-red-400">{batch.p1_bot} wins</dt>
+              <dd>
+                {batch.wins_p1} ({winPct(batch.wins_p1)})
+              </dd>
+              <dt>Draws</dt>
+              <dd>
+                {batch.draws} ({winPct(batch.draws)})
+              </dd>
+              <dt className="text-sky-400">{batch.p0_bot} avg</dt>
+              <dd>{batch.avg_score_p0.toFixed(2)}</dd>
+              <dt className="text-red-400">{batch.p1_bot} avg</dt>
+              <dd>{batch.avg_score_p1.toFixed(2)}</dd>
+              <dt>Avg turns</dt>
+              <dd>{batch.avg_turns.toFixed(1)}</dd>
+              <dt>Seed</dt>
+              <dd className="truncate" title={String(batch.seed)}>
+                {batch.seed}
+              </dd>
+            </dl>
+          </CardContent>
+        </Card>
+      )
+    })()
 
   // Replay view for selected match
   if (mapData && trace && selected) {
@@ -326,10 +315,7 @@ export function MassView({ bots }: MassViewProps) {
                     return ""
                   }
                   const winnerLabel = m.winner === -1 ? "draw" : `p${m.winner}`
-                  const winnerClass =
-                    m.winner === 0 ? userColor(m.p0_bot) :
-                    m.winner === 1 ? userColor(m.p1_bot) :
-                    "text-muted-foreground"
+                  const winnerClass = m.winner === 0 ? userColor(m.p0_bot) : m.winner === 1 ? userColor(m.p1_bot) : "text-muted-foreground"
                   return (
                     <tr key={m.id} className="border-t hover:bg-accent/40">
                       <td className="px-3 py-1.5">{m.id}</td>
@@ -340,15 +326,12 @@ export function MassView({ bots }: MassViewProps) {
                         <span className={userColor(m.p1_bot)}>{m.p1_bot}</span>
                       </td>
                       <td className={`px-3 py-1.5 ${winnerClass}`}>{winnerLabel}</td>
-                      <td className="px-3 py-1.5">{m.score_p0}:{m.score_p1}</td>
+                      <td className="px-3 py-1.5">
+                        {m.score_p0}:{m.score_p1}
+                      </td>
                       <td className="px-3 py-1.5 text-muted-foreground">{m.turns}</td>
                       <td className="px-3 py-1.5 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={loadingMatch !== null}
-                          onClick={() => openMatch(m)}
-                        >
+                        <Button variant="outline" size="sm" disabled={loadingMatch !== null} onClick={() => openMatch(m)}>
                           {loadingMatch === m.id ? <LoaderIcon className="size-3 animate-spin" /> : "Replay"}
                         </Button>
                       </td>

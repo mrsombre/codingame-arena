@@ -4,7 +4,7 @@ BIN_DIR := bin
 .PHONY: test build-arena build-viewer
 
 test:
-	go test ./internal/arena
+	go test ./internal/...
 
 build-arena:
 	mkdir -p $(BIN_DIR)

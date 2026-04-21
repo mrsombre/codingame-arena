@@ -1,21 +1,8 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@shared/components/ui/button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "@shared/components/ui/card.tsx"
 import { Slider } from "@shared/components/ui/slider.tsx"
-import {
-  AppleIcon,
-  ArrowDownIcon,
-  BrickWallIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ChevronsLeftIcon,
-  ChevronsRightIcon,
-  PauseIcon,
-  PlayIcon,
-  RotateCcwIcon,
-  SkullIcon,
-  SwordsIcon,
-} from "lucide-react"
+import { AppleIcon, ArrowDownIcon, BrickWallIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon, PauseIcon, PlayIcon, RotateCcwIcon, SkullIcon, SwordsIcon } from "lucide-react"
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { type FrameData, lerpFrame, type MapData, parseFrameLines, type TraceMatch, type TraceTurn } from "./parser.ts"
 import { destroyRenderer, initRenderer, updateFrame } from "./renderer.ts"
 
@@ -358,12 +345,8 @@ export function ReplayViewer({ mapData, trace, status, leftSlot }: ReplayViewerP
                 <div className="flex flex-col gap-1 font-mono text-xs text-muted-foreground">
                   {turnMoves.map((row) => (
                     <div key={row.birdId} className="flex items-center gap-1.5">
-                      <span className={`w-6 shrink-0 ${row.mine ? "text-sky-400" : "text-red-400"}`}>
-                        S{row.birdId}
-                      </span>
-                      <span className="w-7 shrink-0 tabular-nums text-foreground/80">
-                        {row.size !== undefined ? `[${row.size}]` : ""}
-                      </span>
+                      <span className={`w-6 shrink-0 ${row.mine ? "text-sky-400" : "text-red-400"}`}>S{row.birdId}</span>
+                      <span className="w-7 shrink-0 tabular-nums text-foreground/80">{row.size !== undefined ? `[${row.size}]` : ""}</span>
                       <span className="w-3 shrink-0">{row.mine ? "\u2192" : "\u2190"}</span>
                       <span className="w-14 shrink-0">{row.direction}</span>
                       {row.events.map((e, i) => (
@@ -381,18 +364,11 @@ export function ReplayViewer({ mapData, trace, status, leftSlot }: ReplayViewerP
       </div>
 
       <div className="min-w-0 flex-1 overflow-hidden">
-        {status && (
-          <p className="mb-3 font-mono text-xs text-muted-foreground">{status}</p>
-        )}
+        {status && <p className="mb-3 font-mono text-xs text-muted-foreground">{status}</p>}
         <div ref={containerRef} className="[&_canvas]:block [&_canvas]:rounded-sm" />
         {ready && (
           <div className="mt-3 flex items-center gap-3">
-            <Button
-              variant="default"
-              size="icon-lg"
-              onClick={togglePlay}
-              aria-label={playing && !pauseRequested ? "pause" : "play"}
-            >
+            <Button variant="default" size="icon-lg" onClick={togglePlay} aria-label={playing && !pauseRequested ? "pause" : "play"}>
               {playing && !pauseRequested ? <PauseIcon className="size-5" /> : <PlayIcon className="size-5" />}
             </Button>
             <Button variant="outline" size="icon-sm" onClick={() => goToTurn(0)} aria-label="first turn">

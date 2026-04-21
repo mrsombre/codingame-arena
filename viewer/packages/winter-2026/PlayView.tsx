@@ -1,4 +1,3 @@
-import { useState } from "react"
 import type { BotEntry } from "@shared/api.ts"
 import { Button } from "@shared/components/ui/button.tsx"
 import { Card, CardContent, CardFooter } from "@shared/components/ui/card.tsx"
@@ -6,6 +5,7 @@ import { Input } from "@shared/components/ui/input.tsx"
 import { Label } from "@shared/components/ui/label.tsx"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@shared/components/ui/select.tsx"
 import { LoaderIcon, PlayIcon } from "lucide-react"
+import { useState } from "react"
 import { type MapData, parseSerializeResponse, type TraceMatch } from "./parser.ts"
 import { ReplayViewer } from "./ReplayViewer.tsx"
 
@@ -59,10 +59,7 @@ export function PlayView({ bots }: PlayViewProps) {
 
       setStatus("loading replay\u2026")
 
-      const [serRes, traceRes] = await Promise.all([
-        fetch(`/api/serialize?seed=${encodeURIComponent(actualSeed)}&league=${encodeURIComponent(league)}`),
-        fetch("/api/matches/0"),
-      ])
+      const [serRes, traceRes] = await Promise.all([fetch(`/api/serialize?seed=${encodeURIComponent(actualSeed)}&league=${encodeURIComponent(league)}`), fetch("/api/matches/0")])
 
       if (!serRes.ok) {
         setStatus(`serialize error ${serRes.status}: ${await serRes.text()}`)
@@ -83,9 +80,7 @@ export function PlayView({ bots }: PlayViewProps) {
       }
 
       const winnerStr = runData.winner === -1 ? "draw" : `p${runData.winner}`
-      setStatus(
-        `seed=${actualSeed}  ${map.width}\u00d7${map.height}  winner=${winnerStr}  score=${runData.score_p0}:${runData.score_p1}  turns=${runData.turns}`,
-      )
+      setStatus(`seed=${actualSeed}  ${map.width}\u00d7${map.height}  winner=${winnerStr}  score=${runData.score_p0}:${runData.score_p1}  turns=${runData.turns}`)
       setMapData(map)
       setTrace(traceJson)
     } catch (err) {
@@ -102,15 +97,7 @@ export function PlayView({ bots }: PlayViewProps) {
           <div className="flex gap-4">
             <div className="flex flex-1 flex-col gap-1.5">
               <Label htmlFor="play-seed">Seed</Label>
-              <Input
-                id="play-seed"
-                inputMode="numeric"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="random"
-                value={seed}
-                onChange={(e) => setSeed(e.target.value)}
-              />
+              <Input id="play-seed" inputMode="numeric" autoComplete="off" spellCheck={false} placeholder="random" value={seed} onChange={(e) => setSeed(e.target.value)} />
             </div>
             <div className="flex w-28 flex-col gap-1.5">
               <Label>League</Label>
@@ -140,7 +127,9 @@ export function PlayView({ bots }: PlayViewProps) {
                 <SelectContent>
                   <SelectGroup>
                     {bots.map((b) => (
-                      <SelectItem key={b.path} value={b.path}>{b.name}</SelectItem>
+                      <SelectItem key={b.path} value={b.path}>
+                        {b.name}
+                      </SelectItem>
                     ))}
                   </SelectGroup>
                 </SelectContent>
@@ -155,7 +144,9 @@ export function PlayView({ bots }: PlayViewProps) {
                 <SelectContent>
                   <SelectGroup>
                     {bots.map((b) => (
-                      <SelectItem key={b.path} value={b.path}>{b.name}</SelectItem>
+                      <SelectItem key={b.path} value={b.path}>
+                        {b.name}
+                      </SelectItem>
                     ))}
                   </SelectGroup>
                 </SelectContent>
@@ -166,11 +157,7 @@ export function PlayView({ bots }: PlayViewProps) {
       </CardContent>
       <CardFooter className="border-t">
         <Button type="submit" form="play-form" className="w-full" disabled={running}>
-          {running ? (
-            <LoaderIcon data-icon="inline-start" className="animate-spin" />
-          ) : (
-            <PlayIcon data-icon="inline-start" />
-          )}
+          {running ? <LoaderIcon data-icon="inline-start" className="animate-spin" /> : <PlayIcon data-icon="inline-start" />}
           {running ? "Running\u2026" : "Run Match"}
         </Button>
       </CardFooter>
@@ -183,9 +170,7 @@ export function PlayView({ bots }: PlayViewProps) {
   return (
     <div className="flex gap-8">
       <div className="flex w-80 shrink-0 flex-col gap-4 overflow-hidden">{form}</div>
-      <div className="min-w-0 flex-1 overflow-hidden">
-        {status && <p className="font-mono text-xs text-muted-foreground">{status}</p>}
-      </div>
+      <div className="min-w-0 flex-1 overflow-hidden">{status && <p className="font-mono text-xs text-muted-foreground">{status}</p>}</div>
     </div>
   )
 }

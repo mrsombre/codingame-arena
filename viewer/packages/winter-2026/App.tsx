@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react"
 import { type BotEntry, fetchBots } from "@shared/api.ts"
 import { Button } from "@shared/components/ui/button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "@shared/components/ui/card.tsx"
 import { LoaderIcon } from "lucide-react"
-import { PlayView } from "./PlayView.tsx"
+import { useEffect, useState } from "react"
 import { MassView } from "./MassView.tsx"
+import { PlayView } from "./PlayView.tsx"
 import { ReplaysView } from "./ReplaysView.tsx"
 
 type Tab = "play" | "mass" | "replays"
@@ -35,9 +35,7 @@ export default function App() {
           <CardHeader>
             <CardTitle>Winter 2026</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {botsError ? "Failed to load bots" : "No bots available. Add binaries to --bin-dir."}
-          </CardContent>
+          <CardContent className="text-sm text-muted-foreground">{botsError ? "Failed to load bots" : "No bots available. Add binaries to --bin-dir."}</CardContent>
         </Card>
       </div>
     )
@@ -48,25 +46,13 @@ export default function App() {
       <div className="flex items-center gap-4">
         <h1 className="font-mono text-sm uppercase tracking-wider text-muted-foreground">Winter 2026</h1>
         <div className="flex gap-1 rounded-md border p-1">
-          <Button
-            variant={tab === "play" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setTab("play")}
-          >
+          <Button variant={tab === "play" ? "default" : "ghost"} size="sm" onClick={() => setTab("play")}>
             Play
           </Button>
-          <Button
-            variant={tab === "mass" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setTab("mass")}
-          >
+          <Button variant={tab === "mass" ? "default" : "ghost"} size="sm" onClick={() => setTab("mass")}>
             Mass
           </Button>
-          <Button
-            variant={tab === "replays" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setTab("replays")}
-          >
+          <Button variant={tab === "replays" ? "default" : "ghost"} size="sm" onClick={() => setTab("replays")}>
             Replays
           </Button>
         </div>
