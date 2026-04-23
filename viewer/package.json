@@ -9,6 +9,7 @@
   "scripts": {
     "check": "pnpm exec biome check --write .",
     "build": "pnpm exec vite build",
+    "bundle": "pnpm run build && pnpm run lint && pnpm run type-check",
     "dev": "pnpm exec vite",
     "format": "pnpm exec biome format --write .",
     "lint": "pnpm exec biome check --fix .",

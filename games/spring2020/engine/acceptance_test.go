@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -149,9 +150,9 @@ func rpsKillCase(t *testing.T, attackerType, victimType PacmanType) {
 	assert.True(t, g.Players[1].IsDeactivated(), "no pacs → deactivated")
 }
 
-func TestRockEatsScissors(t *testing.T)   { rpsKillCase(t, TypeRock, TypeScissors) }
-func TestPaperEatsRock(t *testing.T)      { rpsKillCase(t, TypePaper, TypeRock) }
-func TestScissorsEatsPaper(t *testing.T)  { rpsKillCase(t, TypeScissors, TypePaper) }
+func TestRockEatsScissors(t *testing.T)  { rpsKillCase(t, TypeRock, TypeScissors) }
+func TestPaperEatsRock(t *testing.T)     { rpsKillCase(t, TypePaper, TypeRock) }
+func TestScissorsEatsPaper(t *testing.T) { rpsKillCase(t, TypeScissors, TypePaper) }
 
 func TestSameTypeCollisionBothBlocked(t *testing.T) {
 	g := newScenario(4, []string{
@@ -389,6 +390,29 @@ func TestFogOfWarEnemyPacInvisibleBehindWall(t *testing.T) {
 	// Line count: "0 0", "<visible pac count>", then that many pac lines.
 	// Only own pac is visible.
 	assert.Equal(t, "1", lines[1], "only one pac visible")
+}
+
+func TestSnapshotTurnIncludesEnginePerspectivePellets(t *testing.T) {
+	g := newScenario(4, []string{
+		"#####",
+		"# # #",
+		"#####",
+	}, false)
+	g.Grid.Get(grid.Coord{X: 1, Y: 1}).HasPellet = true
+	g.Grid.Get(grid.Coord{X: 3, Y: 1}).HasCherry = true
+	spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
+	spawn(g, 1, 0, TypePaper, grid.Coord{X: 3, Y: 1})
+	g.Players[0].Pellets = 7
+	g.Players[1].Pellets = 5
+
+	var snapshot traceSnapshot
+	err := json.Unmarshal(NewReferee(g).SnapshotTurn(0, nil), &snapshot)
+
+	assert.NoError(t, err)
+	assert.Equal(t, [2]int{7, 5}, snapshot.Scores)
+	assert.Len(t, snapshot.Pacs, 2)
+	assert.Contains(t, snapshot.Pellets, tracePellet{X: 1, Y: 1, Value: 1})
+	assert.Contains(t, snapshot.Pellets, tracePellet{X: 3, Y: 1, Value: CherryScore})
 }
 
 // ——— serialization / referee smoke test ————————————————————————————————————
