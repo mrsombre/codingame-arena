@@ -56,5 +56,5 @@ build-winter2026-agents:
 	cp -f $(WINTER2026_AGENTS)/bot.py $(WINTER2026_PYBOT)
 
 match-winter2026:
-	./$(BIN_DIR)/arena --game=winter-2026 --p0-bin=$(BIN_DIR)/ --p1-bin=./$(WINTER2026_PYBOT) \
+	./$(BIN_DIR)/arena --game=winter-2026 --p0-bin=./$(WINTER2026_CPPBOT) --p1-bin=./$(WINTER2026_PYBOT) \
 		--seed=100030005000 --simulations 100

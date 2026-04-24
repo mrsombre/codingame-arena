@@ -130,8 +130,8 @@ func (cp *commandPlayer) Execute() error {
 		return err
 	}
 
-	cp.turns++
 	cp.recordOutputDuration(duration)
+	cp.turns++
 	cp.player.SetOutputs(outputLines)
 	return nil
 }
