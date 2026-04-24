@@ -273,14 +273,18 @@ type batchRequest struct {
 // random swap that may be the user's P1 bot. Aggregate counters at the top of
 // batchResponse stay on the user-selected bot perspective.
 type batchMatchSummary struct {
-	ID      int    `json:"id"`
-	Seed    int64  `json:"seed,string"`
-	Winner  int    `json:"winner"`
-	ScoreP0 int    `json:"score_p0"`
-	ScoreP1 int    `json:"score_p1"`
-	Turns   int    `json:"turns"`
-	P0Bot   string `json:"p0_bot"`
-	P1Bot   string `json:"p1_bot"`
+	ID      int     `json:"id"`
+	Seed    int64   `json:"seed,string"`
+	Winner  int     `json:"winner"`
+	ScoreP0 int     `json:"score_p0"`
+	ScoreP1 int     `json:"score_p1"`
+	Turns   int     `json:"turns"`
+	TTFOP0  float64 `json:"ttfo_p0_ms"`
+	TTFOP1  float64 `json:"ttfo_p1_ms"`
+	AOTP0   float64 `json:"aot_p0_ms"`
+	AOTP1   float64 `json:"aot_p1_ms"`
+	P0Bot   string  `json:"p0_bot"`
+	P1Bot   string  `json:"p1_bot"`
 }
 
 type batchResponse struct {
@@ -291,6 +295,10 @@ type batchResponse struct {
 	AvgScoreP0  float64             `json:"avg_score_p0"`
 	AvgScoreP1  float64             `json:"avg_score_p1"`
 	AvgTurns    float64             `json:"avg_turns"`
+	AvgTTFOP0   float64             `json:"avg_ttfo_p0_ms"`
+	AvgTTFOP1   float64             `json:"avg_ttfo_p1_ms"`
+	AvgAOTP0    float64             `json:"avg_aot_p0_ms"`
+	AvgAOTP1    float64             `json:"avg_aot_p1_ms"`
 	Seed        int64               `json:"seed,string"`
 	P0Bot       string              `json:"p0_bot"`
 	P1Bot       string              `json:"p1_bot"`
@@ -357,6 +365,7 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			Matches:     make([]batchMatchSummary, 0, len(results)),
 		}
 		var totalScoreP0, totalScoreP1, totalTurns float64
+		var totalTTFOP0, totalTTFOP1, totalAOTP0, totalAOTP1 float64
 		for _, res := range results {
 			// Prefer raw scores (sum of alive bird segments) over the
 			// referee's tie-break-adjusted Scores so displayed values can't
@@ -387,18 +396,27 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			totalScoreP0 += float64(userScores[0])
 			totalScoreP1 += float64(userScores[1])
 			totalTurns += float64(res.Turns)
+			ttfo := res.TTFO()
+			aot := res.AOT()
+			totalTTFOP0 += ttfo[0]
+			totalTTFOP1 += ttfo[1]
+			totalAOTP0 += aot[0]
+			totalAOTP1 += aot[1]
 
 			// Per-match row reports from the in-match side perspective so the
 			// replay map (blue = p0, red = p1) lines up with the numbers.
 			matchScoreP0, matchScoreP1 := userScores[0], userScores[1]
 			matchWinner := userWinner
 			matchP0Bot, matchP1Bot := userP0, userP1
+			matchTTFO, matchAOT := ttfo, aot
 			if res.Swapped {
 				matchScoreP0, matchScoreP1 = matchScoreP1, matchScoreP0
 				if matchWinner != -1 {
 					matchWinner = 1 - matchWinner
 				}
 				matchP0Bot, matchP1Bot = userP1, userP0
+				matchTTFO[0], matchTTFO[1] = matchTTFO[1], matchTTFO[0]
+				matchAOT[0], matchAOT[1] = matchAOT[1], matchAOT[0]
 			}
 			resp.Matches = append(resp.Matches, batchMatchSummary{
 				ID:      res.ID,
@@ -407,6 +425,10 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 				ScoreP0: matchScoreP0,
 				ScoreP1: matchScoreP1,
 				Turns:   res.Turns,
+				TTFOP0:  matchTTFO[0],
+				TTFOP1:  matchTTFO[1],
+				AOTP0:   matchAOT[0],
+				AOTP1:   matchAOT[1],
 				P0Bot:   matchP0Bot,
 				P1Bot:   matchP1Bot,
 			})
@@ -415,6 +437,10 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			resp.AvgScoreP0 = round2(totalScoreP0 / n)
 			resp.AvgScoreP1 = round2(totalScoreP1 / n)
 			resp.AvgTurns = round2(totalTurns / n)
+			resp.AvgTTFOP0 = round2(totalTTFOP0 / n)
+			resp.AvgTTFOP1 = round2(totalTTFOP1 / n)
+			resp.AvgAOTP0 = round2(totalAOTP0 / n)
+			resp.AvgAOTP1 = round2(totalAOTP1 / n)
 		}
 		writeJSON(w, http.StatusOK, resp)
 	}

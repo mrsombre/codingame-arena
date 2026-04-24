@@ -20,6 +20,10 @@ interface BatchMatch {
   score_p0: number
   score_p1: number
   turns: number
+  ttfo_p0_ms: number
+  ttfo_p1_ms: number
+  aot_p0_ms: number
+  aot_p1_ms: number
   p0_bot: string
   p1_bot: string
 }
@@ -32,6 +36,10 @@ interface BatchResponse {
   avg_score_p0: number
   avg_score_p1: number
   avg_turns: number
+  avg_ttfo_p0_ms: number
+  avg_ttfo_p1_ms: number
+  avg_aot_p0_ms: number
+  avg_aot_p1_ms: number
   seed: string
   p0_bot: string
   p1_bot: string
@@ -259,6 +267,14 @@ export function MassView({ bots }: MassViewProps) {
               <dd>{batch.avg_score_p1.toFixed(2)}</dd>
               <dt>Avg turns</dt>
               <dd>{batch.avg_turns.toFixed(1)}</dd>
+              <dt className="text-sky-400">p0 ttfo/aot</dt>
+              <dd>
+                {batch.avg_ttfo_p0_ms.toFixed(0)}ms/{batch.avg_aot_p0_ms.toFixed(0)}ms
+              </dd>
+              <dt className="text-red-400">p1 ttfo/aot</dt>
+              <dd>
+                {batch.avg_ttfo_p1_ms.toFixed(0)}ms/{batch.avg_aot_p1_ms.toFixed(0)}ms
+              </dd>
               <dt>Seed</dt>
               <dd className="truncate" title={String(batch.seed)}>
                 {batch.seed}
@@ -272,7 +288,7 @@ export function MassView({ bots }: MassViewProps) {
   // Replay view for selected match
   if (mapData && trace && selected) {
     const winnerLabel = selected.winner === -1 ? "draw" : `p${selected.winner}`
-    const replayStatus = `match #${selected.id}  seed=${selected.seed}  ${selected.p0_bot} vs ${selected.p1_bot}  winner=${winnerLabel}  score=${selected.score_p0}:${selected.score_p1}  turns=${selected.turns}`
+    const replayStatus = `match #${selected.id}  seed=${selected.seed}  ${selected.p0_bot} vs ${selected.p1_bot}  winner=${winnerLabel}  score=${selected.score_p0}:${selected.score_p1}  turns=${selected.turns}  p0 ttfo=${selected.ttfo_p0_ms.toFixed(0)}ms aot=${selected.aot_p0_ms.toFixed(0)}ms  p1 ttfo=${selected.ttfo_p1_ms.toFixed(0)}ms aot=${selected.aot_p1_ms.toFixed(0)}ms`
     const backCard = (
       <Button variant="outline" size="sm" className="self-start" onClick={backToList}>
         <ArrowLeftIcon data-icon="inline-start" /> Back to list
@@ -301,6 +317,7 @@ export function MassView({ bots }: MassViewProps) {
                   <th className="px-3 py-2">Winner</th>
                   <th className="px-3 py-2">Score</th>
                   <th className="px-3 py-2">Turns</th>
+                  <th className="px-3 py-2">Timing</th>
                   <th className="px-3 py-2" />
                 </tr>
               </thead>
@@ -330,6 +347,9 @@ export function MassView({ bots }: MassViewProps) {
                         {m.score_p0}:{m.score_p1}
                       </td>
                       <td className="px-3 py-1.5 text-muted-foreground">{m.turns}</td>
+                      <td className="px-3 py-1.5 text-muted-foreground">
+                        {m.ttfo_p0_ms.toFixed(0)}/{m.aot_p0_ms.toFixed(0)} vs {m.ttfo_p1_ms.toFixed(0)}/{m.aot_p1_ms.toFixed(0)}ms
+                      </td>
                       <td className="px-3 py-1.5 text-right">
                         <Button variant="outline" size="sm" disabled={loadingMatch !== null} onClick={() => openMatch(m)}>
                           {loadingMatch === m.id ? <LoaderIcon className="size-3 animate-spin" /> : "Replay"}

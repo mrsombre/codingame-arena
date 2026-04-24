@@ -82,7 +82,11 @@ export function PlayView({ bots }: PlayViewProps) {
 
       const winnerStr = runData.winner === -1 ? "draw" : `p${runData.winner}`
       const mainTurns = traceJson.turns.filter((t) => t.game_input.p0 || t.game_input.p1).length
-      setStatus(`seed=${actualSeed}  ${map.width}\u00d7${map.height}  winner=${winnerStr}  score=${runData.score_p0}:${runData.score_p1}  turns=${runData.turns} [${mainTurns}]`)
+      const ttfo = runData.ttfo_ms ?? [0, 0]
+      const aot = runData.aot_ms ?? [0, 0]
+      setStatus(
+        `seed=${actualSeed}  ${map.width}\u00d7${map.height}  winner=${winnerStr}  score=${runData.score_p0}:${runData.score_p1}  turns=${runData.turns} [${mainTurns}]  p0 ttfo=${ttfo[0].toFixed(0)}ms aot=${aot[0].toFixed(0)}ms  p1 ttfo=${ttfo[1].toFixed(0)}ms aot=${aot[1].toFixed(0)}ms`,
+      )
       setFogPerspectiveSide(runData.swapped ? 1 : 0)
       setMapData(map)
       setTrace(traceJson)

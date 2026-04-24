@@ -42,9 +42,8 @@ type MatchResult struct {
 	Winner            int // 0, 1, or -1 for draw
 	LossReasons       [2]LossReason
 	BadCommands       []BadCommandInfo
-	TimeToFirstAnswer [2]time.Duration
-	TimeToTurnP99     [2]time.Duration
-	TimeToTurnMax     [2]time.Duration
+	TimeToFirstOutput [2]time.Duration
+	AverageOutputTime [2]time.Duration
 	Swapped           bool
 	Metrics           []Metric
 }

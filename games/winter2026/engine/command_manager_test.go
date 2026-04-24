@@ -77,6 +77,7 @@ func TestParseCommandsEmptyOutputIsTimeout(t *testing.T) {
 
 	assert.True(t, p.IsDeactivated())
 	assert.Equal(t, "Timeout!", p.DeactivationReason())
+	assert.True(t, p.IsTimedOut())
 }
 
 func TestParseCommandsBackwardsMoveRejected(t *testing.T) {

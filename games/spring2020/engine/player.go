@@ -55,9 +55,9 @@ func (p *Player) TurnReset() {
 
 // arena.Player interface implementation.
 
-func (p *Player) GetIndex() int    { return p.index }
-func (p *Player) GetScore() int    { return p.score }
-func (p *Player) SetScore(s int)   { p.score = s }
+func (p *Player) GetIndex() int  { return p.index }
+func (p *Player) GetScore() int  { return p.score }
+func (p *Player) SetScore(s int) { p.score = s }
 func (p *Player) IsDeactivated() bool {
 	return p.deactivated
 }

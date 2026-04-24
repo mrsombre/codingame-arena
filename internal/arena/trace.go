@@ -21,6 +21,8 @@ type TraceMatch struct {
 	Winner  int         `json:"winner"`
 	Scores  [2]int      `json:"scores"`
 	Bots    [2]string   `json:"bots"`
+	TTFO    [2]float64  `json:"ttfo_ms"`
+	AOT     [2]float64  `json:"aot_ms"`
 	Turns   []TraceTurn `json:"turns"`
 }
 

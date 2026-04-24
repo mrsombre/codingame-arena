@@ -86,6 +86,8 @@ export interface TraceMatch {
   winner: number
   scores: [number, number]
   bots: [string, string]
+  ttfo_ms?: [number, number]
+  aot_ms?: [number, number]
   turns: TraceTurn[]
 }
 

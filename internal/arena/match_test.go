@@ -2,6 +2,7 @@ package arena
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -34,11 +35,11 @@ func (p *mockPlayer) GetExpectedOutputLines() int {
 	return p.expectedOutputLines
 }
 func (p *mockPlayer) SendInputLine(line string)      { p.inputLines = append(p.inputLines, line) }
-func (p *mockPlayer) ConsumeInputLines() []string     { l := p.inputLines; p.inputLines = nil; return l }
-func (p *mockPlayer) GetOutputs() []string            { return p.outputs }
-func (p *mockPlayer) SetOutputs(o []string)           { p.outputs = o }
-func (p *mockPlayer) GetOutputError() error           { return p.outputError }
-func (p *mockPlayer) SetExecuteFunc(fn func() error)  { p.executeFn = fn }
+func (p *mockPlayer) ConsumeInputLines() []string    { l := p.inputLines; p.inputLines = nil; return l }
+func (p *mockPlayer) GetOutputs() []string           { return p.outputs }
+func (p *mockPlayer) SetOutputs(o []string)          { p.outputs = o }
+func (p *mockPlayer) GetOutputError() error          { return p.outputError }
+func (p *mockPlayer) SetExecuteFunc(fn func() error) { p.executeFn = fn }
 func (p *mockPlayer) Execute() error {
 	if p.executeFn != nil {
 		return p.executeFn()
@@ -73,9 +74,11 @@ func TestLossReasonForDraw(t *testing.T) {
 
 func TestSwapMatchSidesSwapsScoresAndWinner(t *testing.T) {
 	r := MatchResult{
-		Scores:      [2]int{10, 20},
-		Winner:      0,
-		LossReasons: [2]LossReason{LossReasonNone, LossReasonScore},
+		Scores:            [2]int{10, 20},
+		Winner:            0,
+		LossReasons:       [2]LossReason{LossReasonNone, LossReasonScore},
+		TimeToFirstOutput: [2]time.Duration{100 * time.Millisecond, 200 * time.Millisecond},
+		AverageOutputTime: [2]time.Duration{10 * time.Millisecond, 20 * time.Millisecond},
 		Metrics: []Metric{
 			{Label: "wins_p0", Value: 1},
 			{Label: "wins_p1", Value: 0},
@@ -92,6 +95,8 @@ func TestSwapMatchSidesSwapsScoresAndWinner(t *testing.T) {
 	assert.Equal(t, 1, swapped.Winner)
 	assert.Equal(t, LossReasonScore, swapped.LossReasons[0])
 	assert.Equal(t, LossReasonNone, swapped.LossReasons[1])
+	assert.Equal(t, [2]float64{200, 100}, swapped.TTFO())
+	assert.Equal(t, [2]float64{20, 10}, swapped.AOT())
 
 	metricMap := make(map[string]float64)
 	for _, m := range swapped.Metrics {

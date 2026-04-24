@@ -80,7 +80,11 @@ export function PlayView({ bots }: PlayViewProps) {
       }
 
       const winnerStr = runData.winner === -1 ? "draw" : `p${runData.winner}`
-      setStatus(`seed=${actualSeed}  ${map.width}\u00d7${map.height}  winner=${winnerStr}  score=${runData.score_p0}:${runData.score_p1}  turns=${runData.turns}`)
+      const ttfo = runData.ttfo_ms ?? [0, 0]
+      const aot = runData.aot_ms ?? [0, 0]
+      setStatus(
+        `seed=${actualSeed}  ${map.width}\u00d7${map.height}  winner=${winnerStr}  score=${runData.score_p0}:${runData.score_p1}  turns=${runData.turns}  p0 ttfo=${ttfo[0].toFixed(0)}ms aot=${aot[0].toFixed(0)}ms  p1 ttfo=${ttfo[1].toFixed(0)}ms aot=${aot[1].toFixed(0)}ms`,
+      )
       setMapData(map)
       setTrace(traceJson)
     } catch (err) {

@@ -19,6 +19,8 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 		Seed:    12345,
 		Winner:  0,
 		Scores:  [2]int{15, 12},
+		TTFO:    [2]float64{820, 910},
+		AOT:     [2]float64{12, 14},
 		Turns: []TraceTurn{
 			{
 				Turn: 0,
@@ -45,6 +47,8 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &got))
 	assert.Equal(t, int64(12345), got.Seed)
 	assert.Equal(t, 0, got.Winner)
+	assert.Equal(t, [2]float64{820, 910}, got.TTFO)
+	assert.Equal(t, [2]float64{12, 14}, got.AOT)
 	require.Len(t, got.Turns, 1)
 	assert.Equal(t, "UP 0 RIGHT 1", got.Turns[0].P0Output)
 	assert.Equal(t, "DOWN 0 LEFT 1", got.Turns[0].P1Output)

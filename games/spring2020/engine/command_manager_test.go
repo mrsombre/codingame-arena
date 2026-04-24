@@ -98,6 +98,7 @@ func TestParseCommandsEmptyOutputDeactivatesAsTimeout(t *testing.T) {
 	cm.ParseCommands(player, nil)
 	assert.True(t, player.IsDeactivated())
 	assert.Equal(t, "Timeout!", player.DeactivationReason())
+	assert.True(t, player.IsTimedOut())
 }
 
 func TestParseCommandsUnknownCommandDeactivates(t *testing.T) {
@@ -110,6 +111,7 @@ func TestParseCommandsMoveOutOfGridDeactivates(t *testing.T) {
 	_, player, cm := newParseGame(t)
 	cm.ParseCommands(player, []string{"MOVE 0 -1 1"})
 	assert.True(t, player.IsDeactivated())
+	assert.Equal(t, "Pac 0 (p0) cannot reach its target (-1, 1) because it is out of grid!", player.DeactivationReason())
 
 	// Also y out of range, fresh player.
 	_, player2, cm2 := newParseGame(t)

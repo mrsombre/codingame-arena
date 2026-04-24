@@ -24,8 +24,9 @@ type Game struct {
 	totalPacs   int
 	currentStep int
 
-	ended   bool
-	summary []string
+	ended             bool
+	gameOverProcessed bool
+	summary           []string
 }
 
 // NewGame sets up a fresh simulation with the given seed and league level.
@@ -573,9 +574,15 @@ func (g *Game) IsGameOver() bool {
 
 // PerformGameOver absorbs remaining pellets when only one player remains.
 func (g *Game) PerformGameOver() {
+	if g.gameOverProcessed {
+		return
+	}
 	activePlayers := g.activePlayers()
 	if len(activePlayers) == 1 {
 		activePlayers[0].Pellets += g.remainingPellets()
+	}
+	if len(activePlayers) <= 1 {
+		g.gameOverProcessed = true
 	}
 }
 

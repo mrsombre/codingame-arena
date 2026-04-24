@@ -92,6 +92,9 @@ func (r *Referee) Ended() bool {
 }
 
 func (r *Referee) EndGame() {
+	if r.game.IsGameOver() {
+		r.game.PerformGameOver()
+	}
 	r.game.EndGame()
 }
 

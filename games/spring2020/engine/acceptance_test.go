@@ -327,6 +327,26 @@ func TestGameOverAwardsRemainingPelletsToSurvivor(t *testing.T) {
 	assert.Equal(t, 3, g.Players[0].Pellets)
 }
 
+func TestRefereeEndGameAwardsRemainingPelletsAfterEarlyArenaStop(t *testing.T) {
+	// The arena runner may call EndGame immediately after a player is
+	// deactivated. Spring 2020 still needs the Java performGameOver absorption.
+	g := newScenario(4, []string{
+		"#####",
+		"#...#",
+		"#####",
+	}, false)
+	spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
+	spawn(g, 1, 0, TypeScissors, grid.Coord{X: 3, Y: 1})
+	g.Players[1].Deactivate("bad command")
+
+	r := NewReferee(g)
+	r.EndGame()
+	r.EndGame()
+
+	assert.True(t, r.Ended())
+	assert.Equal(t, 3, g.Players[0].Pellets, "remaining pellets awarded exactly once")
+}
+
 func TestCanImproveRankingEndsGameWhenPelletsCannotCloseGap(t *testing.T) {
 	g := newScenario(4, []string{"####", "#  #", "####"}, false)
 	spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})

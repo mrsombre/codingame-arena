@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -45,14 +46,13 @@ func SummarizeMatches(results []MatchResult) MatchSummary {
 		}
 	}
 
-	timingPrefix := "time_to_"
 	metrics := make([]MetricSummary, len(firstMetrics))
 	for i, metric := range firstMetrics {
 		ms := MetricSummary{
 			Label: metric.Label,
 			Avg:   round2(totals[i] / float64(len(results))),
 		}
-		if len(metric.Label) < len(timingPrefix) || metric.Label[:len(timingPrefix)] != timingPrefix {
+		if !isTimingMetric(metric.Label) {
 			t := round2(totals[i])
 			ms.Total = &t
 		}
@@ -132,6 +132,8 @@ func (r MatchResult) RenderMatch() string {
 		LossReasonP1 LossReason `json:"loss_reason_p1"`
 		ScoreP0      int        `json:"score_p0"`
 		ScoreP1      int        `json:"score_p1"`
+		TTFO         [2]float64 `json:"ttfo_ms"`
+		AOT          [2]float64 `json:"aot_ms"`
 		Metrics      []Metric   `json:"metrics,omitempty"`
 		Swapped      bool       `json:"swapped,omitempty"`
 	}{
@@ -143,6 +145,8 @@ func (r MatchResult) RenderMatch() string {
 		LossReasonP1: r.LossReasons[1],
 		ScoreP0:      scores[0],
 		ScoreP1:      scores[1],
+		TTFO:         r.TTFO(),
+		AOT:          r.AOT(),
 		Metrics:      r.Metrics,
 		Swapped:      r.Swapped,
 	}
@@ -169,7 +173,20 @@ func WriteShortSummary(w io.Writer, s MatchSummary) error {
 		get("score_p1"),
 		get("turns"),
 	)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(w, "p0 ttfo=%.0fms aot=%.0fms p1 ttfo=%.0fms aot=%.0fms\n",
+		get("ttfo_p0"),
+		get("aot_p0"),
+		get("ttfo_p1"),
+		get("aot_p1"),
+	)
 	return err
+}
+
+func isTimingMetric(label string) bool {
+	return strings.HasPrefix(label, "ttfo_") || strings.HasPrefix(label, "aot_")
 }
 
 func round2(value float64) float64 {

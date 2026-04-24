@@ -2,36 +2,56 @@ package arena
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 )
 
+// Hard limits are a safety net against stuck or infinite-loop bots, not a
+// parity simulation of CodinGame's per-game timeouts. Local matches run in
+// parallel so wall-clock timers aren't accurate enough to end games on; real
+// turn timings are surfaced as TTFO/AOT metrics instead. Both games share
+// these limits.
+const (
+	firstTurnHardLimit = 10 * time.Second
+	nextTurnHardLimit  = time.Second
+)
+
 type playerTimingStats struct {
-	FirstAnswer time.Duration
-	TurnP99     time.Duration
-	TurnMax     time.Duration
+	TimeToFirstOutput time.Duration
+	AverageOutputTime time.Duration
+}
+
+type hardTimeoutError struct {
+	path    string
+	limit   time.Duration
+	turnIdx int
+}
+
+func (e hardTimeoutError) Error() string {
+	return fmt.Sprintf("external player timed out after %s on turn %d (%s)", e.limit, e.turnIdx, e.path)
 }
 
 type commandPlayer struct {
-	player                Player
-	path                  string
-	cmd                   *exec.Cmd
-	stdin                 io.WriteCloser
-	stdout                *bufio.Reader
-	stderrDone            chan struct{}
-	turns                 int
-	writeMu               sync.Mutex
-	timing                bool
-	playerIdx             int
-	lastDuration          time.Duration
-	firstResponseDuration time.Duration
-	turnResponseDurations []time.Duration
+	player            Player
+	path              string
+	cmd               *exec.Cmd
+	stdin             io.WriteCloser
+	stdout            *bufio.Reader
+	stderrDone        chan struct{}
+	turns             int
+	writeMu           sync.Mutex
+	timing            bool
+	playerIdx         int
+	firstTurnLimit    time.Duration
+	nextTurnLimit     time.Duration
+	timeToFirstOutput time.Duration
+	outputDurations   []time.Duration
 }
 
 func newCommandPlayer(player Player, path string) (*commandPlayer, error) {
@@ -50,12 +70,14 @@ func newCommandPlayer(player Player, path string) (*commandPlayer, error) {
 	}
 
 	cp := &commandPlayer{
-		player:     player,
-		path:       path,
-		cmd:        cmd,
-		stdin:      stdin,
-		stdout:     bufio.NewReader(stdout),
-		stderrDone: make(chan struct{}),
+		player:         player,
+		path:           path,
+		cmd:            cmd,
+		stdin:          stdin,
+		stdout:         bufio.NewReader(stdout),
+		stderrDone:     make(chan struct{}),
+		firstTurnLimit: firstTurnHardLimit,
+		nextTurnLimit:  nextTurnHardLimit,
 	}
 	go func() {
 		defer close(cp.stderrDone)
@@ -90,65 +112,90 @@ func (cp *commandPlayer) Execute() error {
 	if expectedLines < 1 {
 		expectedLines = 1
 	}
-	outputLines := make([]string, 0, expectedLines)
-	for i := 0; i < expectedLines; i++ {
-		line, err := cp.readCommandLine()
-		if err != nil {
-			return err
-		}
-		outputLines = append(outputLines, strings.TrimRight(line, "\r\n"))
+
+	turnIdx := cp.turns
+	limit := cp.nextTurnLimit
+	if turnIdx == 0 {
+		limit = cp.firstTurnLimit
 	}
+
+	start := time.Now()
+	outputLines, err := cp.readCommandLines(expectedLines, limit, turnIdx)
+	duration := time.Since(start)
+	if err != nil {
+		var timeout hardTimeoutError
+		if errors.As(err, &timeout) {
+			cp.recordOutputDuration(limit)
+		}
+		return err
+	}
+
 	cp.turns++
+	cp.recordOutputDuration(duration)
 	cp.player.SetOutputs(outputLines)
 	return nil
 }
 
-func (cp *commandPlayer) readCommandLine() (string, error) {
-	start := time.Now()
-	line, err := cp.stdout.ReadString('\n')
-	cp.lastDuration = time.Since(start)
-	cp.recordResponseDuration(cp.lastDuration)
-	if cp.timing {
-		fmt.Fprintf(os.Stderr, "timing p%d turn %d: %s\n", cp.playerIdx, cp.turns, cp.lastDuration)
+func (cp *commandPlayer) readCommandLines(expectedLines int, limit time.Duration, turnIdx int) ([]string, error) {
+	type readResult struct {
+		lines []string
+		err   error
 	}
-	if err != nil {
-		return "", fmt.Errorf("external player read failed (%s): %w", cp.path, err)
+	done := make(chan readResult, 1)
+	go func() {
+		outputLines := make([]string, 0, expectedLines)
+		for i := 0; i < expectedLines; i++ {
+			line, err := cp.stdout.ReadString('\n')
+			if err != nil {
+				done <- readResult{err: fmt.Errorf("external player read failed (%s): %w", cp.path, err)}
+				return
+			}
+			outputLines = append(outputLines, strings.TrimRight(line, "\r\n"))
+		}
+		done <- readResult{lines: outputLines}
+	}()
+
+	timer := time.NewTimer(limit)
+	defer timer.Stop()
+
+	select {
+	case result := <-done:
+		return result.lines, result.err
+	case <-timer.C:
+		if cp.cmd.Process != nil {
+			_ = cp.cmd.Process.Kill()
+		}
+		return nil, hardTimeoutError{path: cp.path, limit: limit, turnIdx: turnIdx}
 	}
-	return line, nil
 }
 
-func (cp *commandPlayer) recordResponseDuration(duration time.Duration) {
+func (cp *commandPlayer) recordOutputDuration(duration time.Duration) {
 	if cp.turns == 0 {
-		cp.firstResponseDuration = duration
-		return
+		cp.timeToFirstOutput = duration
+	} else {
+		cp.outputDurations = append(cp.outputDurations, duration)
 	}
-	cp.turnResponseDurations = append(cp.turnResponseDurations, duration)
+	if cp.timing {
+		fmt.Fprintf(os.Stderr, "timing p%d turn %d: %s\n", cp.playerIdx, cp.turns, duration)
+	}
+}
+
+func averageDuration(durations []time.Duration) time.Duration {
+	if len(durations) == 0 {
+		return 0
+	}
+	var sum time.Duration
+	for _, duration := range durations {
+		sum += duration
+	}
+	return sum / time.Duration(len(durations))
 }
 
 func (cp *commandPlayer) TimingStats() playerTimingStats {
-	p99, max := summarizeDurations(cp.turnResponseDurations)
 	return playerTimingStats{
-		FirstAnswer: cp.firstResponseDuration,
-		TurnP99:     p99,
-		TurnMax:     max,
+		TimeToFirstOutput: cp.timeToFirstOutput,
+		AverageOutputTime: averageDuration(cp.outputDurations),
 	}
-}
-
-func summarizeDurations(durations []time.Duration) (time.Duration, time.Duration) {
-	if len(durations) == 0 {
-		return 0, 0
-	}
-
-	sorted := append([]time.Duration(nil), durations...)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i] < sorted[j]
-	})
-
-	idx := (99*len(sorted)+99)/100 - 1
-	if idx < 0 {
-		idx = 0
-	}
-	return sorted[idx], sorted[len(sorted)-1]
 }
 
 func (cp *commandPlayer) Close() error {

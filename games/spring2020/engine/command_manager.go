@@ -46,6 +46,7 @@ func (m *CommandManager) expected() string {
 func (m *CommandManager) ParseCommands(player *Player, lines []string) {
 	if len(lines) == 0 {
 		m.deactivate(player, "Timeout!")
+		player.SetTimedOut(true)
 		return
 	}
 
@@ -72,8 +73,8 @@ func (m *CommandManager) ParseCommands(player *Player, lines []string) {
 			y, _ := strconv.Atoi(match[3])
 			if x < 0 || x >= m.game.Grid.Width || y < 0 || y >= m.game.Grid.Height {
 				msg := fmt.Sprintf(
-					"Pac %d cannot reach its target (%d, %d) because it is out of grid!",
-					pac.Number, x, y,
+					"Pac %d (p%d) cannot reach its target (%d, %d) because it is out of grid!",
+					pac.Number, player.GetIndex(), x, y,
 				)
 				m.deactivate(player, msg)
 				m.addSummary("Bad command: " + msg)
