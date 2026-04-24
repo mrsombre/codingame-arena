@@ -112,7 +112,7 @@ interface ReplayViewerProps {
   mapData: MapData
   trace: TraceMatch
   fogPerspectiveSide?: ReplaySide
-  status?: string
+  status?: ReactNode
   leftSlot?: ReactNode
 }
 

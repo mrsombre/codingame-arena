@@ -1,16 +1,22 @@
 import { type BotEntry, fetchBots } from "@shared/api.ts"
 import { Button } from "@shared/components/ui/button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "@shared/components/ui/card.tsx"
+import { Link, Outlet, useRouterState } from "@tanstack/react-router"
 import { LoaderIcon } from "lucide-react"
-import { useEffect, useState } from "react"
-import { PlayView } from "./PlayView.tsx"
+import { createContext, useContext, useEffect, useState } from "react"
 
-type Tab = "play"
+const BotsContext = createContext<BotEntry[] | null>(null)
+
+export function useBots(): BotEntry[] {
+  const bots = useContext(BotsContext)
+  if (!bots) throw new Error("BotsContext missing")
+  return bots
+}
 
 export default function App() {
   const [bots, setBots] = useState<BotEntry[] | null>(null)
   const [botsError, setBotsError] = useState(false)
-  const [tab, setTab] = useState<Tab>("play")
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
 
   useEffect(() => {
     fetchBots()
@@ -39,18 +45,28 @@ export default function App() {
     )
   }
 
-  return (
-    <div className="flex flex-col gap-6 p-10">
-      <div className="flex items-center gap-4">
-        <h1 className="font-mono text-sm uppercase tracking-wider text-muted-foreground">Spring 2020</h1>
-        <div className="flex gap-1 rounded-md border p-1">
-          <Button variant={tab === "play" ? "default" : "ghost"} size="sm" onClick={() => setTab("play")}>
-            Play
-          </Button>
-        </div>
-      </div>
+  const tabLink = (path: "/play" | "/mass" | "/replays", label: string) => {
+    const active = path === "/replays" ? pathname === "/replays" || pathname.startsWith("/replay/") : pathname === path
+    return (
+      <Button asChild variant={active ? "default" : "ghost"} size="sm">
+        <Link to={path}>{label}</Link>
+      </Button>
+    )
+  }
 
-      {tab === "play" && <PlayView bots={bots} />}
-    </div>
+  return (
+    <BotsContext.Provider value={bots}>
+      <div className="flex flex-col gap-6 p-10">
+        <div className="flex items-center gap-4">
+          <h1 className="font-mono text-sm uppercase tracking-wider text-muted-foreground">Spring 2020</h1>
+          <div className="flex gap-1 rounded-md border p-1">
+            {tabLink("/play", "Play")}
+            {tabLink("/mass", "Mass")}
+            {tabLink("/replays", "Replays")}
+          </div>
+        </div>
+        <Outlet />
+      </div>
+    </BotsContext.Provider>
   )
 }

@@ -117,7 +117,7 @@ export function PlayView({ bots }: PlayViewProps) {
                     <SelectItem value="1">Wood 2</SelectItem>
                     <SelectItem value="2">Wood 1</SelectItem>
                     <SelectItem value="3">Bronze</SelectItem>
-                    <SelectItem value="4">Legend</SelectItem>
+                    <SelectItem value="4">Silver+</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>

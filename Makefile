@@ -4,7 +4,7 @@ BIN_DIR := bin
 .PHONY: test build-arena build-viewer clean
 
 clean:
-	rm -f tmp/* replays/* matches/*
+	rm -rf bin/* tmp/* replays/* matches/*
 
 test:
 	go test ./internal/...
