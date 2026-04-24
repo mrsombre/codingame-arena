@@ -57,7 +57,7 @@ export function lerpFrame(from: FrameData, to: FrameData, t: number): FrameData 
     const tailFallback = fromBody[fromBody.length - 1]
     const body: Coord[] = new Array(toBird.body.length)
     for (let i = 0; i < toBird.body.length; i++) {
-      const toSeg = toBird.body[i]!
+      const toSeg = toBird.body[i] as Coord
       const fromSeg = fromBody[i] ?? tailFallback ?? toSeg
       body[i] = {
         x: fromSeg.x + (toSeg.x - fromSeg.x) * t,

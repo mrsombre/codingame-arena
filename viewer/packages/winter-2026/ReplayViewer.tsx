@@ -268,7 +268,7 @@ export function ReplayViewer({ mapData, trace, status, leftSlot }: ReplayViewerP
       frames.push(parseFrameLines(initialTurn.game_input.p0))
       turns.push(null)
       for (let i = 1; i <= N; i++) {
-        const source = trace.turns[i] ?? trace.turns[i - 1]!
+        const source = trace.turns[i] ?? trace.turns[i - 1] ?? initialTurn
         frames.push(parseFrameLines(source.game_input.p0))
         turns.push(trace.turns[i - 1] ?? null)
       }

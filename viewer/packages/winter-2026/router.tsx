@@ -13,7 +13,7 @@ export const router = createGameRouter(
     ReplaysView,
     ReplayView,
   },
-  "Spring 2020",
+  "Winter 2026",
 )
 
 declare module "@tanstack/react-router" {

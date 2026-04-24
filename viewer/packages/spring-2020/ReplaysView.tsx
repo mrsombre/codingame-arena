@@ -73,7 +73,7 @@ export function ReplaysView() {
                       <td className="px-3 py-1.5 text-muted-foreground">{new Date(r.mtime).toLocaleString()}</td>
                       <td className="px-3 py-1.5 text-right">
                         <Button asChild variant="outline" size="sm">
-                          <Link to="/replay/$id" params={{ id: r.id }}>
+                          <Link to="/replays/$replayId" params={{ replayId: r.id }}>
                             Replay
                           </Link>
                         </Button>
