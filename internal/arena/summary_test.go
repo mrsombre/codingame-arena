@@ -13,13 +13,13 @@ func TestSummarizeMatchesAggregatesMetrics(t *testing.T) {
 		{
 			Metrics: []Metric{
 				{Label: "score_p0", Value: 17},
-				{Label: "time_to_first_answer_p0", Value: 111.11},
+				{Label: "ttfo_p0", Value: 111.11},
 			},
 		},
 		{
 			Metrics: []Metric{
 				{Label: "score_p0", Value: 19},
-				{Label: "time_to_first_answer_p0", Value: 111.05},
+				{Label: "ttfo_p0", Value: 111.05},
 			},
 		},
 	}
@@ -32,7 +32,7 @@ func TestSummarizeMatchesAggregatesMetrics(t *testing.T) {
 	assert.Equal(t, 36.0, *score.Total)
 	assert.Equal(t, 18.0, score.Avg)
 
-	timing := summary.Get("time_to_first_answer_p0")
+	timing := summary.Get("ttfo_p0")
 	require.NotNil(t, timing)
 	assert.Nil(t, timing.Total)
 	assert.Equal(t, 111.08, timing.Avg)
@@ -58,6 +58,10 @@ func TestWriteShortSummary(t *testing.T) {
 			{Label: "draws", Avg: 0.1},
 			{Label: "score_p0", Avg: 15.3},
 			{Label: "score_p1", Avg: 12.1},
+			{Label: "ttfo_p0", Avg: 820},
+			{Label: "aot_p0", Avg: 12},
+			{Label: "ttfo_p1", Avg: 900},
+			{Label: "aot_p1", Avg: 14},
 		},
 	}
 	var buf bytes.Buffer
@@ -65,4 +69,6 @@ func TestWriteShortSummary(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "W=70%")
 	assert.Contains(t, buf.String(), "L=20%")
+	assert.Contains(t, buf.String(), "p0 ttfo=820ms aot=12ms")
+	assert.Contains(t, buf.String(), "p1 ttfo=900ms aot=14ms")
 }

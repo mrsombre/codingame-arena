@@ -83,6 +83,8 @@ export interface TraceMatch {
   scores: [number, number]
   /** Bot basenames per in-match side: [left, right]. */
   bots: [string, string]
+  ttfo_ms?: [number, number]
+  aot_ms?: [number, number]
   turns: TraceTurn[]
 }
 

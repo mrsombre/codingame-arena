@@ -38,6 +38,7 @@ replays/                 # Replay JSON files (gitignored)
 ```shell
 # Go
 make test                        # Run arena tests
+make test-games                  # Run arena games tests
 make build-arena                 # Build arena binary to bin/
 make build                       # Build viewer + arena
 
@@ -45,9 +46,8 @@ make build                       # Build viewer + arena
 pnpm install                     # Install dependencies
 pnpm run build                   # Production build
 pnpm run dev                     # Dev server
-pnpm run check                   # Biome check
-pnpm run lint                    # Biome lint with autofix
 pnpm run format                  # Biome format
+pnpm run check                   # Biome lint
 pnpm run type-check              # TypeScript type check
 
 # Game-specific

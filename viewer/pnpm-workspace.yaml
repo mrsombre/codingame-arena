@@ -5,4 +5,5 @@ packages:
 strictDepBuilds: true
 allowBuilds:
   "@biomejs/biome": true
+  "esbuild": true
   "msw": true

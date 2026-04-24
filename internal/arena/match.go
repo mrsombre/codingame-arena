@@ -1,6 +1,7 @@
 package arena
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -214,12 +215,20 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				traceWinner = -1
 			}
 		}
+		traceTTFO := result.TTFO()
+		traceAOT := result.AOT()
+		if result.Swapped {
+			traceTTFO[0], traceTTFO[1] = traceTTFO[1], traceTTFO[0]
+			traceAOT[0], traceAOT[1] = traceAOT[1], traceAOT[0]
+		}
 		traceMatch := TraceMatch{
 			MatchID: simulationID,
 			Seed:    seed,
 			Winner:  traceWinner,
 			Scores:  traceScores,
 			Bots:    [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
+			TTFO:    traceTTFO,
+			AOT:     traceAOT,
 			Turns:   traceTurns,
 		}
 		if err := runner.Options.TraceWriter.WriteMatch(traceMatch); err != nil {
@@ -238,6 +247,10 @@ func handlePlayerCommands(players []Player, referee Referee) {
 		err := player.GetOutputError()
 		if err == nil {
 			continue
+		}
+		var timeout hardTimeoutError
+		if errors.As(err, &timeout) {
+			player.SetTimedOut(true)
 		}
 		player.Deactivate(err.Error())
 	}
@@ -277,14 +290,12 @@ func buildMatchResult(simulationID int, seed int64, turns int, players []Player,
 		winner = 1
 	}
 
-	firstAnswer := [2]time.Duration{}
-	turnP99 := [2]time.Duration{}
-	turnMax := [2]time.Duration{}
+	ttfo := [2]time.Duration{}
+	aot := [2]time.Duration{}
 	for i, controller := range controllers {
 		stats := controller.TimingStats()
-		firstAnswer[i] = stats.FirstAnswer
-		turnP99[i] = stats.TurnP99
-		turnMax[i] = stats.TurnMax
+		ttfo[i] = stats.TimeToFirstOutput
+		aot[i] = stats.AverageOutputTime
 	}
 
 	// Build common metrics: win/loss/draw + scores + timing.
@@ -307,12 +318,10 @@ func buildMatchResult(simulationID int, seed int64, turns int, players []Player,
 		{Label: "draws", Value: draws},
 		{Label: "score_p0", Value: float64(players[0].GetScore())},
 		{Label: "score_p1", Value: float64(players[1].GetScore())},
-		{Label: "time_to_first_answer_p0", Value: durationMillis(firstAnswer[0])},
-		{Label: "time_to_first_answer_p1", Value: durationMillis(firstAnswer[1])},
-		{Label: "time_to_turn_p99_p0", Value: durationMillis(turnP99[0])},
-		{Label: "time_to_turn_p99_p1", Value: durationMillis(turnP99[1])},
-		{Label: "time_to_turn_max_p0", Value: durationMillis(turnMax[0])},
-		{Label: "time_to_turn_max_p1", Value: durationMillis(turnMax[1])},
+		{Label: "ttfo_p0", Value: durationMillis(ttfo[0])},
+		{Label: "ttfo_p1", Value: durationMillis(ttfo[1])},
+		{Label: "aot_p0", Value: durationMillis(aot[0])},
+		{Label: "aot_p1", Value: durationMillis(aot[1])},
 	}
 
 	return MatchResult{
@@ -322,20 +331,26 @@ func buildMatchResult(simulationID int, seed int64, turns int, players []Player,
 		Scores:            [2]int{players[0].GetScore(), players[1].GetScore()},
 		Winner:            winner,
 		LossReasons:       [2]LossReason{lossReasonFor(players[0], winner, 0), lossReasonFor(players[1], winner, 1)},
-		TimeToFirstAnswer: firstAnswer,
-		TimeToTurnP99:     turnP99,
-		TimeToTurnMax:     turnMax,
+		TimeToFirstOutput: ttfo,
+		AverageOutputTime: aot,
 		Metrics:           metrics,
 	}
+}
+
+func (r MatchResult) TTFO() [2]float64 {
+	return [2]float64{durationMillis(r.TimeToFirstOutput[0]), durationMillis(r.TimeToFirstOutput[1])}
+}
+
+func (r MatchResult) AOT() [2]float64 {
+	return [2]float64{durationMillis(r.AverageOutputTime[0]), durationMillis(r.AverageOutputTime[1])}
 }
 
 func swapMatchSides(r MatchResult) MatchResult {
 	r.Scores[0], r.Scores[1] = r.Scores[1], r.Scores[0]
 	r.RawScores[0], r.RawScores[1] = r.RawScores[1], r.RawScores[0]
 	r.LossReasons[0], r.LossReasons[1] = r.LossReasons[1], r.LossReasons[0]
-	r.TimeToFirstAnswer[0], r.TimeToFirstAnswer[1] = r.TimeToFirstAnswer[1], r.TimeToFirstAnswer[0]
-	r.TimeToTurnP99[0], r.TimeToTurnP99[1] = r.TimeToTurnP99[1], r.TimeToTurnP99[0]
-	r.TimeToTurnMax[0], r.TimeToTurnMax[1] = r.TimeToTurnMax[1], r.TimeToTurnMax[0]
+	r.TimeToFirstOutput[0], r.TimeToFirstOutput[1] = r.TimeToFirstOutput[1], r.TimeToFirstOutput[0]
+	r.AverageOutputTime[0], r.AverageOutputTime[1] = r.AverageOutputTime[1], r.AverageOutputTime[0]
 	for i := range r.BadCommands {
 		r.BadCommands[i].Player = 1 - r.BadCommands[i].Player
 	}

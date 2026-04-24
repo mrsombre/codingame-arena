@@ -20,6 +20,7 @@ func NewCommandManager(summary *[]string) *CommandManager {
 func (m *CommandManager) ParseCommands(player *Player, lines []string) {
 	if len(lines) == 0 {
 		m.deactivatePlayer(player, "Timeout!")
+		player.SetTimedOut(true)
 		return
 	}
 

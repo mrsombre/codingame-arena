@@ -213,6 +213,9 @@ func parseReplayLeague(questionTitle string) int {
 func extractReplayMoves(replay codingameReplay) arena.ReplayMoves {
 	var moves arena.ReplayMoves
 	for _, f := range replay.GameResult.Frames {
+		if strings.TrimSpace(f.Stdout) == "" {
+			continue
+		}
 		switch f.AgentID {
 		case 0:
 			moves.P0 = append(moves.P0, f.Stdout)
