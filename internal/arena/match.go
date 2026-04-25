@@ -15,7 +15,6 @@ type MatchOptions struct {
 	P0Bin       string
 	P1Bin       string
 	Debug       bool
-	Timing      bool
 	NoSwap      bool
 	TraceWriter *TraceWriter
 	GameOptions map[string]string
@@ -286,7 +285,6 @@ func attachCommandPlayers(options MatchOptions, players []Player) ([]*commandPla
 			return nil, nil, fmt.Errorf("failed to start player %d session: %w", i, err)
 		}
 		cp.playerIdx = i
-		cp.timing = options.Timing
 		players[i].SetExecuteFunc(cp.Execute)
 		controllers = append(controllers, cp)
 	}

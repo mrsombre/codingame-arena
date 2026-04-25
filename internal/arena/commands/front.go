@@ -39,7 +39,10 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 	}
 
 	if v.GetBool("help") {
-		_, err := fmt.Fprintln(stdout, arena.Usage(arena.Games()))
+		extra := "API: GET /api/game, GET /api/games, GET /api/bots, GET /api/matches, GET /api/matches/{id},\n" +
+			"     GET /api/replays, GET /api/replays/{id}, POST /api/run\n" +
+			"Stdin keys: o<enter> open in default browser   q<enter> quit"
+		_, err := fmt.Fprintln(stdout, arena.CommandUsage("serve", "Serve the embedded web viewer.", flags, extra))
 		return err
 	}
 

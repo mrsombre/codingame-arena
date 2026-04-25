@@ -9,11 +9,11 @@ import (
 // Reference values for seed=123 captured from OpenJDK 17's java.util.Random.
 // Probe: tmp/JavaRandProbe.java.
 var (
-	javaSeed123NextInt      = []int32{-1188957731, 1018954901, -39088943, 1295249578, 1087885590}
-	javaSeed123NextInt10    = []int{2, 0, 6, 9, 5, 7, 4, 7, 5, 3}
-	javaSeed123NextInt16    = []int{11, 3, 15, 4, 4, 9, 9, 4, 12, 9}
-	javaSeed123NextInt100   = []int{82, 50, 76, 89, 95, 57, 34, 37, 85, 53}
-	javaSeed123NextDouble   = []float64{0.7231742029971469, 0.9908988967772393, 0.25329310557439133, 0.6088003703785169, 0.8058695140834087}
+	javaSeed123NextInt    = []int32{-1188957731, 1018954901, -39088943, 1295249578, 1087885590}
+	javaSeed123NextInt10  = []int{2, 0, 6, 9, 5, 7, 4, 7, 5, 3}
+	javaSeed123NextInt16  = []int{11, 3, 15, 4, 4, 9, 9, 4, 12, 9}
+	javaSeed123NextInt100 = []int{82, 50, 76, 89, 95, 57, 34, 37, 85, 53}
+	javaSeed123NextDouble = []float64{0.7231742029971469, 0.9908988967772393, 0.25329310557439133, 0.6088003703785169, 0.8058695140834087}
 )
 
 func TestNext32MatchesJava(t *testing.T) {

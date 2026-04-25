@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -48,7 +47,6 @@ type commandPlayer struct {
 	stderrDone        chan struct{}
 	turns             int
 	writeMu           sync.Mutex
-	timing            bool
 	playerIdx         int
 	firstTurnLimit    time.Duration
 	nextTurnLimit     time.Duration
@@ -179,9 +177,6 @@ func (cp *commandPlayer) recordOutputDuration(duration time.Duration) {
 		cp.outputDurations = append(cp.outputDurations, duration)
 	}
 	cp.lastDuration = duration
-	if cp.timing {
-		fmt.Fprintf(os.Stderr, "timing p%d turn %d: %s\n", cp.playerIdx, cp.turns, duration)
-	}
 }
 
 // BeginTurn resets the per-turn duration sentinel. Called by the runner before

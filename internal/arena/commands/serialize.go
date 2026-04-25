@@ -23,9 +23,10 @@ func Serialize(args []string, stdout io.Writer, factory arena.GameFactory, fs *p
 	}
 
 	arena.MergeConfigGameOptions(v, fs, gameOptions)
+	arena.InjectLeague(v, gameOptions)
 
 	if v.GetBool("help") {
-		_, err := fmt.Fprintln(stdout, arena.Usage(arena.Games()))
+		_, err := fmt.Fprintln(stdout, arena.CommandUsage("serialize", "Print initial game input for first turn for a given seed.", fs, ""))
 		return err
 	}
 
@@ -40,7 +41,7 @@ func Serialize(args []string, stdout io.Writer, factory arena.GameFactory, fs *p
 
 	playerIdx := v.GetInt("player")
 	if playerIdx != 0 && playerIdx != 1 {
-		return fmt.Errorf("--player is required (0 or 1)")
+		return fmt.Errorf("--player must be 0 or 1")
 	}
 
 	referee, players := factory.NewGame(seed, gameOptions)

@@ -22,7 +22,6 @@ type ParsedArgs struct {
 	MaxTurns    int
 	TraceDir    string
 	Debug       bool
-	Timing      bool
 	NoSwap      bool
 	Verbose     bool
 	Help        bool
@@ -37,31 +36,32 @@ func NewBaseFlagSet(name string) *pflag.FlagSet {
 	fs.SortFlags = false
 	fs.SetOutput(io.Discard)
 	fs.BoolP("help", "h", false, "Show this help")
-	fs.String("game", "", "Active game (auto-detected when only one is registered)")
+	fs.String("game", "", "Active game")
 	return fs
 }
 
 // AddRunFlags registers flags used by the "run" subcommand on fs.
 func AddRunFlags(fs *pflag.FlagSet) {
-	fs.Int("simulations", 1, "Number of matches to run")
-	fs.Int("parallel", runtime.NumCPU(), "Worker threads")
-	fs.String("seed", "", "Base RNG seed (default: current time)")
-	fs.String("seedx", "", "Seed increment per match (seed_i = seed + i*N)")
+	fs.StringP("league", "l", "", "League level (default: game-specific)")
+	fs.IntP("simulations", "n", 100, "Number of matches to run")
+	fs.IntP("parallel", "p", runtime.NumCPU(), "Worker threads")
+	fs.StringP("seed", "s", "", "Base RNG seed (default: current time)")
+	fs.Int("seedx", 1, "Seed increment per match (seed_i = seed + i*N)")
 	fs.Bool("output-matches", false, "Include per-match results in JSON output")
 	fs.Bool("debug", false, "Force one match, fixed sides, print debug to stderr")
-	fs.Bool("timing", false, "Print per-turn timing to stderr")
 	fs.Bool("no-swap", false, "Disable automatic side swapping")
 	fs.String("trace-dir", "", "Write per-match JSON trace files")
 	fs.Int("max-turns", 200, "Maximum turns per match")
-	fs.String("p0-bin", "", "Player 0 binary (required)")
-	fs.String("p1-bin", filepath.Clean("./bin/opponent"), "Player 1 binary")
+	fs.String("p0", "", "Player 0 binary (required)")
+	fs.String("p1", filepath.Clean("./bin/opponent"), "Player 1 binary")
 	fs.Bool("verbose", false, "Output full JSON (default: short summary line)")
 }
 
 // AddSerializeFlags registers flags used by the "serialize" subcommand on fs.
 func AddSerializeFlags(fs *pflag.FlagSet) {
-	fs.String("seed", "", "RNG seed (required)")
-	fs.Int("player", -1, "Player index (0 or 1)")
+	fs.StringP("league", "l", "", "League level (default: game-specific)")
+	fs.StringP("seed", "s", "", "RNG seed (required)")
+	fs.Int("player", 0, "Player index (0 or 1)")
 }
 
 // AddReplayFlags registers flags used by the "replay" subcommand on fs.
@@ -88,19 +88,20 @@ func ParseRunArgs(args []string, fs *pflag.FlagSet, v *viper.Viper) (ParsedArgs,
 	}
 
 	MergeConfigGameOptions(v, fs, gameOptions)
+	injectLeague(v, gameOptions)
 
 	parsed := ParsedArgs{
 		BatchOptions: BatchOptions{
 			Simulations:   v.GetInt("simulations"),
 			Parallel:      v.GetInt("parallel"),
+			SeedIncrement: int64(v.GetInt("seedx")),
 			OutputMatches: v.GetBool("output-matches"),
 		},
-		P0Bin:       v.GetString("p0-bin"),
-		P1Bin:       v.GetString("p1-bin"),
+		P0Bin:       v.GetString("p0"),
+		P1Bin:       v.GetString("p1"),
 		MaxTurns:    v.GetInt("max-turns"),
 		TraceDir:    v.GetString("trace-dir"),
 		Debug:       v.GetBool("debug"),
-		Timing:      v.GetBool("timing"),
 		NoSwap:      v.GetBool("no-swap"),
 		Verbose:     v.GetBool("verbose"),
 		Help:        v.GetBool("help"),
@@ -117,14 +118,6 @@ func ParseRunArgs(args []string, fs *pflag.FlagSet, v *viper.Viper) (ParsedArgs,
 		parsed.Seed = time.Now().UnixNano()
 	}
 
-	if raw := v.GetString("seedx"); raw != "" {
-		n, err := ParseSeed(raw)
-		if err != nil {
-			return ParsedArgs{}, fmt.Errorf("invalid integer for --seedx: %s", raw)
-		}
-		parsed.SeedIncrement = &n
-	}
-
 	if parsed.Simulations < 1 {
 		return ParsedArgs{}, fmt.Errorf("--simulations must be >= 1")
 	}
@@ -134,11 +127,11 @@ func ParseRunArgs(args []string, fs *pflag.FlagSet, v *viper.Viper) (ParsedArgs,
 	if parsed.MaxTurns < 1 {
 		return ParsedArgs{}, fmt.Errorf("--max-turns must be >= 1")
 	}
-	if parsed.SeedIncrement != nil && *parsed.SeedIncrement <= 0 {
+	if parsed.SeedIncrement < 1 {
 		return ParsedArgs{}, fmt.Errorf("--seedx must be >= 1")
 	}
 	if !parsed.Help && parsed.P0Bin == "" {
-		return ParsedArgs{}, fmt.Errorf("--p0-bin is required")
+		return ParsedArgs{}, fmt.Errorf("--p0 is required")
 	}
 	if parsed.Debug {
 		parsed.Simulations = 1
@@ -244,53 +237,54 @@ func MergeConfigGameOptions(v *viper.Viper, fs *pflag.FlagSet, gameOptions map[s
 	}
 }
 
-// Usage returns the top-level help text, including available games.
+// InjectLeague copies the --league flag value into gameOptions if set.
+// Exported for use by subcommands that build gameOptions outside ParseRunArgs.
+func InjectLeague(v *viper.Viper, gameOptions map[string]string) {
+	injectLeague(v, gameOptions)
+}
+
+func injectLeague(v *viper.Viper, gameOptions map[string]string) {
+	if league := v.GetString("league"); league != "" {
+		if _, exists := gameOptions["league"]; !exists {
+			gameOptions["league"] = league
+		}
+	}
+}
+
+// Usage returns the top-level help text, listing available commands.
 func Usage(games []string) string {
 	return strings.TrimSpace(fmt.Sprintf(`Available games: %s
 
 Usage: arena <command> [OPTIONS]
 
-arena run - Run one or more match simulations against a player binary.
-  --simulations <N>    Number of matches to run (default: 1)
-  --parallel <N>       Number of worker threads (default: logical CPUs)
-  --seed <N>           Base RNG seed (default: current time)
-  --seedx <N>          Seed increment per match (seed_i = seed + i*N)
-  --output-matches     Include per-match results in JSON output
-  --trace-dir <PATH>   Write per-match JSON trace files
-  --no-swap            Disable automatic side swapping
-  --debug              Force one match, fixed sides, print debug to stderr
-  --max-turns <N>      Maximum turns per match (default: 200)
-  --p0-bin <PATH>      Player 0 binary (required)
-  --p1-bin <PATH>      Player 1 binary (default: ./bin/opponent)
-  --timing             Print per-turn timing to stderr
-  --verbose            Output full JSON (default: short summary line)
+Commands:
+  run          Run one or more match simulations against a player binary
+  serialize    Print initial game input for first turn for a given seed
+  replay       Download raw replay JSON from codingame.com
+  serve        Serve the embedded web viewer
 
-arena serialize - Print initial global + first-frame inputs for a given seed.
-  --seed <N>           RNG seed (required)
-  --player <0|1>       Player index (required)
-
-arena replay <url|id> - Download raw replay JSON from codingame.com.
-  -o, --out <PATH>     Output path. Default: ./replays/replay-<id>.json.
-                       Trailing "/" or existing dir → replay-<id>.json inside.
-                       Otherwise treated as a file path (created/overwritten).
-
-arena serve - Serve the embedded web viewer.
-  --port <N>           HTTP port (default: 5757)
-  --host <HOST>        Bind host (default: localhost)
-  --trace-dir <PATH>   Directory with match trace JSON files (powers /api/matches)
-  --replay-dir <PATH>  Directory with CodinGame replay JSON files (powers /api/replays)
-  --bin-dir <PATH>     Directory to scan for bot binaries (default: ./bin)
-  API: GET /api/game, GET /api/games, GET /api/bots, GET /api/matches, GET /api/matches/{id}, GET /api/replays, GET /api/replays/{id}, POST /api/run
-  Stdin keys: o<enter> open in default browser   q<enter> quit
-
-Common options:
-  --game <NAME>        Active game (auto-detected when only one is registered)
-  -h, --help           Show this help
+Use "arena <command> --help" for more information about a command.
 
 Env vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_GAME, ARENA_SEED).
 Config: arena.yml in current directory (e.g. game: winter2026).
 
 Unknown --key value flags are passed as game options to the engine factory.`, strings.Join(games, ", ")))
+}
+
+// CommandUsage returns help text for a specific subcommand using fs.FlagUsages().
+func CommandUsage(command, description string, fs *pflag.FlagSet, extra string) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "arena %s - %s\n\nOptions:\n", command, description)
+	sb.WriteString(fs.FlagUsages())
+	if extra != "" {
+		sb.WriteString("\n")
+		sb.WriteString(extra)
+		sb.WriteString("\n")
+	}
+	sb.WriteString("\nEnv vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_GAME, ARENA_SEED).\n")
+	sb.WriteString("Config: arena.yml in current directory (e.g. game: winter2026).\n")
+	sb.WriteString("Unknown --key value flags are passed as game options to the engine factory.")
+	return sb.String()
 }
 
 func ParseSeed(value string) (int64, error) {

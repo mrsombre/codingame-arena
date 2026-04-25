@@ -45,7 +45,7 @@ build-spring2020-agents:
 	cp -f $(SPRING2020_AGENTS)/bot.py $(SPRING2020_PYBOT)
 
 match-spring2020:
-	./$(BIN_DIR)/arena --game=spring2020 --p0-bin=./$(SPRING2020_CPPBOT) --p1-bin=./$(SPRING2020_PYBOT) \
+	./$(BIN_DIR)/arena --game=spring2020 --p0=./$(SPRING2020_CPPBOT) --p1=./$(SPRING2020_PYBOT) \
 		--seed=100030005000 --simulations 100
 
 # winter-2026
@@ -61,5 +61,5 @@ build-winter2026-agents:
 	cp -f $(WINTER2026_AGENTS)/bot.py $(WINTER2026_PYBOT)
 
 match-winter2026:
-	./$(BIN_DIR)/arena --game=winter2026 --p0-bin=./$(WINTER2026_CPPBOT) --p1-bin=./$(WINTER2026_PYBOT) \
+	./$(BIN_DIR)/arena --game=winter2026 --p0=./$(WINTER2026_CPPBOT) --p1=./$(WINTER2026_PYBOT) \
 		--seed=100030005000 --simulations 100

@@ -31,7 +31,7 @@ func Replay(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfla
 	}
 
 	if v.GetBool("help") {
-		_, err := fmt.Fprintln(stdout, arena.Usage(arena.Games()))
+		_, err := fmt.Fprintln(stdout, arena.CommandUsage("replay <url|id>", "Download raw replay JSON from codingame.com.", fs, ""))
 		return err
 	}
 

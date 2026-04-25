@@ -8,9 +8,9 @@ import (
 
 func TestCellTypeFromChar(t *testing.T) {
 	tests := []struct {
-		c       byte
-		isWall  bool
-		pellet  bool
+		c      byte
+		isWall bool
+		pellet bool
 	}{
 		{'#', true, false},
 		{'x', true, false},

@@ -204,4 +204,3 @@ func extractReplayMoves(replay arena.CodinGameReplay[arena.CodinGameReplayFrame]
 	}
 	return moves
 }
-

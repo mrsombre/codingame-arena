@@ -22,7 +22,7 @@ func newTestRunCtx(t *testing.T) (*pflag.FlagSet, *viper.Viper) {
 func TestParseArgsParsesAllCommonFlags(t *testing.T) {
 	fs, v := newTestRunCtx(t)
 	got, err := ParseRunArgs([]string{
-		"--p0-bin", "./bin/p0",
+		"--p0", "./bin/p0",
 		"--seed", "-1755827269105404700",
 		"--seedx", "7",
 		"--max-turns", "123",
@@ -31,26 +31,23 @@ func TestParseArgsParsesAllCommonFlags(t *testing.T) {
 		"--output-matches",
 		"--trace-dir", "./tmp/traces",
 		"--no-swap",
-		"--timing",
 	}, fs, v)
 	require.NoError(t, err)
-	require.NotNil(t, got.SeedIncrement)
 	assert.Equal(t, int64(-1755827269105404700), got.Seed)
-	assert.Equal(t, int64(7), *got.SeedIncrement)
+	assert.Equal(t, int64(7), got.SeedIncrement)
 	assert.Equal(t, 123, got.MaxTurns)
 	assert.Equal(t, 4, got.Simulations)
 	assert.Equal(t, 2, got.Parallel)
 	assert.True(t, got.OutputMatches)
 	assert.Equal(t, "./tmp/traces", got.TraceDir)
 	assert.True(t, got.NoSwap)
-	assert.True(t, got.Timing)
 	assert.Equal(t, filepath.Clean("./bin/opponent"), got.P1Bin)
 }
 
 func TestParseArgsAcceptsSeedPrefix(t *testing.T) {
 	fs, v := newTestRunCtx(t)
 	got, err := ParseRunArgs([]string{
-		"--p0-bin", "./bin/p0",
+		"--p0", "./bin/p0",
 		"--seed", "seed=1001",
 	}, fs, v)
 	require.NoError(t, err)
@@ -60,7 +57,7 @@ func TestParseArgsAcceptsSeedPrefix(t *testing.T) {
 func TestParseArgsCollectsUnknownFlagsAsGameOptions(t *testing.T) {
 	fs, v := newTestRunCtx(t)
 	got, err := ParseRunArgs([]string{
-		"--p0-bin", "./bin/p0",
+		"--p0", "./bin/p0",
 		"--league", "3",
 		"--custom-flag", "value",
 	}, fs, v)
@@ -74,7 +71,7 @@ func TestParseArgsRejectsNonPositiveSeedIncrement(t *testing.T) {
 		t.Run(value, func(t *testing.T) {
 			fs, v := newTestRunCtx(t)
 			_, err := ParseRunArgs([]string{
-				"--p0-bin", "./bin/p0",
+				"--p0", "./bin/p0",
 				"--seedx", value,
 			}, fs, v)
 			require.Error(t, err)
@@ -87,12 +84,12 @@ func TestParseArgsRequiresP0Bin(t *testing.T) {
 	fs, v := newTestRunCtx(t)
 	_, err := ParseRunArgs([]string{}, fs, v)
 	require.Error(t, err)
-	assert.EqualError(t, err, "--p0-bin is required")
+	assert.EqualError(t, err, "--p0 is required")
 }
 
 func TestParseArgsReadsFromViperConfig(t *testing.T) {
 	fs, v := newTestRunCtx(t)
-	v.Set("p0-bin", "./bin/cfg-p0")
+	v.Set("p0", "./bin/cfg-p0")
 	v.Set("max-turns", 77)
 	got, err := ParseRunArgs([]string{}, fs, v)
 	require.NoError(t, err)

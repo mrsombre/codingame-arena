@@ -31,12 +31,12 @@ make build-arena
 make build-winter2026-agents
 
 bin/arena --game=winter2026 \
---p0-bin=bin/bot-winter2026-cpp \
---p1-bin=bin/bot-winter2026-py \
---seed=100030005000 --simulations 100
+  --p0=bin/bot-winter2026-cpp \
+  --p1=bin/bot-winter2026-py \
+  --seed=100030005000 --simulations 100
 
-# W=25% L=29% D=46% score=13.3v13.3 turns=150.8
-# p0 ttfo=2ms aot=0ms p1 ttfo=33ms aot=0ms
+# wins=26% losses=31% draws=43% avg_score=12.8v12.8 avg_turns=154
+# p0: avg_first_response=2ms avg_turn_response=0ms p1: avg_first_response=37ms avg_turn_response=0ms
 ```
 
 ### Web Viewer
