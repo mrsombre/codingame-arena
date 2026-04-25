@@ -67,8 +67,8 @@ func TestWriteShortSummary(t *testing.T) {
 	var buf bytes.Buffer
 	err := WriteShortSummary(&buf, summary)
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "W=70%")
-	assert.Contains(t, buf.String(), "L=20%")
-	assert.Contains(t, buf.String(), "p0 ttfo=820ms aot=12ms")
-	assert.Contains(t, buf.String(), "p1 ttfo=900ms aot=14ms")
+	assert.Contains(t, buf.String(), "wins=70%")
+	assert.Contains(t, buf.String(), "losses=20%")
+	assert.Contains(t, buf.String(), "avg_first_response=820msx900ms")
+	assert.Contains(t, buf.String(), "avg_turn_response=12msx14ms")
 }

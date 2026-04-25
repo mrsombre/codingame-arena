@@ -143,7 +143,7 @@ func TestGameShouldSkipPlayerTurnIsAlwaysFalse(t *testing.T) {
 // TestFactoryBasics asserts the public factory wiring.
 func TestFactoryBasics(t *testing.T) {
 	f := NewFactory()
-	assert.Equal(t, "winter-2026", f.Name())
+	assert.Equal(t, "winter2026", f.Name())
 	assert.Equal(t, 200, f.MaxTurns())
 
 	ref, players := f.NewGame(1, map[string]string{"league": "1"})

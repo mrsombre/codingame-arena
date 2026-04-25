@@ -140,11 +140,11 @@ func handleSerialize(factory arena.GameFactory) http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		for _, line := range referee.GlobalInfoFor(player) {
-			fmt.Fprintln(w, line)
+			_, _ = fmt.Fprintln(w, line)
 		}
 		referee.ResetGameTurnData()
 		for _, line := range referee.FrameInfoFor(player) {
-			fmt.Fprintln(w, line)
+			_, _ = fmt.Fprintln(w, line)
 		}
 	}
 }
@@ -229,7 +229,7 @@ type runRequest struct {
 
 func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
+		defer func() { _ = r.Body.Close() }()
 		var req runRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid json: "+err.Error())
@@ -307,7 +307,7 @@ type batchResponse struct {
 
 func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
+		defer func() { _ = r.Body.Close() }()
 		var req batchRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid json: "+err.Error())

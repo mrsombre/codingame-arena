@@ -19,7 +19,7 @@ func TestFindPathStraightCorridor(t *testing.T) {
 	assert.False(t, r.IsNearest)
 	assert.Equal(t, 4, r.WeightedLength)
 	assert.Equal(t,
-		[]grid.Coord{{1, 1}, {2, 1}, {3, 1}, {4, 1}, {5, 1}},
+		[]grid.Coord{{X: 1, Y: 1}, {X: 2, Y: 1}, {X: 3, Y: 1}, {X: 4, Y: 1}, {X: 5, Y: 1}},
 		r.Path,
 	)
 }

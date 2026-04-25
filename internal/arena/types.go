@@ -65,6 +65,6 @@ type BatchOptions struct {
 	Simulations   int
 	Parallel      int
 	Seed          int64
-	SeedIncrement *int64
+	SeedIncrement int64
 	OutputMatches bool
 }

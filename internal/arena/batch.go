@@ -64,20 +64,10 @@ func RunMatches(options BatchOptions, runMatch func(simulationID int, seed int64
 	return all
 }
 
-func deriveSeed(base int64, offset uint64, seedIncrement *int64) int64 {
-	if seedIncrement != nil {
-		return int64(uint64(base) + offset*uint64(*seedIncrement))
+func deriveSeed(base int64, offset uint64, seedIncrement int64) int64 {
+	seed := int64(uint64(base) + offset*uint64(seedIncrement))
+	if offset%2 == 1 {
+		seed = -seed
 	}
-	return mixSeed(base, offset)
-}
-
-func mixSeed(base int64, offset uint64) int64 {
-	z := uint64(base)
-	if offset == 0 {
-		return base
-	}
-	z += offset + 0x9E3779B97F4A7C15
-	z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9
-	z = (z ^ (z >> 27)) * 0x94D049BB133111EB
-	return int64(z ^ (z >> 31))
+	return seed
 }

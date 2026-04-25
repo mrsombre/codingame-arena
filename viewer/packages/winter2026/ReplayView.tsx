@@ -10,11 +10,11 @@ interface ReplayResponse extends TraceMatch {
 }
 
 interface ReplayViewProps {
-  id: string
+  replayId: string
 }
 
-export function ReplayView({ id }: ReplayViewProps) {
-  const [status, setStatus] = useState(`loading replay ${id}\u2026`)
+export function ReplayView({ replayId }: ReplayViewProps) {
+  const [status, setStatus] = useState(`loading replay ${replayId}\u2026`)
   const [mapData, setMapData] = useState<MapData | null>(null)
   const [trace, setTrace] = useState<TraceMatch | null>(null)
 
@@ -22,10 +22,10 @@ export function ReplayView({ id }: ReplayViewProps) {
     let cancelled = false
     setMapData(null)
     setTrace(null)
-    setStatus(`loading replay ${id}\u2026`)
+    setStatus(`loading replay ${replayId}\u2026`)
     ;(async () => {
       try {
-        const traceRes = await fetch(`/api/replays/${encodeURIComponent(id)}`)
+        const traceRes = await fetch(`/api/replays/${encodeURIComponent(replayId)}`)
         if (!traceRes.ok) {
           if (!cancelled) setStatus(`replay error ${traceRes.status}: ${await traceRes.text()}`)
           return
@@ -49,7 +49,7 @@ export function ReplayView({ id }: ReplayViewProps) {
     return () => {
       cancelled = true
     }
-  }, [id])
+  }, [replayId])
 
   const backCard = (
     <Button asChild variant="outline" size="sm" className="self-start">
@@ -60,18 +60,10 @@ export function ReplayView({ id }: ReplayViewProps) {
   )
 
   if (mapData && trace) {
-    const p0 = trace.bots[0] ?? "p0"
-    const p1 = trace.bots[1] ?? "p1"
-    const shortId = id.startsWith("replay-") ? id.slice("replay-".length) : id
-    const winnerName = trace.winner === 0 ? p0 : trace.winner === 1 ? p1 : null
-    const winnerClass = trace.winner === 0 ? "text-sky-400" : trace.winner === 1 ? "text-red-400" : "text-muted-foreground"
-    const replayStatus = (
-      <>
-        replay: {shortId}&nbsp;&nbsp;seed={trace.seed}&nbsp;&nbsp;<span className="text-sky-400">{p0}</span> vs <span className="text-red-400">{p1}</span>&nbsp;&nbsp;winner=
-        <span className={winnerClass}>{winnerName ?? "draw"}</span>&nbsp;&nbsp;score=<span className="text-sky-400">{trace.scores[0]}</span>:<span className="text-red-400">{trace.scores[1]}</span>
-        &nbsp;&nbsp;turns={trace.turns.length}
-      </>
-    )
+    const p0 = trace.players[0] ?? "p0"
+    const p1 = trace.players[1] ?? "p1"
+    const winnerLabel = trace.winner === -1 ? "draw" : `p${trace.winner}`
+    const replayStatus = `replay ${replayId}  seed=${trace.seed}  ${p0} vs ${p1}  winner=${winnerLabel}  score=${trace.scores[0]}:${trace.scores[1]}  turns=${trace.turns.length}`
     return <ReplayViewer mapData={mapData} trace={trace} status={replayStatus} leftSlot={backCard} />
   }
 

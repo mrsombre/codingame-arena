@@ -25,7 +25,7 @@ type runnerMetadata struct {
 	Simulations   int    `json:"simulations"`
 	Parallel      int    `json:"parallel"`
 	Seed          int64  `json:"seed"`
-	SeedIncrement *int64 `json:"seed_increment,omitempty"`
+	SeedIncrement int64  `json:"seed_increment"`
 	OutputMatches bool   `json:"output_matches"`
 	TraceDir      string `json:"trace_dir,omitempty"`
 	MaxTurns      int    `json:"max_turns"`
@@ -42,7 +42,7 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 	}
 
 	if parsed.Help {
-		_, err = fmt.Fprintln(stdout, arena.Usage(arena.Games()))
+		_, err = fmt.Fprintln(stdout, arena.CommandUsage("run", "Run one or more match simulations against a player binary.", fs, ""))
 		return err
 	}
 
@@ -53,7 +53,6 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 		P0Bin:       parsed.P0Bin,
 		P1Bin:       parsed.P1Bin,
 		Debug:       parsed.Debug,
-		Timing:      parsed.Timing,
 		NoSwap:      parsed.NoSwap,
 		TraceWriter: traceWriter,
 		GameOptions: parsed.GameOptions,

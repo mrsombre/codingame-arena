@@ -31,8 +31,12 @@ func main() {
 
 	command, rest := args[0], args[1:]
 	// If the first token isn't a subcommand name, assume implicit "run"
-	// and feed every arg as a flag (preserves `arena --p0-bin …` ergonomics).
+	// and feed every arg as a flag (preserves `arena --p0 …` ergonomics).
 	if strings.HasPrefix(command, "-") {
+		if command == "--help" || command == "-h" {
+			fmt.Println(arena.Usage(games))
+			return
+		}
 		command, rest = "run", args
 	}
 

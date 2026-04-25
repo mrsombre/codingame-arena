@@ -39,7 +39,10 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 	}
 
 	if v.GetBool("help") {
-		_, err := fmt.Fprintln(stdout, arena.Usage(arena.Games()))
+		extra := "API: GET /api/game, GET /api/games, GET /api/bots, GET /api/matches, GET /api/matches/{id},\n" +
+			"     GET /api/replays, GET /api/replays/{id}, POST /api/run\n" +
+			"Stdin keys: o<enter> open in default browser   q<enter> quit"
+		_, err := fmt.Fprintln(stdout, arena.CommandUsage("serve", "Serve the embedded web viewer.", flags, extra))
 		return err
 	}
 
@@ -92,7 +95,8 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 		serverErr <- nil
 	}()
 
-	printFrontUsage(stdout, url, traceDir)
+	watching, _ := resolveExe()
+	printFrontUsage(stdout, url, traceDir, watching)
 
 	binaryChanged := watchBinary(ctx, stdout)
 	stdinCmds := readStdinCommands(ctx)
@@ -100,7 +104,7 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Fprintln(stdout, "shutting down...")
+			_, _ = fmt.Fprintln(stdout, "shutting down...")
 			return shutdown(httpServer)
 
 		case err := <-serverErr:
@@ -110,7 +114,7 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 			return nil
 
 		case <-binaryChanged:
-			fmt.Fprintln(stdout, "\nbinary changed — restarting...")
+			_, _ = fmt.Fprintln(stdout, "\nbinary changed — restarting...")
 			_ = shutdown(httpServer)
 			return reexec()
 
@@ -122,16 +126,16 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 			switch cmd {
 			case "o":
 				if err := openBrowser(url); err != nil {
-					fmt.Fprintf(stdout, "open browser: %v\n", err)
+					_, _ = fmt.Fprintf(stdout, "open browser: %v\n", err)
 				} else {
-					fmt.Fprintf(stdout, "opened %s\n", url)
+					_, _ = fmt.Fprintf(stdout, "opened %s\n", url)
 				}
-				printFrontUsage(stdout, url, traceDir)
+				printFrontUsage(stdout, url, traceDir, watching)
 			case "q":
-				fmt.Fprintln(stdout, "shutting down...")
+				_, _ = fmt.Fprintln(stdout, "shutting down...")
 				return shutdown(httpServer)
 			default:
-				printFrontUsage(stdout, url, traceDir)
+				printFrontUsage(stdout, url, traceDir, watching)
 			}
 		}
 	}
@@ -163,16 +167,32 @@ func shutdown(server *http.Server) error {
 	return nil
 }
 
-func printFrontUsage(w io.Writer, url, traceDir string) {
-	traceInfo := "(none — /api/matches returns [])"
+func printFrontUsage(w io.Writer, url, traceDir, watching string) {
+	traceInfo := "(none)"
 	if traceDir != "" {
 		traceInfo = traceDir
 	}
-	fmt.Fprintf(w, `arena serve — viewer server
-  url:       %s
-  trace-dir: %s
-  keys:      o<enter> open in browser   q<enter> quit
-`, url, traceInfo)
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "  arena front  ready")
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintf(w, "  ➜  Local:     %s\n", url)
+	_, _ = fmt.Fprintf(w, "  ➜  Trace:     %s\n", traceInfo)
+	if watching != "" {
+		_, _ = fmt.Fprintf(w, "  ➜  Watching:  %s\n", watching)
+	}
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "  Shortcuts")
+	_, _ = fmt.Fprintln(w, "  press o + enter to open in browser")
+	_, _ = fmt.Fprintln(w, "  press q + enter to quit")
+	_, _ = fmt.Fprintln(w)
+}
+
+func resolveExe() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return filepath.EvalSymlinks(exe)
 }
 
 // watchBinary watches the current executable for changes and signals on the
@@ -182,35 +202,28 @@ func printFrontUsage(w io.Writer, url, traceDir string) {
 func watchBinary(ctx context.Context, log io.Writer) <-chan struct{} {
 	ch := make(chan struct{}, 1)
 
-	exe, err := os.Executable()
+	exe, err := resolveExe()
 	if err != nil {
-		fmt.Fprintf(log, "watch: cannot resolve executable: %v\n", err)
-		return ch
-	}
-	exe, err = filepath.EvalSymlinks(exe)
-	if err != nil {
-		fmt.Fprintf(log, "watch: cannot resolve symlinks: %v\n", err)
+		_, _ = fmt.Fprintf(log, "watch: cannot resolve executable: %v\n", err)
 		return ch
 	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		fmt.Fprintf(log, "watch: cannot create watcher: %v\n", err)
+		_, _ = fmt.Fprintf(log, "watch: cannot create watcher: %v\n", err)
 		return ch
 	}
 
 	dir := filepath.Dir(exe)
 	base := filepath.Base(exe)
 	if err := watcher.Add(dir); err != nil {
-		fmt.Fprintf(log, "watch: cannot watch %s: %v\n", dir, err)
+		_, _ = fmt.Fprintf(log, "watch: cannot watch %s: %v\n", dir, err)
 		_ = watcher.Close()
 		return ch
 	}
 
-	fmt.Fprintf(log, "  watching:  %s\n", exe)
-
 	go func() {
-		defer watcher.Close()
+		defer func() { _ = watcher.Close() }()
 		// Debounce: builds may fire multiple events in quick succession.
 		var debounce *time.Timer
 		for {

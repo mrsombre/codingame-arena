@@ -15,7 +15,6 @@ type MatchOptions struct {
 	P0Bin       string
 	P1Bin       string
 	Debug       bool
-	Timing      bool
 	NoSwap      bool
 	TraceWriter *TraceWriter
 	GameOptions map[string]string
@@ -76,6 +75,10 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	for turn = 0; !referee.Ended() && turn < maxTurns; turn++ {
 		referee.ResetGameTurnData()
 
+		for _, controller := range controllers {
+			controller.BeginTurn()
+		}
+
 		wasDeactivated := [2]bool{players[0].IsDeactivated(), players[1].IsDeactivated()}
 		playerOutputs := [2]string{}
 		var turnInput traceTurnInput
@@ -118,6 +121,10 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				GameInput: turnInput,
 				P0Output:  playerOutputs[0],
 				P1Output:  playerOutputs[1],
+				Timing: &TraceTurnTiming{Response: [2]float64{
+					durationMillis(controllers[0].LastOutputDuration()),
+					durationMillis(controllers[1].LastOutputDuration()),
+				}},
 			}
 			if tp, ok := referee.(TraceProvider); ok {
 				tt.GameState = tp.SnapshotTurn(turn, players)
@@ -215,20 +222,28 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				traceWinner = -1
 			}
 		}
-		traceTTFO := result.TTFO()
-		traceAOT := result.AOT()
-		if result.Swapped {
-			traceTTFO[0], traceTTFO[1] = traceTTFO[1], traceTTFO[0]
-			traceAOT[0], traceAOT[1] = traceAOT[1], traceAOT[0]
+		stats := [2]playerTimingStats{controllers[0].TimingStats(), controllers[1].TimingStats()}
+		traceTiming := &TraceTiming{
+			FirstResponse: [2]float64{
+				durationMillis(stats[0].TimeToFirstOutput),
+				durationMillis(stats[1].TimeToFirstOutput),
+			},
+			ResponseAverage: [2]float64{
+				durationMillis(stats[0].AverageOutputTime),
+				durationMillis(stats[1].AverageOutputTime),
+			},
+			ResponseMedian: [2]float64{
+				durationMillis(stats[0].MedianOutputTime),
+				durationMillis(stats[1].MedianOutputTime),
+			},
 		}
 		traceMatch := TraceMatch{
 			MatchID: simulationID,
 			Seed:    seed,
 			Winner:  traceWinner,
 			Scores:  traceScores,
-			Bots:    [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
-			TTFO:    traceTTFO,
-			AOT:     traceAOT,
+			Players: [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
+			Timing:  traceTiming,
 			Turns:   traceTurns,
 		}
 		if err := runner.Options.TraceWriter.WriteMatch(traceMatch); err != nil {
@@ -270,7 +285,6 @@ func attachCommandPlayers(options MatchOptions, players []Player) ([]*commandPla
 			return nil, nil, fmt.Errorf("failed to start player %d session: %w", i, err)
 		}
 		cp.playerIdx = i
-		cp.timing = options.Timing
 		players[i].SetExecuteFunc(cp.Execute)
 		controllers = append(controllers, cp)
 	}

@@ -19,8 +19,11 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 		Seed:    12345,
 		Winner:  0,
 		Scores:  [2]int{15, 12},
-		TTFO:    [2]float64{820, 910},
-		AOT:     [2]float64{12, 14},
+		Timing: &TraceTiming{
+			FirstResponse:   [2]float64{820, 910},
+			ResponseAverage: [2]float64{12, 14},
+			ResponseMedian:  [2]float64{10, 13},
+		},
 		Turns: []TraceTurn{
 			{
 				Turn: 0,
@@ -30,6 +33,7 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 				},
 				P0Output: "UP 0 RIGHT 1",
 				P1Output: "DOWN 0 LEFT 1",
+				Timing:   &TraceTurnTiming{Response: [2]float64{820, 910}},
 				Events: []TurnEvent{
 					{Label: "eat", Payload: "bot0:14.5"},
 				},
@@ -47,11 +51,15 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &got))
 	assert.Equal(t, int64(12345), got.Seed)
 	assert.Equal(t, 0, got.Winner)
-	assert.Equal(t, [2]float64{820, 910}, got.TTFO)
-	assert.Equal(t, [2]float64{12, 14}, got.AOT)
+	require.NotNil(t, got.Timing)
+	assert.Equal(t, [2]float64{820, 910}, got.Timing.FirstResponse)
+	assert.Equal(t, [2]float64{12, 14}, got.Timing.ResponseAverage)
+	assert.Equal(t, [2]float64{10, 13}, got.Timing.ResponseMedian)
 	require.Len(t, got.Turns, 1)
 	assert.Equal(t, "UP 0 RIGHT 1", got.Turns[0].P0Output)
 	assert.Equal(t, "DOWN 0 LEFT 1", got.Turns[0].P1Output)
+	require.NotNil(t, got.Turns[0].Timing)
+	assert.Equal(t, [2]float64{820, 910}, got.Turns[0].Timing.Response)
 	require.Len(t, got.Turns[0].Events, 1)
 	assert.Equal(t, "eat", got.Turns[0].Events[0].Label)
 }

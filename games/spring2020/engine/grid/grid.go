@@ -106,7 +106,7 @@ func (g *Grid) Cells() []*Cell {
 func (g *Grid) GetCoordNeighbour(pos, delta Coord) (Coord, bool) {
 	n := pos.Add(delta)
 	if g.MapWraps {
-		n = Coord{X: ((n.X%g.Width)+g.Width)%g.Width, Y: n.Y}
+		n = Coord{X: ((n.X % g.Width) + g.Width) % g.Width, Y: n.Y}
 	}
 	if g.Get(n).IsValid() {
 		return n, true

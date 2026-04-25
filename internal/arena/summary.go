@@ -108,7 +108,7 @@ func FindWorstLosses(results []MatchResult, limit int) []int {
 // RenderMatch serializes a MatchResult to JSON for verbose output.
 // Scores and Winner prefer raw alive-segment sums when the engine provides
 // them, so the viewer's single-match status never shows the negative values
-// that referees like winter-2026 emit after tie-break adjustments.
+// that referees like winter2026 emit after tie-break adjustments.
 func (r MatchResult) RenderMatch() string {
 	scores := r.Scores
 	winner := r.Winner
@@ -165,7 +165,7 @@ func WriteShortSummary(w io.Writer, s MatchSummary) error {
 		}
 		return 0
 	}
-	_, err := fmt.Fprintf(w, "W=%.0f%% L=%.0f%% D=%.0f%% score=%.1fv%.1f turns=%.1f\n",
+	_, err := fmt.Fprintf(w, "wins=%.0f%% losses=%.0f%% draws=%.0f%% avg_score=%.1fx%.1f avg_turns=%.0f\n",
 		get("wins_p0")*100,
 		get("loses_p0")*100,
 		get("draws")*100,
@@ -176,10 +176,10 @@ func WriteShortSummary(w io.Writer, s MatchSummary) error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(w, "p0 ttfo=%.0fms aot=%.0fms p1 ttfo=%.0fms aot=%.0fms\n",
+	_, err = fmt.Fprintf(w, "avg_first_response=%.0fmsx%.0fms avg_turn_response=%.0fmsx%.0fms\n",
 		get("ttfo_p0"),
-		get("aot_p0"),
 		get("ttfo_p1"),
+		get("aot_p0"),
 		get("aot_p1"),
 	)
 	return err

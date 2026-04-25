@@ -1,6 +1,6 @@
 packages:
   - packages/shared
-  - packages/winter-2026
+  - packages/winter2026
 
 strictDepBuilds: true
 allowBuilds:

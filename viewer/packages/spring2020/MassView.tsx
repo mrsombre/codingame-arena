@@ -4,16 +4,27 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@shared/co
 import { Input } from "@shared/components/ui/input.tsx"
 import { Label } from "@shared/components/ui/label.tsx"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@shared/components/ui/select.tsx"
-import { ArrowLeftIcon, LoaderIcon, PlayIcon } from "lucide-react"
+import { useNavigate } from "@tanstack/react-router"
+import { LoaderIcon, PlayIcon } from "lucide-react"
 import { useState } from "react"
 import { type MapData, parseSerializeResponse, type TraceMatch } from "./parser.ts"
-import { ReplayViewer } from "./ReplayViewer.tsx"
 
 interface MassViewProps {
   bots: BotEntry[]
 }
 
-interface BatchMatch {
+export interface BatchMatchCacheEntry {
+  match: BatchMatch
+  mapData: MapData
+  trace: TraceMatch
+  fogPerspectiveSide: 0 | 1
+}
+
+export const batchMatchCache = new Map<string, BatchMatchCacheEntry>()
+
+let lastBatch: { response: BatchResponse; league: string } | null = null
+
+export interface BatchMatch {
   id: number
   seed: string
   winner: number
@@ -47,8 +58,9 @@ interface BatchResponse {
 }
 
 export function MassView({ bots }: MassViewProps) {
+  const navigate = useNavigate()
   const [seed, setSeed] = useState("")
-  const [league, setLeague] = useState("4")
+  const [league, setLeague] = useState(lastBatch?.league ?? "4")
   const [p0Bot, setP0Bot] = useState(bots[0]?.path ?? "")
   const [p1Bot, setP1Bot] = useState(bots[1]?.path ?? bots[0]?.path ?? "")
   const [simulations, setSimulations] = useState("50")
@@ -56,12 +68,9 @@ export function MassView({ bots }: MassViewProps) {
 
   const [status, setStatus] = useState("")
   const [running, setRunning] = useState(false)
-  const [batch, setBatch] = useState<BatchResponse | null>(null)
+  const [batch, setBatch] = useState<BatchResponse | null>(lastBatch?.response ?? null)
 
   const [loadingMatch, setLoadingMatch] = useState<number | null>(null)
-  const [mapData, setMapData] = useState<MapData | null>(null)
-  const [trace, setTrace] = useState<TraceMatch | null>(null)
-  const [selected, setSelected] = useState<BatchMatch | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -81,11 +90,10 @@ export function MassView({ bots }: MassViewProps) {
     }
 
     setRunning(true)
-    setStatus(`running ${sims} match${sims === 1 ? "" : "es"}\u2026`)
+    setStatus(`running batch: ${sims} match${sims === 1 ? "" : "es"}\u2026`)
     setBatch(null)
-    setMapData(null)
-    setTrace(null)
-    setSelected(null)
+    lastBatch = null
+    batchMatchCache.clear()
 
     try {
       const body: Record<string, unknown> = {
@@ -108,6 +116,7 @@ export function MassView({ bots }: MassViewProps) {
         return
       }
       const data: BatchResponse = await res.json()
+      lastBatch = { response: data, league }
       setBatch(data)
       setStatus("")
     } catch (err) {
@@ -118,6 +127,7 @@ export function MassView({ bots }: MassViewProps) {
   }
 
   const openMatch = async (m: BatchMatch) => {
+    if (!batch) return
     setLoadingMatch(m.id)
     setStatus(`loading match ${m.id}\u2026`)
     try {
@@ -132,22 +142,19 @@ export function MassView({ bots }: MassViewProps) {
       }
       const serText = await serRes.text()
       const traceJson: TraceMatch = await traceRes.json()
-      const map = parseSerializeResponse(serText)
-      setMapData(map)
-      setTrace(traceJson)
-      setSelected(m)
+      const mapData = parseSerializeResponse(serText)
+      // Batch summary swaps per-match p0/p1 bot names to the in-match side.
+      // When user's P0 bot played as in-match side 1 (swapped), fog follows
+      // the user's P0 so the viewer stays consistent with PlayView.
+      const fogPerspectiveSide: 0 | 1 = m.p0_bot === batch.p0_bot ? 0 : 1
+      batchMatchCache.set(String(m.id), { match: m, mapData, trace: traceJson, fogPerspectiveSide })
       setStatus("")
+      navigate({ to: "/batch/$matchId", params: { matchId: String(m.id) } })
     } catch (err) {
       setStatus(`error: ${String(err)}`)
     } finally {
       setLoadingMatch(null)
     }
-  }
-
-  const backToList = () => {
-    setMapData(null)
-    setTrace(null)
-    setSelected(null)
   }
 
   const form = (
@@ -167,10 +174,10 @@ export function MassView({ bots }: MassViewProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="1">Bronze</SelectItem>
-                    <SelectItem value="2">Silver</SelectItem>
-                    <SelectItem value="3">Gold</SelectItem>
-                    <SelectItem value="4">Legend</SelectItem>
+                    <SelectItem value="1">Wood 2</SelectItem>
+                    <SelectItem value="2">Wood 1</SelectItem>
+                    <SelectItem value="3">Bronze</SelectItem>
+                    <SelectItem value="4">Silver+</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -229,7 +236,7 @@ export function MassView({ bots }: MassViewProps) {
       <CardFooter className="border-t">
         <Button type="submit" form="mass-form" className="w-full" disabled={running}>
           {running ? <LoaderIcon data-icon="inline-start" className="animate-spin" /> : <PlayIcon data-icon="inline-start" />}
-          {running ? "Simulating\u2026" : "Simulate"}
+          {running ? "Running\u2026" : "Run Batch"}
         </Button>
       </CardFooter>
     </Card>
@@ -285,19 +292,6 @@ export function MassView({ bots }: MassViewProps) {
       )
     })()
 
-  // Replay view for selected match
-  if (mapData && trace && selected) {
-    const winnerLabel = selected.winner === -1 ? "draw" : `p${selected.winner}`
-    const replayStatus = `match #${selected.id}  seed=${selected.seed}  ${selected.p0_bot} vs ${selected.p1_bot}  winner=${winnerLabel}  score=${selected.score_p0}:${selected.score_p1}  turns=${selected.turns}  p0 ttfo=${selected.ttfo_p0_ms.toFixed(0)}ms aot=${selected.aot_p0_ms.toFixed(0)}ms  p1 ttfo=${selected.ttfo_p1_ms.toFixed(0)}ms aot=${selected.aot_p1_ms.toFixed(0)}ms`
-    const backCard = (
-      <Button variant="outline" size="sm" className="self-start" onClick={backToList}>
-        <ArrowLeftIcon data-icon="inline-start" /> Back to list
-      </Button>
-    )
-    return <ReplayViewer mapData={mapData} trace={trace} status={replayStatus} leftSlot={backCard} />
-  }
-
-  // List view
   return (
     <div className="flex gap-8">
       <div className="flex w-80 shrink-0 flex-col gap-4 overflow-hidden">
@@ -323,9 +317,6 @@ export function MassView({ bots }: MassViewProps) {
               </thead>
               <tbody>
                 {batch.matches.map((m) => {
-                  // Color by user-selected role: user's P0 bot is always blue,
-                  // user's P1 bot is always red, no matter which in-match side
-                  // they played. Winner column picks up the winning bot's color.
                   const userColor = (botName: string) => {
                     if (botName === batch.p0_bot) return "text-sky-400"
                     if (botName === batch.p1_bot) return "text-red-400"

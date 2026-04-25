@@ -57,7 +57,7 @@ export function lerpFrame(from: FrameData, to: FrameData, t: number): FrameData 
     const tailFallback = fromBody[fromBody.length - 1]
     const body: Coord[] = new Array(toBird.body.length)
     for (let i = 0; i < toBird.body.length; i++) {
-      const toSeg = toBird.body[i]!
+      const toSeg = toBird.body[i] as Coord
       const fromSeg = fromBody[i] ?? tailFallback ?? toSeg
       body[i] = {
         x: fromSeg.x + (toSeg.x - fromSeg.x) * t,
@@ -81,11 +81,16 @@ export interface TraceMatch {
   seed: string
   winner: number
   scores: [number, number]
-  /** Bot basenames per in-match side: [left, right]. */
-  bots: [string, string]
-  ttfo_ms?: [number, number]
-  aot_ms?: [number, number]
+  /** Player (bot) basenames per in-match side: [left, right]. */
+  players: [string, string]
+  timing?: TraceTiming
   turns: TraceTurn[]
+}
+
+export interface TraceTiming {
+  first_response: [number, number]
+  response_average: [number, number]
+  response_median: [number, number]
 }
 
 export interface TraceTurn {
@@ -93,7 +98,12 @@ export interface TraceTurn {
   game_input: { p0: string[]; p1: string[] }
   p0_output: string
   p1_output: string
+  timing?: TraceTurnTiming
   events?: TraceTurnEvent[]
+}
+
+export interface TraceTurnTiming {
+  response: [number, number]
 }
 
 export interface TraceTurnEvent {
