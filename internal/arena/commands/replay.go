@@ -69,7 +69,7 @@ func Replay(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfla
 		return fmt.Errorf("write %s: %w", outPath, err)
 	}
 
-	fmt.Fprintf(stdout, "saved %d bytes to %s\n", len(pretty), outPath)
+	_, _ = fmt.Fprintf(stdout, "saved %d bytes to %s\n", len(pretty), outPath)
 	return nil
 }
 
@@ -149,7 +149,7 @@ func fetchReplay(id int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

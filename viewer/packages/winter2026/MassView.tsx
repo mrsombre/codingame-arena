@@ -17,7 +17,6 @@ export interface BatchMatchCacheEntry {
   match: BatchMatch
   mapData: MapData
   trace: TraceMatch
-  fogPerspectiveSide: 0 | 1
 }
 
 export const batchMatchCache = new Map<string, BatchMatchCacheEntry>()
@@ -90,7 +89,7 @@ export function MassView({ bots }: MassViewProps) {
     }
 
     setRunning(true)
-    setStatus(`running ${sims} match${sims === 1 ? "" : "es"}\u2026`)
+    setStatus(`running batch: ${sims} match${sims === 1 ? "" : "es"}\u2026`)
     setBatch(null)
     lastBatch = null
     batchMatchCache.clear()
@@ -127,7 +126,6 @@ export function MassView({ bots }: MassViewProps) {
   }
 
   const openMatch = async (m: BatchMatch) => {
-    if (!batch) return
     setLoadingMatch(m.id)
     setStatus(`loading match ${m.id}\u2026`)
     try {
@@ -143,11 +141,7 @@ export function MassView({ bots }: MassViewProps) {
       const serText = await serRes.text()
       const traceJson: TraceMatch = await traceRes.json()
       const mapData = parseSerializeResponse(serText)
-      // Batch summary swaps per-match p0/p1 bot names to the in-match side.
-      // When user's P0 bot played as in-match side 1 (swapped), fog follows
-      // the user's P0 so the viewer stays consistent with PlayView.
-      const fogPerspectiveSide: 0 | 1 = m.p0_bot === batch.p0_bot ? 0 : 1
-      batchMatchCache.set(String(m.id), { match: m, mapData, trace: traceJson, fogPerspectiveSide })
+      batchMatchCache.set(String(m.id), { match: m, mapData, trace: traceJson })
       setStatus("")
       navigate({ to: "/batch/$matchId", params: { matchId: String(m.id) } })
     } catch (err) {
@@ -174,10 +168,10 @@ export function MassView({ bots }: MassViewProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="1">Wood 2</SelectItem>
-                    <SelectItem value="2">Wood 1</SelectItem>
-                    <SelectItem value="3">Bronze</SelectItem>
-                    <SelectItem value="4">Silver+</SelectItem>
+                    <SelectItem value="1">Bronze</SelectItem>
+                    <SelectItem value="2">Silver</SelectItem>
+                    <SelectItem value="3">Gold</SelectItem>
+                    <SelectItem value="4">Legend</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -236,7 +230,7 @@ export function MassView({ bots }: MassViewProps) {
       <CardFooter className="border-t">
         <Button type="submit" form="mass-form" className="w-full" disabled={running}>
           {running ? <LoaderIcon data-icon="inline-start" className="animate-spin" /> : <PlayIcon data-icon="inline-start" />}
-          {running ? "Simulating\u2026" : "Simulate"}
+          {running ? "Running\u2026" : "Run Batch"}
         </Button>
       </CardFooter>
     </Card>
@@ -317,6 +311,9 @@ export function MassView({ bots }: MassViewProps) {
               </thead>
               <tbody>
                 {batch.matches.map((m) => {
+                  // Color by user-selected role: user's P0 bot is always blue,
+                  // user's P1 bot is always red, no matter which in-match side
+                  // they played. Winner column picks up the winning bot's color.
                   const userColor = (botName: string) => {
                     if (botName === batch.p0_bot) return "text-sky-400"
                     if (botName === batch.p1_bot) return "text-red-400"

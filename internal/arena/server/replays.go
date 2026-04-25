@@ -14,28 +14,6 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-// codingameReplay matches the subset of the CodinGame replay JSON we need to
-// replay a match through the engine.
-type codingameReplay struct {
-	GameResult struct {
-		Agents []struct {
-			Index      int `json:"index"`
-			CodinGamer struct {
-				Pseudo string `json:"pseudo"`
-			} `json:"codingamer"`
-		} `json:"agents"`
-		Frames []struct {
-			AgentID int    `json:"agentId"`
-			Stdout  string `json:"stdout"`
-		} `json:"frames"`
-		RefereeInput string `json:"refereeInput"`
-		GameID       int64  `json:"gameId"`
-		Scores       []int  `json:"scores"`
-		Ranks        []int  `json:"ranks"`
-	} `json:"gameResult"`
-	QuestionTitle string `json:"questionTitle"`
-}
-
 type replayListEntry struct {
 	ID      string    `json:"id"`
 	Size    int64     `json:"size"`
@@ -87,7 +65,7 @@ func handleReplayList(replayDir string) http.HandlerFunc {
 			id := strings.TrimSuffix(entry.Name(), ".json")
 			e := replayListEntry{ID: id, Size: info.Size(), MTime: info.ModTime(), Winner: -1}
 			if data, err := os.ReadFile(filepath.Join(replayDir, entry.Name())); err == nil {
-				var r codingameReplay
+				var r arena.CodinGameReplay[arena.CodinGameReplayFrame]
 				if err := json.Unmarshal(data, &r); err == nil {
 					for _, a := range r.GameResult.Agents {
 						switch a.Index {
@@ -99,10 +77,10 @@ func handleReplayList(replayDir string) http.HandlerFunc {
 					}
 					e.League = parseReplayLeague(r.QuestionTitle)
 					if len(r.GameResult.Scores) > 0 {
-						e.ScoreP0 = r.GameResult.Scores[0]
+						e.ScoreP0 = int(r.GameResult.Scores[0])
 					}
 					if len(r.GameResult.Scores) > 1 {
-						e.ScoreP1 = r.GameResult.Scores[1]
+						e.ScoreP1 = int(r.GameResult.Scores[1])
 					}
 					// CodinGame ranks[i] is the finishing rank of agent i
 					// (0 = winner). Ties would give equal ranks; treat as draw.
@@ -146,7 +124,7 @@ func handleReplayGet(replayDir string, factory arena.GameFactory) http.HandlerFu
 			return
 		}
 
-		var replay codingameReplay
+		var replay arena.CodinGameReplay[arena.CodinGameReplayFrame]
 		if err := json.Unmarshal(data, &replay); err != nil {
 			writeError(w, http.StatusBadRequest, "parse replay: "+err.Error())
 			return
@@ -168,9 +146,10 @@ func handleReplayGet(replayDir string, factory arena.GameFactory) http.HandlerFu
 
 		names := [2]string{"p0", "p1"}
 		for _, a := range replay.GameResult.Agents {
-			if a.Index == 0 {
+			switch a.Index {
+			case 0:
 				names[0] = a.CodinGamer.Pseudo
-			} else if a.Index == 1 {
+			case 1:
 				names[1] = a.CodinGamer.Pseudo
 			}
 		}
@@ -210,7 +189,7 @@ func parseReplayLeague(questionTitle string) int {
 	return n
 }
 
-func extractReplayMoves(replay codingameReplay) arena.ReplayMoves {
+func extractReplayMoves(replay arena.CodinGameReplay[arena.CodinGameReplayFrame]) arena.ReplayMoves {
 	var moves arena.ReplayMoves
 	for _, f := range replay.GameResult.Frames {
 		if strings.TrimSpace(f.Stdout) == "" {

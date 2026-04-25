@@ -18,8 +18,8 @@ type ReplayMoves struct {
 // TraceMatch has the same shape as TraceWriter.WriteMatch produces, so viewers
 // that consume /api/matches can render replays without any format translation.
 //
-// botNames are copied into TraceMatch.Bots (basename applied). maxTurns of 0
-// defaults to factory.MaxTurns().
+// botNames are copied into TraceMatch.Players (basename applied). maxTurns of
+// 0 defaults to factory.MaxTurns().
 func RunReplay(
 	factory GameFactory,
 	seed int64,
@@ -145,7 +145,7 @@ func RunReplay(
 		Seed:    seed,
 		Winner:  winner,
 		Scores:  scores,
-		Bots:    [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
+		Players: [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
 		Turns:   traceTurns,
 	}
 }

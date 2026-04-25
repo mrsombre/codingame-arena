@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +26,7 @@ const (
 type playerTimingStats struct {
 	TimeToFirstOutput time.Duration
 	AverageOutputTime time.Duration
+	MedianOutputTime  time.Duration
 }
 
 type hardTimeoutError struct {
@@ -52,6 +54,7 @@ type commandPlayer struct {
 	nextTurnLimit     time.Duration
 	timeToFirstOutput time.Duration
 	outputDurations   []time.Duration
+	lastDuration      time.Duration
 }
 
 func newCommandPlayer(player Player, path string) (*commandPlayer, error) {
@@ -175,9 +178,23 @@ func (cp *commandPlayer) recordOutputDuration(duration time.Duration) {
 	} else {
 		cp.outputDurations = append(cp.outputDurations, duration)
 	}
+	cp.lastDuration = duration
 	if cp.timing {
 		fmt.Fprintf(os.Stderr, "timing p%d turn %d: %s\n", cp.playerIdx, cp.turns, duration)
 	}
+}
+
+// BeginTurn resets the per-turn duration sentinel. Called by the runner before
+// each turn so LastOutputDuration reports zero for sides that didn't execute
+// (deactivated or skipped) instead of returning a stale prior-turn value.
+func (cp *commandPlayer) BeginTurn() {
+	cp.lastDuration = 0
+}
+
+// LastOutputDuration returns the duration recorded by the most recent Execute
+// call within the current turn. Zero when the side did not execute this turn.
+func (cp *commandPlayer) LastOutputDuration() time.Duration {
+	return cp.lastDuration
 }
 
 func averageDuration(durations []time.Duration) time.Duration {
@@ -191,10 +208,25 @@ func averageDuration(durations []time.Duration) time.Duration {
 	return sum / time.Duration(len(durations))
 }
 
+func medianDuration(durations []time.Duration) time.Duration {
+	if len(durations) == 0 {
+		return 0
+	}
+	sorted := make([]time.Duration, len(durations))
+	copy(sorted, durations)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+	n := len(sorted)
+	if n%2 == 1 {
+		return sorted[n/2]
+	}
+	return (sorted[n/2-1] + sorted[n/2]) / 2
+}
+
 func (cp *commandPlayer) TimingStats() playerTimingStats {
 	return playerTimingStats{
 		TimeToFirstOutput: cp.timeToFirstOutput,
 		AverageOutputTime: averageDuration(cp.outputDurations),
+		MedianOutputTime:  medianDuration(cp.outputDurations),
 	}
 }
 

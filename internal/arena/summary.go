@@ -108,7 +108,7 @@ func FindWorstLosses(results []MatchResult, limit int) []int {
 // RenderMatch serializes a MatchResult to JSON for verbose output.
 // Scores and Winner prefer raw alive-segment sums when the engine provides
 // them, so the viewer's single-match status never shows the negative values
-// that referees like winter-2026 emit after tie-break adjustments.
+// that referees like winter2026 emit after tie-break adjustments.
 func (r MatchResult) RenderMatch() string {
 	scores := r.Scores
 	winner := r.Winner

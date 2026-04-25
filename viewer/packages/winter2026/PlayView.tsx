@@ -9,6 +9,8 @@ import { useState } from "react"
 import { type MapData, parseSerializeResponse, type TraceMatch } from "./parser.ts"
 import { ReplayViewer } from "./ReplayViewer.tsx"
 
+let lastSingleMatch: { mapData: MapData; trace: TraceMatch; status: string } | null = null
+
 interface PlayViewProps {
   bots: BotEntry[]
 }
@@ -19,10 +21,10 @@ export function PlayView({ bots }: PlayViewProps) {
   const [p0Bot, setP0Bot] = useState(bots[0]?.path ?? "")
   const [p1Bot, setP1Bot] = useState(bots[1]?.path ?? bots[0]?.path ?? "")
 
-  const [status, setStatus] = useState("")
+  const [status, setStatus] = useState(lastSingleMatch?.status ?? "")
   const [running, setRunning] = useState(false)
-  const [mapData, setMapData] = useState<MapData | null>(null)
-  const [trace, setTrace] = useState<TraceMatch | null>(null)
+  const [mapData, setMapData] = useState<MapData | null>(lastSingleMatch?.mapData ?? null)
+  const [trace, setTrace] = useState<TraceMatch | null>(lastSingleMatch?.trace ?? null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,6 +37,7 @@ export function PlayView({ bots }: PlayViewProps) {
     setStatus("running match\u2026")
     setMapData(null)
     setTrace(null)
+    lastSingleMatch = null
 
     try {
       const runBody: Record<string, unknown> = {
@@ -82,9 +85,9 @@ export function PlayView({ bots }: PlayViewProps) {
       const winnerStr = runData.winner === -1 ? "draw" : `p${runData.winner}`
       const ttfo = runData.ttfo_ms ?? [0, 0]
       const aot = runData.aot_ms ?? [0, 0]
-      setStatus(
-        `seed=${actualSeed}  ${map.width}\u00d7${map.height}  winner=${winnerStr}  score=${runData.score_p0}:${runData.score_p1}  turns=${runData.turns}  p0 ttfo=${ttfo[0].toFixed(0)}ms aot=${aot[0].toFixed(0)}ms  p1 ttfo=${ttfo[1].toFixed(0)}ms aot=${aot[1].toFixed(0)}ms`,
-      )
+      const statusLine = `seed=${actualSeed}  ${map.width}\u00d7${map.height}  winner=${winnerStr}  score=${runData.score_p0}:${runData.score_p1}  turns=${runData.turns}  p0 ttfo=${ttfo[0].toFixed(0)}ms aot=${aot[0].toFixed(0)}ms  p1 ttfo=${ttfo[1].toFixed(0)}ms aot=${aot[1].toFixed(0)}ms`
+      setStatus(statusLine)
+      lastSingleMatch = { mapData: map, trace: traceJson, status: statusLine }
       setMapData(map)
       setTrace(traceJson)
     } catch (err) {

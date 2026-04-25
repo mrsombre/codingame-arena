@@ -15,7 +15,7 @@ func NewFactory() arena.GameFactory {
 	return &factory{}
 }
 
-func (f *factory) Name() string { return "winter-2026" }
+func (f *factory) Name() string { return "winter2026" }
 
 func (f *factory) MaxTurns() int { return 200 }
 

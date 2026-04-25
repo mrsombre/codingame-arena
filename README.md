@@ -16,7 +16,7 @@ Local game engine runner for [CodinGame](https://www.codingame.com/) bot program
 
 | Game | Flag | Source |
 |---|---|---|
-| Winter Challenge 2026 | `--game winter-2026` | `games/winter2026/` |
+| Winter Challenge 2026 | `--game winter2026` | `games/winter2026/` |
 
 ## Requirements
 
@@ -206,7 +206,7 @@ Settings can be provided via CLI flags, environment variables, or an `arena.yml`
 **Environment variables** use the `ARENA_` prefix with underscores:
 
 ```sh
-export ARENA_GAME=winter-2026
+export ARENA_GAME=winter2026
 export ARENA_SEED=42
 export ARENA_SIMULATIONS=100
 ```
@@ -214,7 +214,7 @@ export ARENA_SIMULATIONS=100
 **Config file** (`arena.yml` in the working directory):
 
 ```yaml
-game: winter-2026
+game: winter2026
 seed: 100030005000
 simulations: 100
 p0-bin: ./bin/bot-winter2026-cpp

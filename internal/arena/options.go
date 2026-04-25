@@ -288,7 +288,7 @@ Common options:
   -h, --help           Show this help
 
 Env vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_GAME, ARENA_SEED).
-Config: arena.yml in current directory (e.g. game: winter-2026).
+Config: arena.yml in current directory (e.g. game: winter2026).
 
 Unknown --key value flags are passed as game options to the engine factory.`, strings.Join(games, ", ")))
 }

@@ -20,7 +20,7 @@ func NewFactory() arena.GameFactory {
 	return &factory{}
 }
 
-func (f *factory) Name() string { return "spring-2020" }
+func (f *factory) Name() string { return "spring2020" }
 
 func (f *factory) MaxTurns() int { return maxTurns }
 
