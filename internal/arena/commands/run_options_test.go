@@ -1,4 +1,4 @@
-package arena
+package commands
 
 import (
 	"path/filepath"
@@ -8,20 +8,22 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
 func newTestRunCtx(t *testing.T) (*pflag.FlagSet, *viper.Viper) {
 	t.Helper()
-	fs := NewBaseFlagSet("arena")
-	AddRunFlags(fs)
+	fs := arena.NewBaseFlagSet("arena")
+	arena.AddRunFlags(fs)
 	v := viper.New()
 	require.NoError(t, v.BindPFlags(fs))
 	return fs, v
 }
 
-func TestParseArgsParsesAllCommonFlags(t *testing.T) {
+func TestParseRunOptionsParsesAllCommonFlags(t *testing.T) {
 	fs, v := newTestRunCtx(t)
-	got, err := ParseRunArgs([]string{
+	got, err := parseRunOptions([]string{
 		"--p0", "./bin/p0",
 		"--seed", "-1755827269105404700",
 		"--seedx", "7",
@@ -44,9 +46,9 @@ func TestParseArgsParsesAllCommonFlags(t *testing.T) {
 	assert.Equal(t, filepath.Clean("./bin/opponent"), got.P1Bin)
 }
 
-func TestParseArgsAcceptsSeedPrefix(t *testing.T) {
+func TestParseRunOptionsAcceptsSeedPrefix(t *testing.T) {
 	fs, v := newTestRunCtx(t)
-	got, err := ParseRunArgs([]string{
+	got, err := parseRunOptions([]string{
 		"--p0", "./bin/p0",
 		"--seed", "seed=1001",
 	}, fs, v)
@@ -54,9 +56,9 @@ func TestParseArgsAcceptsSeedPrefix(t *testing.T) {
 	assert.Equal(t, int64(1001), got.Seed)
 }
 
-func TestParseArgsCollectsUnknownFlagsAsGameOptions(t *testing.T) {
+func TestParseRunOptionsCollectsUnknownFlagsAsGameOptions(t *testing.T) {
 	fs, v := newTestRunCtx(t)
-	got, err := ParseRunArgs([]string{
+	got, err := parseRunOptions([]string{
 		"--p0", "./bin/p0",
 		"--league", "3",
 		"--custom-flag", "value",
@@ -66,11 +68,11 @@ func TestParseArgsCollectsUnknownFlagsAsGameOptions(t *testing.T) {
 	assert.Equal(t, "value", got.GameOptions["custom-flag"])
 }
 
-func TestParseArgsRejectsNonPositiveSeedIncrement(t *testing.T) {
+func TestParseRunOptionsRejectsNonPositiveSeedIncrement(t *testing.T) {
 	for _, value := range []string{"0", "-1"} {
 		t.Run(value, func(t *testing.T) {
 			fs, v := newTestRunCtx(t)
-			_, err := ParseRunArgs([]string{
+			_, err := parseRunOptions([]string{
 				"--p0", "./bin/p0",
 				"--seedx", value,
 			}, fs, v)
@@ -80,18 +82,18 @@ func TestParseArgsRejectsNonPositiveSeedIncrement(t *testing.T) {
 	}
 }
 
-func TestParseArgsRequiresP0Bin(t *testing.T) {
+func TestParseRunOptionsRequiresP0Bin(t *testing.T) {
 	fs, v := newTestRunCtx(t)
-	_, err := ParseRunArgs([]string{}, fs, v)
+	_, err := parseRunOptions([]string{}, fs, v)
 	require.Error(t, err)
 	assert.EqualError(t, err, "--p0 is required")
 }
 
-func TestParseArgsReadsFromViperConfig(t *testing.T) {
+func TestParseRunOptionsReadsFromViperConfig(t *testing.T) {
 	fs, v := newTestRunCtx(t)
 	v.Set("p0", "./bin/cfg-p0")
 	v.Set("max-turns", 77)
-	got, err := ParseRunArgs([]string{}, fs, v)
+	got, err := parseRunOptions([]string{}, fs, v)
 	require.NoError(t, err)
 	assert.Equal(t, "./bin/cfg-p0", got.P0Bin)
 	assert.Equal(t, 77, got.MaxTurns)

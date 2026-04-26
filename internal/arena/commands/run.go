@@ -36,7 +36,7 @@ type runnerMetadata struct {
 
 // Run is the entry point for the "run" subcommand.
 func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	parsed, err := arena.ParseRunArgs(args, fs, v)
+	parsed, err := parseRunOptions(args, fs, v)
 	if err != nil {
 		return err
 	}

@@ -14,20 +14,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// ParsedArgs holds all parsed CLI arguments.
-type ParsedArgs struct {
-	BatchOptions
-	P0Bin       string
-	P1Bin       string
-	MaxTurns    int
-	TraceDir    string
-	Debug       bool
-	NoSwap      bool
-	Verbose     bool
-	Help        bool
-	GameOptions map[string]string
-}
-
 // NewBaseFlagSet returns a flag set pre-populated with flags shared by
 // every subcommand. Subcommands register their own flags on top via
 // AddRunFlags / AddSerializeFlags.
@@ -83,69 +69,6 @@ func AddFrontFlags(fs *pflag.FlagSet) {
 	fs.String("trace-dir", "./matches", "Directory with match trace JSON files (powers /api/matches)")
 	fs.String("replay-dir", "./replays", "Directory with CodinGame replay JSON files (powers /api/replays)")
 	fs.String("bin-dir", "./bin", "Directory to scan for bot binaries (powers /api/bots)")
-}
-
-func ParseRunArgs(args []string, fs *pflag.FlagSet, v *viper.Viper) (ParsedArgs, error) {
-	knownArgs, gameOptions, err := SplitArgs(args, fs)
-	if err != nil {
-		return ParsedArgs{}, err
-	}
-	if err := fs.Parse(knownArgs); err != nil {
-		return ParsedArgs{}, err
-	}
-
-	MergeConfigGameOptions(v, fs, gameOptions)
-	injectLeague(v, gameOptions)
-
-	parsed := ParsedArgs{
-		BatchOptions: BatchOptions{
-			Simulations:   v.GetInt("simulations"),
-			Parallel:      v.GetInt("parallel"),
-			SeedIncrement: int64(v.GetInt("seedx")),
-			OutputMatches: v.GetBool("output-matches"),
-		},
-		P0Bin:       v.GetString("p0"),
-		P1Bin:       v.GetString("p1"),
-		MaxTurns:    v.GetInt("max-turns"),
-		TraceDir:    v.GetString("trace-dir"),
-		Debug:       v.GetBool("debug"),
-		NoSwap:      v.GetBool("no-swap"),
-		Verbose:     v.GetBool("verbose"),
-		Help:        v.GetBool("help"),
-		GameOptions: gameOptions,
-	}
-
-	if raw := v.GetString("seed"); raw != "" {
-		n, err := ParseSeed(raw)
-		if err != nil {
-			return ParsedArgs{}, fmt.Errorf("invalid integer for --seed: %s", raw)
-		}
-		parsed.Seed = n
-	} else {
-		parsed.Seed = time.Now().UnixNano()
-	}
-
-	if parsed.Simulations < 1 {
-		return ParsedArgs{}, fmt.Errorf("--simulations must be >= 1")
-	}
-	if parsed.Parallel < 1 {
-		return ParsedArgs{}, fmt.Errorf("--parallel must be >= 1")
-	}
-	if parsed.MaxTurns < 1 {
-		return ParsedArgs{}, fmt.Errorf("--max-turns must be >= 1")
-	}
-	if parsed.SeedIncrement < 1 {
-		return ParsedArgs{}, fmt.Errorf("--seedx must be >= 1")
-	}
-	if !parsed.Help && parsed.P0Bin == "" {
-		return ParsedArgs{}, fmt.Errorf("--p0 is required")
-	}
-	if parsed.Debug {
-		parsed.Simulations = 1
-		parsed.Parallel = 1
-	}
-
-	return parsed, nil
 }
 
 // NewViper returns a viper instance bound to the given flag set, configured
@@ -245,12 +168,7 @@ func MergeConfigGameOptions(v *viper.Viper, fs *pflag.FlagSet, gameOptions map[s
 }
 
 // InjectLeague copies the --league flag value into gameOptions if set.
-// Exported for use by subcommands that build gameOptions outside ParseRunArgs.
 func InjectLeague(v *viper.Viper, gameOptions map[string]string) {
-	injectLeague(v, gameOptions)
-}
-
-func injectLeague(v *viper.Viper, gameOptions map[string]string) {
 	if league := v.GetString("league"); league != "" {
 		if _, exists := gameOptions["league"]; !exists {
 			gameOptions["league"] = league
