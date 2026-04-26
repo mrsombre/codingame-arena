@@ -66,7 +66,14 @@ func AddSerializeFlags(fs *pflag.FlagSet) {
 
 // AddReplayFlags registers flags used by the "replay" subcommand on fs.
 func AddReplayFlags(fs *pflag.FlagSet) {
-	fs.StringP("out", "o", "", "Output path. Empty → ./replays/replay-<id>.json. Trailing '/' or existing directory → replay-<id>.json inside. Otherwise → a file at that path.")
+	fs.StringP("out", "o", "", "Output path. Empty → ./replays/<id>.json. Trailing '/' or existing directory → <id>.json inside. Otherwise → a file at that path.")
+}
+
+// AddLeaderboardFlags registers flags used by the "leaderboard" subcommand on fs.
+func AddLeaderboardFlags(fs *pflag.FlagSet) {
+	fs.StringP("out", "o", filepath.Clean("./replays"), "Directory to save replays as <gameId>.json")
+	fs.IntP("limit", "l", 0, "Maximum number of replays to download (0 = all)")
+	fs.Duration("delay", 500*time.Millisecond, "Delay between replay downloads")
 }
 
 // AddFrontFlags registers flags used by the "front" subcommand on fs.
@@ -261,6 +268,7 @@ Commands:
   run          Run one or more match simulations against a player binary
   serialize    Print initial game input for first turn for a given seed
   replay       Download raw replay JSON from codingame.com
+  leaderboard  Download every replay from a player's last battles list
   serve        Serve the embedded web viewer
 
 Use "arena <command> --help" for more information about a command.

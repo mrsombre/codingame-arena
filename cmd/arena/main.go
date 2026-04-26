@@ -52,6 +52,9 @@ func main() {
 	case "replay":
 		arena.AddReplayFlags(fs)
 		handler = commands.Replay
+	case "leaderboard":
+		arena.AddLeaderboardFlags(fs)
+		handler = commands.Leaderboard
 	case "run":
 		arena.AddRunFlags(fs)
 		handler = commands.Run
