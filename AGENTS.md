@@ -10,7 +10,7 @@ CodinGame Arena — local game engine runner for CodinGame challenges. Runs bot-
 cmd/arena/              # CLI entrypoint
 internal/
 ├─ arena/               # Match runner, batching, tracing, server
-│  ├─ commands/          # CLI subcommands (run, replay, front, serialize)
+│  ├─ commands/          # CLI subcommands (run, serialize, replay, leaderboard, serve)
 │  └─ server/            # HTTP server for viewer
 ├─ util/
 │  ├─ javarand/          # Java random port

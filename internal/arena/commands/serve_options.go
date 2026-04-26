@@ -9,8 +9,8 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-// FrontOptions holds the parsed configuration for the "serve" subcommand.
-type FrontOptions struct {
+// ServeOptions holds the parsed configuration for the "serve" subcommand.
+type ServeOptions struct {
 	Port      int
 	Host      string
 	TraceDir  string
@@ -19,16 +19,16 @@ type FrontOptions struct {
 	Help      bool
 }
 
-func parseFrontOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (FrontOptions, error) {
+func parseServeOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (ServeOptions, error) {
 	knownArgs, _, err := arena.SplitArgs(args, fs)
 	if err != nil {
-		return FrontOptions{}, err
+		return ServeOptions{}, err
 	}
 	if err := fs.Parse(knownArgs); err != nil {
-		return FrontOptions{}, err
+		return ServeOptions{}, err
 	}
 
-	opts := FrontOptions{
+	opts := ServeOptions{
 		Help: v.GetBool("help"),
 	}
 	if opts.Help {
@@ -42,7 +42,7 @@ func parseFrontOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (FrontO
 	opts.BinDir = v.GetString("bin-dir")
 
 	if opts.Port < 1 || opts.Port > 65535 {
-		return FrontOptions{}, fmt.Errorf("--port must be in 1..65535")
+		return ServeOptions{}, fmt.Errorf("--port must be in 1..65535")
 	}
 
 	return opts, nil

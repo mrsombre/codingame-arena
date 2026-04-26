@@ -27,10 +27,10 @@ import (
 	"github.com/mrsombre/codingame-arena/viewer"
 )
 
-// Front is the entry point for the "front" subcommand. It serves the embedded
+// Serve is the entry point for the "serve" subcommand. It serves the embedded
 // viewer bundle over HTTP and listens on stdin for single-letter commands.
-func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pflag.FlagSet, v *viper.Viper) error {
-	opts, err := parseFrontOptions(args, flags, v)
+func Serve(args []string, stdout io.Writer, factory arena.GameFactory, flags *pflag.FlagSet, v *viper.Viper) error {
+	opts, err := parseServeOptions(args, flags, v)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 	}()
 
 	watching, _ := resolveExe()
-	printFrontUsage(stdout, url, opts.TraceDir, watching)
+	printServeUsage(stdout, url, opts.TraceDir, watching)
 
 	binaryChanged := watchBinary(ctx, stdout)
 	stdinCmds := readStdinCommands(ctx)
@@ -118,12 +118,12 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 				} else {
 					_, _ = fmt.Fprintf(stdout, "opened %s\n", url)
 				}
-				printFrontUsage(stdout, url, opts.TraceDir, watching)
+				printServeUsage(stdout, url, opts.TraceDir, watching)
 			case "q":
 				_, _ = fmt.Fprintln(stdout, "shutting down...")
 				return shutdown(httpServer)
 			default:
-				printFrontUsage(stdout, url, opts.TraceDir, watching)
+				printServeUsage(stdout, url, opts.TraceDir, watching)
 			}
 		}
 	}
@@ -155,13 +155,13 @@ func shutdown(server *http.Server) error {
 	return nil
 }
 
-func printFrontUsage(w io.Writer, url, traceDir, watching string) {
+func printServeUsage(w io.Writer, url, traceDir, watching string) {
 	traceInfo := "(none)"
 	if traceDir != "" {
 		traceInfo = traceDir
 	}
 	_, _ = fmt.Fprintln(w)
-	_, _ = fmt.Fprintln(w, "  arena front  ready")
+	_, _ = fmt.Fprintln(w, "  arena serve  ready")
 	_, _ = fmt.Fprintln(w)
 	_, _ = fmt.Fprintf(w, "  ➜  Local:     %s\n", url)
 	_, _ = fmt.Fprintf(w, "  ➜  Trace:     %s\n", traceInfo)

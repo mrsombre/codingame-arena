@@ -62,8 +62,8 @@ func AddLeaderboardFlags(fs *pflag.FlagSet) {
 	fs.Duration("delay", 500*time.Millisecond, "Delay between replay downloads")
 }
 
-// AddFrontFlags registers flags used by the "front" subcommand on fs.
-func AddFrontFlags(fs *pflag.FlagSet) {
+// AddServeFlags registers flags used by the "serve" subcommand on fs.
+func AddServeFlags(fs *pflag.FlagSet) {
 	fs.Int("port", 5757, "HTTP port")
 	fs.String("host", "localhost", "Bind host")
 	fs.String("trace-dir", "./matches", "Directory with match trace JSON files (powers /api/matches)")

@@ -1,4 +1,4 @@
-// Package server wires the `arena front` HTTP API and static asset handler.
+// Package server wires the `arena serve` HTTP API and static asset handler.
 package server
 
 import (
@@ -194,7 +194,7 @@ var matchIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 func handleMatchGet(traceDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if traceDir == "" {
-			writeError(w, http.StatusNotFound, "no trace-dir configured; start arena front with --trace-dir <path>")
+			writeError(w, http.StatusNotFound, "no trace-dir configured; start arena serve with --trace-dir <path>")
 			return
 		}
 		id := r.PathValue("id")
@@ -330,7 +330,7 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			seed = *req.Seed
 		}
 		if traceDir == "" {
-			writeError(w, http.StatusBadRequest, "no trace-dir configured; start arena front with --trace-dir <path>")
+			writeError(w, http.StatusBadRequest, "no trace-dir configured; start arena serve with --trace-dir <path>")
 			return
 		}
 		if err := cleanupTraceDir(traceDir); err != nil {

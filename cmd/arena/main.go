@@ -60,8 +60,8 @@ func main() {
 		handler = commands.Run
 		needsFactory = true
 	case "serve":
-		arena.AddFrontFlags(fs)
-		handler = commands.Front
+		arena.AddServeFlags(fs)
+		handler = commands.Serve
 		needsFactory = true
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q; run `arena --help` for usage\n", command)
