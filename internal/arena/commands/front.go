@@ -30,15 +30,12 @@ import (
 // Front is the entry point for the "front" subcommand. It serves the embedded
 // viewer bundle over HTTP and listens on stdin for single-letter commands.
 func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pflag.FlagSet, v *viper.Viper) error {
-	knownArgs, _, err := arena.SplitArgs(args, flags)
+	opts, err := parseFrontOptions(args, flags, v)
 	if err != nil {
 		return err
 	}
-	if err := flags.Parse(knownArgs); err != nil {
-		return err
-	}
 
-	if v.GetBool("help") {
+	if opts.Help {
 		extra := "API: GET /api/game, GET /api/games, GET /api/bots, GET /api/matches, GET /api/matches/{id},\n" +
 			"     GET /api/replays, GET /api/replays/{id}, POST /api/run\n" +
 			"Stdin keys: o<enter> open in default browser   q<enter> quit"
@@ -46,16 +43,7 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 		return err
 	}
 
-	port := v.GetInt("port")
-	host := v.GetString("host")
-	traceDir := v.GetString("trace-dir")
-	replayDir := v.GetString("replay-dir")
-	binDir := v.GetString("bin-dir")
-	if port < 1 || port > 65535 {
-		return fmt.Errorf("--port must be in 1..65535")
-	}
-
-	bots := scanBots(binDir)
+	bots := scanBots(opts.BinDir)
 
 	assets, err := fs.Sub(viewer.Assets, "dist")
 	if err != nil {
@@ -64,12 +52,12 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 	handler := server.New(server.Options{
 		Factory:   factory,
 		Assets:    assets,
-		TraceDir:  traceDir,
-		ReplayDir: replayDir,
+		TraceDir:  opts.TraceDir,
+		ReplayDir: opts.ReplayDir,
 		Bots:      bots,
 	})
 
-	addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
+	addr := net.JoinHostPort(opts.Host, fmt.Sprintf("%d", opts.Port))
 	url := fmt.Sprintf("http://%s", addr)
 
 	httpServer := &http.Server{
@@ -96,7 +84,7 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 	}()
 
 	watching, _ := resolveExe()
-	printFrontUsage(stdout, url, traceDir, watching)
+	printFrontUsage(stdout, url, opts.TraceDir, watching)
 
 	binaryChanged := watchBinary(ctx, stdout)
 	stdinCmds := readStdinCommands(ctx)
@@ -130,12 +118,12 @@ func Front(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 				} else {
 					_, _ = fmt.Fprintf(stdout, "opened %s\n", url)
 				}
-				printFrontUsage(stdout, url, traceDir, watching)
+				printFrontUsage(stdout, url, opts.TraceDir, watching)
 			case "q":
 				_, _ = fmt.Fprintln(stdout, "shutting down...")
 				return shutdown(httpServer)
 			default:
-				printFrontUsage(stdout, url, traceDir, watching)
+				printFrontUsage(stdout, url, opts.TraceDir, watching)
 			}
 		}
 	}

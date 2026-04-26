@@ -3,11 +3,8 @@ package commands
 import (
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -22,15 +19,12 @@ import (
 // a CodinGame leaderboard URL plus nickname into the player's last battles
 // and downloads each replay's raw JSON to disk.
 func Leaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	knownArgs, _, err := arena.SplitArgs(args, fs)
+	opts, err := parseLeaderboardOptions(args, fs, v)
 	if err != nil {
 		return err
 	}
-	if err := fs.Parse(knownArgs); err != nil {
-		return err
-	}
 
-	if v.GetBool("help") {
+	if opts.Help {
 		_, err := fmt.Fprintln(stdout, arena.CommandUsage(
 			"leaderboard <leaderboard-url> <nickname>",
 			"Download every replay from a player's last battles list.",
@@ -40,26 +34,6 @@ func Leaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag
 		return err
 	}
 
-	if fs.NArg() < 2 {
-		return fmt.Errorf("leaderboard URL and nickname are required")
-	}
-
-	urlSlug, err := parseLeaderboardSlug(fs.Arg(0))
-	if err != nil {
-		return err
-	}
-	nickname := strings.TrimSpace(fs.Arg(1))
-	if nickname == "" {
-		return fmt.Errorf("nickname is required")
-	}
-
-	outDir := v.GetString("out")
-	if outDir == "" {
-		outDir = "replays"
-	}
-	limit := v.GetInt("limit")
-	delay := v.GetDuration("delay")
-
 	store, err := db.Open("")
 	if err != nil {
 		return err
@@ -68,17 +42,17 @@ func Leaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag
 
 	client := codingame.New()
 
-	apiSlug, puzzleHit, err := resolvePuzzle(client, store, urlSlug)
+	apiSlug, puzzleHit, err := resolvePuzzle(client, store, opts.Slug)
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(stdout, "puzzle: %s -> %s%s\n", urlSlug, apiSlug, cacheTag(puzzleHit))
+	_, _ = fmt.Fprintf(stdout, "puzzle: %s -> %s%s\n", opts.Slug, apiSlug, cacheTag(puzzleHit))
 
-	agentID, playerHit, err := resolveAgent(client, store, apiSlug, nickname)
+	agentID, playerHit, err := resolveAgent(client, store, apiSlug, opts.Nickname)
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(stdout, "player: %s -> agentId %d%s\n", nickname, agentID, cacheTag(playerHit))
+	_, _ = fmt.Fprintf(stdout, "player: %s -> agentId %d%s\n", opts.Nickname, agentID, cacheTag(playerHit))
 
 	gameIDs, err := client.FindLastBattles(agentID)
 	if err != nil {
@@ -86,26 +60,26 @@ func Leaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag
 	}
 	_, _ = fmt.Fprintf(stdout, "battles: %d\n", len(gameIDs))
 
-	if limit > 0 && len(gameIDs) > limit {
-		gameIDs = gameIDs[:limit]
+	if opts.Limit > 0 && len(gameIDs) > opts.Limit {
+		gameIDs = gameIDs[:opts.Limit]
 	}
 
-	if err := os.MkdirAll(outDir, 0755); err != nil {
-		return fmt.Errorf("create %s: %w", outDir, err)
+	if err := os.MkdirAll(opts.OutDir, 0755); err != nil {
+		return fmt.Errorf("create %s: %w", opts.OutDir, err)
 	}
 
 	var saved, skipped, failed int
 	first := true
 	for i, id := range gameIDs {
-		path := filepath.Join(outDir, fmt.Sprintf("%d.json", id))
+		path := filepath.Join(opts.OutDir, fmt.Sprintf("%d.json", id))
 		if _, err := os.Stat(path); err == nil {
 			skipped++
 			_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (exists)\n", i+1, len(gameIDs), id)
 			continue
 		}
 
-		if !first && delay > 0 {
-			time.Sleep(delay)
+		if !first && opts.Delay > 0 {
+			time.Sleep(opts.Delay)
 		}
 		first = false
 
@@ -122,43 +96,8 @@ func Leaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag
 		_, _ = fmt.Fprintf(stdout, "[%d/%d] save %d (%d bytes)\n", i+1, len(gameIDs), id, len(body))
 	}
 
-	_, _ = fmt.Fprintf(stdout, "done: %d saved, %d skipped, %d failed (out=%s)\n", saved, skipped, failed, outDir)
+	_, _ = fmt.Fprintf(stdout, "done: %d saved, %d skipped, %d failed (out=%s)\n", saved, skipped, failed, opts.OutDir)
 	return nil
-}
-
-// parseLeaderboardSlug pulls the puzzle pretty-id out of a CodinGame
-// leaderboard URL. Accepts:
-//   - https://www.codingame.com/multiplayer/<kind>/<slug>/leaderboard
-//   - https://www.codingame.com/contests/<slug>/leaderboard/global
-//   - bare slug "<slug>"
-func parseLeaderboardSlug(raw string) (string, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return "", fmt.Errorf("leaderboard URL is required")
-	}
-
-	u, err := url.Parse(raw)
-	if err != nil || u.Host == "" {
-		if !validSlug(raw) {
-			return "", fmt.Errorf("cannot extract puzzle slug from %q", raw)
-		}
-		return raw, nil
-	}
-
-	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
-	switch {
-	case len(parts) >= 4 && parts[0] == "multiplayer":
-		return parts[2], nil
-	case len(parts) >= 2 && parts[0] == "contests":
-		return parts[1], nil
-	}
-	return "", fmt.Errorf("cannot extract puzzle slug from %q", raw)
-}
-
-var slugPattern = regexp.MustCompile(`^[a-z0-9-]+$`)
-
-func validSlug(s string) bool {
-	return slugPattern.MatchString(s)
 }
 
 // cacheTag returns a short " (cached)" suffix when hit is true.

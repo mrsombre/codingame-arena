@@ -5,8 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -19,15 +17,12 @@ import (
 // Replay is the entry point for the "replay" subcommand. It downloads the
 // raw replay JSON for a CodinGame game and writes it to disk untouched.
 func Replay(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	knownArgs, _, err := arena.SplitArgs(args, fs)
+	opts, err := parseReplayOptions(args, fs, v)
 	if err != nil {
 		return err
 	}
-	if err := fs.Parse(knownArgs); err != nil {
-		return err
-	}
 
-	if v.GetBool("help") {
+	if opts.Help {
 		_, err := fmt.Fprintln(stdout, arena.CommandUsage(
 			"replay <url|id>",
 			"Download raw replay JSON from codingame.com.",
@@ -37,21 +32,12 @@ func Replay(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.Flag
 		return err
 	}
 
-	if fs.NArg() < 1 {
-		return fmt.Errorf("replay URL or ID is required")
-	}
-
-	id, err := parseReplayID(fs.Arg(0))
+	body, err := codingame.New().FetchReplay(opts.ReplayID)
 	if err != nil {
 		return err
 	}
 
-	body, err := codingame.New().FetchReplay(id)
-	if err != nil {
-		return err
-	}
-
-	outPath, err := resolveOutPath(v.GetString("out"), id)
+	outPath, err := resolveOutPath(opts.Out, opts.ReplayID)
 	if err != nil {
 		return err
 	}
@@ -93,18 +79,4 @@ func resolveOutPath(out string, id int64) (string, error) {
 	}
 
 	return out, nil
-}
-
-var replayURLPattern = regexp.MustCompile(`(\d+)/?$`)
-
-func parseReplayID(raw string) (int64, error) {
-	raw = strings.TrimSpace(raw)
-	if id, err := strconv.ParseInt(raw, 10, 64); err == nil {
-		return id, nil
-	}
-	m := replayURLPattern.FindStringSubmatch(raw)
-	if m == nil {
-		return 0, fmt.Errorf("cannot extract replay ID from %q", raw)
-	}
-	return strconv.ParseInt(m[1], 10, 64)
 }
