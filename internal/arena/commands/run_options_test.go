@@ -56,16 +56,23 @@ func TestParseRunOptionsAcceptsSeedPrefix(t *testing.T) {
 	assert.Equal(t, int64(1001), got.Seed)
 }
 
-func TestParseRunOptionsCollectsUnknownFlagsAsGameOptions(t *testing.T) {
+func TestParseRunOptionsExposesLeagueViaViper(t *testing.T) {
 	fs, v := newTestRunCtx(t)
-	got, err := parseRunOptions([]string{
+	_, err := parseRunOptions([]string{
 		"--p0", "./bin/p0",
 		"--league", "3",
-		"--custom-flag", "value",
 	}, fs, v)
 	require.NoError(t, err)
-	assert.Equal(t, "3", got.GameOptions["league"])
-	assert.Equal(t, "value", got.GameOptions["custom-flag"])
+	assert.Equal(t, "3", v.GetString("league"))
+}
+
+func TestParseRunOptionsRejectsUnknownFlags(t *testing.T) {
+	fs, v := newTestRunCtx(t)
+	_, err := parseRunOptions([]string{
+		"--p0", "./bin/p0",
+		"--unknown", "value",
+	}, fs, v)
+	require.Error(t, err)
 }
 
 func TestParseRunOptionsRejectsNonPositiveSeedIncrement(t *testing.T) {

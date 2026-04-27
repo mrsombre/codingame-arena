@@ -11,27 +11,18 @@ import (
 
 // SerializeOptions holds the parsed configuration for the "serialize" subcommand.
 type SerializeOptions struct {
-	Seed        int64
-	Player      int
-	Help        bool
-	GameOptions map[string]string
+	Seed   int64
+	Player int
+	Help   bool
 }
 
 func parseSerializeOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (SerializeOptions, error) {
-	knownArgs, gameOptions, err := arena.SplitArgs(args, fs)
-	if err != nil {
+	if err := fs.Parse(args); err != nil {
 		return SerializeOptions{}, err
 	}
-	if err := fs.Parse(knownArgs); err != nil {
-		return SerializeOptions{}, err
-	}
-
-	arena.MergeConfigGameOptions(v, fs, gameOptions)
-	arena.InjectLeague(v, gameOptions)
 
 	opts := SerializeOptions{
-		Help:        v.GetBool("help"),
-		GameOptions: gameOptions,
+		Help: v.GetBool("help"),
 	}
 	if opts.Help {
 		return opts, nil

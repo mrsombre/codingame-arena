@@ -55,7 +55,7 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 		Debug:       parsed.Debug,
 		NoSwap:      parsed.NoSwap,
 		TraceWriter: traceWriter,
-		GameOptions: parsed.GameOptions,
+		GameOptions: v,
 	})
 
 	results := arena.RunMatches(parsed.BatchOptions, runner.RunMatch)

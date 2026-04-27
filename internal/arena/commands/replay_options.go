@@ -8,8 +8,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-
-	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
 // ReplayOptions holds the parsed configuration for the "replay" subcommand.
@@ -20,11 +18,7 @@ type ReplayOptions struct {
 }
 
 func parseReplayOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (ReplayOptions, error) {
-	knownArgs, _, err := arena.SplitArgs(args, fs)
-	if err != nil {
-		return ReplayOptions{}, err
-	}
-	if err := fs.Parse(knownArgs); err != nil {
+	if err := fs.Parse(args); err != nil {
 		return ReplayOptions{}, err
 	}
 

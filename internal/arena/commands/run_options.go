@@ -13,28 +13,20 @@ import (
 // RunOptions holds the parsed configuration for the "run" subcommand.
 type RunOptions struct {
 	arena.BatchOptions
-	P0Bin       string
-	P1Bin       string
-	MaxTurns    int
-	TraceDir    string
-	Debug       bool
-	NoSwap      bool
-	Verbose     bool
-	Help        bool
-	GameOptions map[string]string
+	P0Bin    string
+	P1Bin    string
+	MaxTurns int
+	TraceDir string
+	Debug    bool
+	NoSwap   bool
+	Verbose  bool
+	Help     bool
 }
 
 func parseRunOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (RunOptions, error) {
-	knownArgs, gameOptions, err := arena.SplitArgs(args, fs)
-	if err != nil {
+	if err := fs.Parse(args); err != nil {
 		return RunOptions{}, err
 	}
-	if err := fs.Parse(knownArgs); err != nil {
-		return RunOptions{}, err
-	}
-
-	arena.MergeConfigGameOptions(v, fs, gameOptions)
-	arena.InjectLeague(v, gameOptions)
 
 	opts := RunOptions{
 		BatchOptions: arena.BatchOptions{
@@ -43,15 +35,14 @@ func parseRunOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (RunOptio
 			SeedIncrement: int64(v.GetInt("seedx")),
 			OutputMatches: v.GetBool("output-matches"),
 		},
-		P0Bin:       v.GetString("p0"),
-		P1Bin:       v.GetString("p1"),
-		MaxTurns:    v.GetInt("max-turns"),
-		TraceDir:    v.GetString("trace-dir"),
-		Debug:       v.GetBool("debug"),
-		NoSwap:      v.GetBool("no-swap"),
-		Verbose:     v.GetBool("verbose"),
-		Help:        v.GetBool("help"),
-		GameOptions: gameOptions,
+		P0Bin:    v.GetString("p0"),
+		P1Bin:    v.GetString("p1"),
+		MaxTurns: v.GetInt("max-turns"),
+		TraceDir: v.GetString("trace-dir"),
+		Debug:    v.GetBool("debug"),
+		NoSwap:   v.GetBool("no-swap"),
+		Verbose:  v.GetBool("verbose"),
+		Help:     v.GetBool("help"),
 	}
 
 	if raw := v.GetString("seed"); raw != "" {

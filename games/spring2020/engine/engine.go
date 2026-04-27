@@ -6,6 +6,8 @@ package engine
 import (
 	"strconv"
 
+	"github.com/spf13/viper"
+
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
@@ -24,9 +26,9 @@ func (f *factory) Name() string { return "spring2020" }
 
 func (f *factory) MaxTurns() int { return maxTurns }
 
-func (f *factory) NewGame(seed int64, options map[string]string) (arena.Referee, []arena.Player) {
+func (f *factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []arena.Player) {
 	leagueLevel := 4
-	if raw := options["league"]; raw != "" {
+	if raw := options.GetString("league"); raw != "" {
 		if value, err := strconv.Atoi(raw); err == nil {
 			leagueLevel = value
 		}

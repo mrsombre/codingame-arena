@@ -24,7 +24,7 @@ func Serialize(args []string, stdout io.Writer, factory arena.GameFactory, fs *p
 		return err
 	}
 
-	referee, players := factory.NewGame(opts.Seed, opts.GameOptions)
+	referee, players := factory.NewGame(opts.Seed, v)
 	referee.Init(players)
 
 	player := players[opts.Player]

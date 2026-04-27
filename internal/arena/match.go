@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 // MatchOptions configures a single match execution.
@@ -17,7 +19,7 @@ type MatchOptions struct {
 	Debug       bool
 	NoSwap      bool
 	TraceWriter *TraceWriter
-	GameOptions map[string]string
+	GameOptions *viper.Viper
 }
 
 // Runner executes matches using a GameFactory.

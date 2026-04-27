@@ -5,8 +5,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-
-	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
 // ServeOptions holds the parsed configuration for the "serve" subcommand.
@@ -20,11 +18,7 @@ type ServeOptions struct {
 }
 
 func parseServeOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (ServeOptions, error) {
-	knownArgs, _, err := arena.SplitArgs(args, fs)
-	if err != nil {
-		return ServeOptions{}, err
-	}
-	if err := fs.Parse(knownArgs); err != nil {
+	if err := fs.Parse(args); err != nil {
 		return ServeOptions{}, err
 	}
 

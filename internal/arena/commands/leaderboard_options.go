@@ -9,8 +9,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-
-	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
 // LeaderboardOptions holds the parsed configuration for the "leaderboard" subcommand.
@@ -24,11 +22,7 @@ type LeaderboardOptions struct {
 }
 
 func parseLeaderboardOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (LeaderboardOptions, error) {
-	knownArgs, _, err := arena.SplitArgs(args, fs)
-	if err != nil {
-		return LeaderboardOptions{}, err
-	}
-	if err := fs.Parse(knownArgs); err != nil {
+	if err := fs.Parse(args); err != nil {
 		return LeaderboardOptions{}, err
 	}
 

@@ -15,8 +15,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/viper"
+
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
+
+// gameOptionsViper builds a viper instance carrying the per-request
+// gameOptions map so it can be passed to GameFactory.NewGame.
+func gameOptionsViper(opts map[string]string) *viper.Viper {
+	v := viper.New()
+	for k, val := range opts {
+		v.Set(k, val)
+	}
+	return v
+}
 
 // Options configures a Handler built by New.
 type Options struct {
@@ -133,7 +145,7 @@ func handleSerialize(factory arena.GameFactory) http.HandlerFunc {
 			}
 		}
 
-		referee, players := factory.NewGame(seed, gameOptions)
+		referee, players := factory.NewGame(seed, gameOptionsViper(gameOptions))
 		referee.Init(players)
 		player := players[playerIdx]
 
@@ -249,7 +261,7 @@ func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			P1Bin:       req.P1Bin,
 			NoSwap:      req.NoSwap,
 			TraceWriter: arena.NewTraceWriter(traceDir),
-			GameOptions: req.GameOptions,
+			GameOptions: gameOptionsViper(req.GameOptions),
 		})
 		result := runner.RunMatch(0, seed)
 		w.Header().Set("Content-Type", "application/json")
@@ -343,7 +355,7 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			P1Bin:       req.P1Bin,
 			NoSwap:      req.NoSwap,
 			TraceWriter: arena.NewTraceWriter(traceDir),
-			GameOptions: req.GameOptions,
+			GameOptions: gameOptionsViper(req.GameOptions),
 		})
 		parallel := runtime.NumCPU()
 		if parallel > 4 {

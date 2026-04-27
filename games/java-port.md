@@ -97,14 +97,16 @@ See `internal/arena/interfaces.go` for the full signatures.
 
 ```go
 type GameFactory interface {
-    NewGame(seed int64, options map[string]string) (Referee, []Player)
+    NewGame(seed int64, options *viper.Viper) (Referee, []Player)
     MaxTurns() int
 }
 ```
 
 - `NewGame` creates a fresh game state from a seed and CLI options.
 - `MaxTurns` returns the hard turn limit for this game.
-- `options` contains any `--key value` flags not consumed by the arena core.
+- `options` is the viper instance carrying flags, config, env, and any
+  `--key value` pairs not consumed by the arena core. Read game-specific
+  keys via the standard viper API (`options.GetString`, `GetInt`, …).
 
 ### Referee
 

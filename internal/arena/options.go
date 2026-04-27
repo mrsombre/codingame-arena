@@ -96,86 +96,6 @@ func NewViper(fs *pflag.FlagSet) (*viper.Viper, error) {
 	return v, nil
 }
 
-// SplitArgs separates args known to fs from unknown --key value pairs,
-// returning the unknown pairs as a game options map.
-func SplitArgs(args []string, fs *pflag.FlagSet) ([]string, map[string]string, error) {
-	known := make([]string, 0, len(args))
-	gameOptions := make(map[string]string)
-
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		if !strings.HasPrefix(a, "--") || a == "--" {
-			known = append(known, a)
-			continue
-		}
-
-		trimmed := strings.TrimPrefix(a, "--")
-		name := trimmed
-		var value string
-		hasInline := false
-		if eq := strings.Index(trimmed, "="); eq >= 0 {
-			name = trimmed[:eq]
-			value = trimmed[eq+1:]
-			hasInline = true
-		}
-
-		if f := fs.Lookup(name); f != nil {
-			known = append(known, a)
-			if !hasInline && !isBoolFlag(f) {
-				if i+1 >= len(args) {
-					return nil, nil, fmt.Errorf("missing value for --%s", name)
-				}
-				known = append(known, args[i+1])
-				i++
-			}
-			continue
-		}
-
-		if !hasInline {
-			if i+1 >= len(args) {
-				return nil, nil, fmt.Errorf("missing value for --%s", name)
-			}
-			value = args[i+1]
-			i++
-		}
-		gameOptions[name] = value
-	}
-
-	return known, gameOptions, nil
-}
-
-func isBoolFlag(f *pflag.Flag) bool {
-	bf, ok := f.Value.(interface{ IsBoolFlag() bool })
-	return ok && bf.IsBoolFlag()
-}
-
-// MergeConfigGameOptions copies viper keys that aren't bound to known flags
-// into gameOptions, leaving existing (CLI-provided) entries untouched.
-func MergeConfigGameOptions(v *viper.Viper, fs *pflag.FlagSet, gameOptions map[string]string) {
-	for _, key := range v.AllKeys() {
-		if fs.Lookup(key) != nil {
-			continue
-		}
-		if _, ok := gameOptions[key]; ok {
-			continue
-		}
-		raw := v.Get(key)
-		if raw == nil {
-			continue
-		}
-		gameOptions[key] = fmt.Sprintf("%v", raw)
-	}
-}
-
-// InjectLeague copies the --league flag value into gameOptions if set.
-func InjectLeague(v *viper.Viper, gameOptions map[string]string) {
-	if league := v.GetString("league"); league != "" {
-		if _, exists := gameOptions["league"]; !exists {
-			gameOptions["league"] = league
-		}
-	}
-}
-
 // Usage returns the top-level help text, listing available commands.
 func Usage(games []string) string {
 	return strings.TrimSpace(fmt.Sprintf(`Available games: %s
@@ -192,9 +112,7 @@ Commands:
 Use "arena <command> --help" for more information about a command.
 
 Env vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_GAME, ARENA_SEED).
-Config: arena.yml in current directory (e.g. game: winter2026).
-
-Unknown --key value flags are passed as game options to the engine factory.`, strings.Join(games, ", ")))
+Config: arena.yml in current directory (e.g. game: winter2026).`, strings.Join(games, ", ")))
 }
 
 // CommandUsage returns help text for a specific subcommand using fs.FlagUsages().
@@ -208,8 +126,7 @@ func CommandUsage(command, description string, fs *pflag.FlagSet, extra string) 
 		sb.WriteString("\n")
 	}
 	sb.WriteString("\nEnv vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_GAME, ARENA_SEED).\n")
-	sb.WriteString("Config: arena.yml in current directory (e.g. game: winter2026).\n")
-	sb.WriteString("Unknown --key value flags are passed as game options to the engine factory.")
+	sb.WriteString("Config: arena.yml in current directory (e.g. game: winter2026).")
 	return sb.String()
 }
 

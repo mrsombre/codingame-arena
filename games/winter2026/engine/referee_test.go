@@ -3,11 +3,20 @@ package engine
 import (
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/mrsombre/codingame-arena/games/winter2026/engine/grid"
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
+
+func newTestOptions(values map[string]string) *viper.Viper {
+	v := viper.New()
+	for k, val := range values {
+		v.Set(k, val)
+	}
+	return v
+}
 
 // TestRefereeSmokeFullTurn runs a single turn through the arena.Referee
 // interface: Init → GlobalInfoFor → ResetGameTurnData → FrameInfoFor →
@@ -146,11 +155,11 @@ func TestFactoryBasics(t *testing.T) {
 	assert.Equal(t, "winter2026", f.Name())
 	assert.Equal(t, 200, f.MaxTurns())
 
-	ref, players := f.NewGame(1, map[string]string{"league": "1"})
+	ref, players := f.NewGame(1, newTestOptions(map[string]string{"league": "1"}))
 	assert.NotNil(t, ref)
 	assert.Len(t, players, 2)
 
 	// Invalid league option is silently ignored — defaults still applied.
-	ref2, _ := f.NewGame(1, map[string]string{"league": "abc"})
+	ref2, _ := f.NewGame(1, newTestOptions(map[string]string{"league": "abc"}))
 	assert.NotNil(t, ref2)
 }

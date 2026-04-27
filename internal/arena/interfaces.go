@@ -1,6 +1,10 @@
 package arena
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/spf13/viper"
+)
 
 // Referee drives the game through a standard protocol.
 // Match calls these methods in order during the game loop.
@@ -42,7 +46,7 @@ type Player interface {
 // GameFactory creates game instances for each match.
 type GameFactory interface {
 	Name() string
-	NewGame(seed int64, options map[string]string) (Referee, []Player)
+	NewGame(seed int64, options *viper.Viper) (Referee, []Player)
 	MaxTurns() int
 }
 
