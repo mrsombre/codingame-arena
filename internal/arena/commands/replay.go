@@ -5,78 +5,182 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 	"github.com/mrsombre/codingame-arena/internal/arena/codingame"
+	"github.com/mrsombre/codingame-arena/internal/arena/db"
 )
 
-// Replay is the entry point for the "replay" subcommand. It downloads the
-// raw replay JSON for a CodinGame game and writes it to disk untouched.
-func Replay(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	opts, err := parseReplayOptions(args, fs, v)
+// ReplayUsage returns the help text shown for `arena replay` without a
+// recognized sub-subcommand.
+func ReplayUsage() string {
+	return `arena replay - Download raw replay JSON from codingame.com.
+
+Subcommands:
+  get <url|id> [<url|id>...]            Download one or more replays by ID/URL
+  leaderboard <leaderboard-url> <nick>  Download every replay from a player's last battles list
+
+Use "arena replay <subcommand> --help" for subcommand-specific flags.`
+}
+
+// ReplayGet is the entry point for the "replay get" subcommand. It downloads
+// the raw replay JSON for one or more CodinGame games and writes each to disk
+// untouched.
+func ReplayGet(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
+	opts, err := parseReplayGetOptions(args, fs, v)
 	if err != nil {
 		return err
 	}
 
 	if opts.Help {
 		_, err := fmt.Fprintln(stdout, arena.CommandUsage(
-			"replay <url|id>",
-			"Download raw replay JSON from codingame.com.",
+			"replay get <url|id> [<url|id>...]",
+			"Download raw replay JSON for one or more CodinGame games.",
 			fs,
 			"",
 		))
 		return err
 	}
 
-	body, err := codingame.New().FetchReplay(opts.ReplayID)
+	client := codingame.New()
+	return downloadReplays(client, opts.IDs, opts.OutDir, opts.Limit, opts.Delay, stdout)
+}
+
+// ReplayLeaderboard is the entry point for the "replay leaderboard"
+// subcommand. It resolves a CodinGame leaderboard URL plus nickname into the
+// player's last battles and downloads each replay's raw JSON to disk.
+func ReplayLeaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
+	opts, err := parseReplayLeaderboardOptions(args, fs, v)
 	if err != nil {
 		return err
 	}
 
-	outPath, err := resolveOutPath(opts.Out, opts.ReplayID)
+	if opts.Help {
+		_, err := fmt.Fprintln(stdout, arena.CommandUsage(
+			"replay leaderboard <leaderboard-url> <nickname>",
+			"Download every replay from a player's last battles list.",
+			fs,
+			"",
+		))
+		return err
+	}
+
+	store, err := db.Open("")
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(outPath, body, 0644); err != nil {
-		return fmt.Errorf("write %s: %w", outPath, err)
+	defer func() { _ = store.Close() }()
+
+	client := codingame.New()
+
+	apiSlug, puzzleHit, err := resolvePuzzle(client, store, opts.Slug)
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stdout, "puzzle: %s -> %s%s\n", opts.Slug, apiSlug, cacheTag(puzzleHit))
+
+	agentID, playerHit, err := resolveAgent(client, store, apiSlug, opts.Nickname)
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stdout, "player: %s -> agentId %d%s\n", opts.Nickname, agentID, cacheTag(playerHit))
+
+	gameIDs, err := client.FindLastBattles(agentID)
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stdout, "battles: %d\n", len(gameIDs))
+
+	return downloadReplays(client, gameIDs, opts.OutDir, opts.Limit, opts.Delay, stdout)
+}
+
+// downloadReplays runs the shared per-ID download loop: skip-if-exists,
+// inter-request delay, soft failure, and a final summary line.
+func downloadReplays(client *codingame.Client, ids []int64, outDir string, limit int, delay time.Duration, stdout io.Writer) error {
+	if limit > 0 && len(ids) > limit {
+		ids = ids[:limit]
 	}
 
-	_, _ = fmt.Fprintf(stdout, "saved %d bytes to %s\n", len(body), outPath)
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return fmt.Errorf("create %s: %w", outDir, err)
+	}
+
+	var saved, skipped, failed int
+	first := true
+	for i, id := range ids {
+		path := filepath.Join(outDir, fmt.Sprintf("%d.json", id))
+		if _, err := os.Stat(path); err == nil {
+			skipped++
+			_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (exists)\n", i+1, len(ids), id)
+			continue
+		}
+
+		if !first && delay > 0 {
+			time.Sleep(delay)
+		}
+		first = false
+
+		body, err := client.FetchReplay(id)
+		if err != nil {
+			failed++
+			_, _ = fmt.Fprintf(stdout, "[%d/%d] fail %d: %v\n", i+1, len(ids), id, err)
+			continue
+		}
+		if err := os.WriteFile(path, body, 0644); err != nil {
+			return fmt.Errorf("write %s: %w", path, err)
+		}
+		saved++
+		_, _ = fmt.Fprintf(stdout, "[%d/%d] save %d (%d bytes)\n", i+1, len(ids), id, len(body))
+	}
+
+	_, _ = fmt.Fprintf(stdout, "done: %d saved, %d skipped, %d failed (out=%s)\n", saved, skipped, failed, outDir)
 	return nil
 }
 
-// resolveOutPath decides the final output file path based on user input.
-//
-//   - empty               → ./replays/<id>.json (creates ./replays if missing)
-//   - trailing "/"        → <out>/<id>.json (creates <out> if missing)
-//   - existing directory  → <out>/<id>.json
-//   - anything else       → treated as a file path, written as-is
-func resolveOutPath(out string, id int64) (string, error) {
-	filename := fmt.Sprintf("%d.json", id)
-
-	if out == "" {
-		dir := "replays"
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return "", fmt.Errorf("create %s: %w", dir, err)
-		}
-		return filepath.Join(dir, filename), nil
+// cacheTag returns a short " (cached)" suffix when hit is true.
+func cacheTag(hit bool) string {
+	if hit {
+		return " (cached)"
 	}
+	return ""
+}
 
-	if strings.HasSuffix(out, string(os.PathSeparator)) {
-		dir := strings.TrimRight(out, string(os.PathSeparator))
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return "", fmt.Errorf("create %s: %w", dir, err)
-		}
-		return filepath.Join(dir, filename), nil
+// resolvePuzzle reads from cache, falling back to a CodinGame API lookup and
+// persisting the result.
+func resolvePuzzle(client *codingame.Client, store *db.DB, prettyID string) (string, bool, error) {
+	if cached, err := store.Puzzles.Find(prettyID); err != nil {
+		return "", false, err
+	} else if cached != nil {
+		return cached.LeaderboardID, true, nil
 	}
-
-	if info, err := os.Stat(out); err == nil && info.IsDir() {
-		return filepath.Join(out, filename), nil
+	apiSlug, err := client.ResolvePuzzle(prettyID)
+	if err != nil {
+		return "", false, err
 	}
+	if err := store.Puzzles.Save(prettyID, apiSlug); err != nil {
+		return "", false, fmt.Errorf("cache puzzle: %w", err)
+	}
+	return apiSlug, false, nil
+}
 
-	return out, nil
+// resolveAgent reads from cache, falling back to a CodinGame leaderboard
+// search and persisting the result.
+func resolveAgent(client *codingame.Client, store *db.DB, apiSlug, nickname string) (int64, bool, error) {
+	if cached, err := store.Players.Find(apiSlug, nickname); err != nil {
+		return 0, false, err
+	} else if cached != nil {
+		return cached.AgentID, true, nil
+	}
+	agentID, err := client.FindAgent(apiSlug, nickname)
+	if err != nil {
+		return 0, false, err
+	}
+	if err := store.Players.Save(apiSlug, nickname, agentID); err != nil {
+		return 0, false, fmt.Errorf("cache player: %w", err)
+	}
+	return agentID, false, nil
 }

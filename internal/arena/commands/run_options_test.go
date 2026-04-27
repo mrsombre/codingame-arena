@@ -15,7 +15,7 @@ import (
 func newTestRunCtx(t *testing.T) (*pflag.FlagSet, *viper.Viper) {
 	t.Helper()
 	fs := arena.NewBaseFlagSet("arena")
-	arena.AddRunFlags(fs)
+	AddRunFlags(fs)
 	v := viper.New()
 	require.NoError(t, v.BindPFlags(fs))
 	return fs, v

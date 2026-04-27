@@ -45,24 +45,39 @@ func main() {
 	var handler handlerFunc
 	var needsFactory bool
 	switch command {
-	case "serialize":
-		arena.AddSerializeFlags(fs)
-		handler = commands.Serialize
-		needsFactory = true
-	case "replay":
-		arena.AddReplayFlags(fs)
-		handler = commands.Replay
-	case "leaderboard":
-		arena.AddLeaderboardFlags(fs)
-		handler = commands.Leaderboard
 	case "run":
-		arena.AddRunFlags(fs)
+		commands.AddRunFlags(fs)
 		handler = commands.Run
 		needsFactory = true
 	case "serve":
-		arena.AddServeFlags(fs)
+		commands.AddServeFlags(fs)
 		handler = commands.Serve
 		needsFactory = true
+	case "serialize":
+		commands.AddSerializeFlags(fs)
+		handler = commands.Serialize
+		needsFactory = true
+	case "replay":
+		if len(rest) == 0 {
+			fmt.Println(commands.ReplayUsage())
+			return
+		}
+		sub := rest[0]
+		rest = rest[1:]
+		switch sub {
+		case "get":
+			commands.AddReplayGetFlags(fs)
+			handler = commands.ReplayGet
+		case "leaderboard":
+			commands.AddReplayLeaderboardFlags(fs)
+			handler = commands.ReplayLeaderboard
+		case "--help", "-h":
+			fmt.Println(commands.ReplayUsage())
+			return
+		default:
+			fmt.Fprintf(os.Stderr, "unknown replay subcommand %q; run `arena replay --help` for usage\n", sub)
+			os.Exit(1)
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q; run `arena --help` for usage\n", command)
 		os.Exit(1)

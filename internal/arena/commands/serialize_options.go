@@ -9,6 +9,13 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
+// AddSerializeFlags registers flags used by the "serialize" subcommand on fs.
+func AddSerializeFlags(fs *pflag.FlagSet) {
+	fs.StringP("league", "l", "", "League level (default: game-specific)")
+	fs.StringP("seed", "s", "", "RNG seed (required)")
+	fs.Int("player", 0, "Player index (0 or 1)")
+}
+
 // SerializeOptions holds the parsed configuration for the "serialize" subcommand.
 type SerializeOptions struct {
 	Seed   int64

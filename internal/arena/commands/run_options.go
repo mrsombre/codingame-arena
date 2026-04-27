@@ -2,6 +2,8 @@ package commands
 
 import (
 	"fmt"
+	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -9,6 +11,23 @@ import (
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
+
+// AddRunFlags registers flags used by the "run" subcommand on fs.
+func AddRunFlags(fs *pflag.FlagSet) {
+	fs.StringP("league", "l", "", "League level (default: game-specific)")
+	fs.IntP("simulations", "n", 100, "Number of matches to run")
+	fs.IntP("parallel", "p", runtime.NumCPU(), "Worker threads")
+	fs.StringP("seed", "s", "", "Base RNG seed (default: current time)")
+	fs.Int("seedx", 1, "Seed increment per match (seed_i = seed + i*N)")
+	fs.Bool("output-matches", false, "Include per-match results in JSON output")
+	fs.Bool("debug", false, "Force one match, fixed sides, print debug to stderr")
+	fs.Bool("no-swap", false, "Disable automatic side swapping")
+	fs.String("trace-dir", "", "Write per-match JSON trace files")
+	fs.Int("max-turns", 200, "Maximum turns per match")
+	fs.String("p0", "", "Player 0 binary (required)")
+	fs.String("p1", filepath.Clean("./bin/opponent"), "Player 1 binary")
+	fs.Bool("verbose", false, "Output full JSON (default: short summary line)")
+}
 
 // RunOptions holds the parsed configuration for the "run" subcommand.
 type RunOptions struct {

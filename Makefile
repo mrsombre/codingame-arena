@@ -7,15 +7,15 @@ clean:
 	rm -rf bin/* tmp/* replays/* matches/*
 
 # backend
-.PHONY: test test-games lint build-arena build-viewer clean
+.PHONY: test-arena test-games lint-arena build-arena build-viewer clean
 
-test:
+test-arena:
 	go test ./internal/...
 
 test-games:
 	go test ./games/...
 
-lint:
+lint-arena:
 	golangci-lint run ./...
 
 build-arena:

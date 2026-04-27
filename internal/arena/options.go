@@ -4,11 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -24,51 +21,6 @@ func NewBaseFlagSet(name string) *pflag.FlagSet {
 	fs.BoolP("help", "h", false, "Show this help")
 	fs.String("game", "", "Active game")
 	return fs
-}
-
-// AddRunFlags registers flags used by the "run" subcommand on fs.
-func AddRunFlags(fs *pflag.FlagSet) {
-	fs.StringP("league", "l", "", "League level (default: game-specific)")
-	fs.IntP("simulations", "n", 100, "Number of matches to run")
-	fs.IntP("parallel", "p", runtime.NumCPU(), "Worker threads")
-	fs.StringP("seed", "s", "", "Base RNG seed (default: current time)")
-	fs.Int("seedx", 1, "Seed increment per match (seed_i = seed + i*N)")
-	fs.Bool("output-matches", false, "Include per-match results in JSON output")
-	fs.Bool("debug", false, "Force one match, fixed sides, print debug to stderr")
-	fs.Bool("no-swap", false, "Disable automatic side swapping")
-	fs.String("trace-dir", "", "Write per-match JSON trace files")
-	fs.Int("max-turns", 200, "Maximum turns per match")
-	fs.String("p0", "", "Player 0 binary (required)")
-	fs.String("p1", filepath.Clean("./bin/opponent"), "Player 1 binary")
-	fs.Bool("verbose", false, "Output full JSON (default: short summary line)")
-}
-
-// AddSerializeFlags registers flags used by the "serialize" subcommand on fs.
-func AddSerializeFlags(fs *pflag.FlagSet) {
-	fs.StringP("league", "l", "", "League level (default: game-specific)")
-	fs.StringP("seed", "s", "", "RNG seed (required)")
-	fs.Int("player", 0, "Player index (0 or 1)")
-}
-
-// AddReplayFlags registers flags used by the "replay" subcommand on fs.
-func AddReplayFlags(fs *pflag.FlagSet) {
-	fs.StringP("out", "o", "", "Output path. Empty → ./replays/<id>.json. Trailing '/' or existing directory → <id>.json inside. Otherwise → a file at that path.")
-}
-
-// AddLeaderboardFlags registers flags used by the "leaderboard" subcommand on fs.
-func AddLeaderboardFlags(fs *pflag.FlagSet) {
-	fs.StringP("out", "o", filepath.Clean("./replays"), "Directory to save replays as <gameId>.json")
-	fs.IntP("limit", "l", 0, "Maximum number of replays to download (0 = all)")
-	fs.Duration("delay", 500*time.Millisecond, "Delay between replay downloads")
-}
-
-// AddServeFlags registers flags used by the "serve" subcommand on fs.
-func AddServeFlags(fs *pflag.FlagSet) {
-	fs.Int("port", 5757, "HTTP port")
-	fs.String("host", "localhost", "Bind host")
-	fs.String("trace-dir", "./matches", "Directory with match trace JSON files (powers /api/matches)")
-	fs.String("replay-dir", "./replays", "Directory with CodinGame replay JSON files (powers /api/replays)")
-	fs.String("bin-dir", "./bin", "Directory to scan for bot binaries (powers /api/bots)")
 }
 
 // NewViper returns a viper instance bound to the given flag set, configured
@@ -105,8 +57,7 @@ Usage: arena <command> [OPTIONS]
 Commands:
   run          Run one or more match simulations against a player binary
   serialize    Print initial game input for first turn for a given seed
-  replay       Download raw replay JSON from codingame.com
-  leaderboard  Download every replay from a player's last battles list
+  replay       Download replay JSON (sub: get <url|id>..., leaderboard <url> <nick>)
   serve        Serve the embedded web viewer
 
 Use "arena <command> --help" for more information about a command.
