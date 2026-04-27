@@ -1,11 +1,9 @@
-package action
+package engine
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/mrsombre/codingame-arena/games/spring2020/engine/grid"
 )
 
 func TestNoActionSentinel(t *testing.T) {
@@ -14,9 +12,9 @@ func TestNoActionSentinel(t *testing.T) {
 }
 
 func TestNewMoveAction(t *testing.T) {
-	a := NewMoveAction(grid.Coord{X: 3, Y: 4})
+	a := NewMoveAction(Coord{X: 3, Y: 4})
 	assert.Equal(t, ActionMove, a.Type)
-	assert.Equal(t, grid.Coord{X: 3, Y: 4}, a.Target)
+	assert.Equal(t, Coord{X: 3, Y: 4}, a.Target)
 	assert.False(t, a.IsNoAction())
 }
 
@@ -27,8 +25,8 @@ func TestNewSpeedAction(t *testing.T) {
 }
 
 func TestNewSwitchAction(t *testing.T) {
-	a := NewSwitchAction(PacPaper)
+	a := NewSwitchAction(TypePaper)
 	assert.Equal(t, ActionSwitch, a.Type)
-	assert.Equal(t, PacPaper, a.NewType)
+	assert.Equal(t, TypePaper, a.NewType)
 	assert.False(t, a.IsNoAction())
 }

@@ -1,4 +1,4 @@
-package grid
+package engine
 
 import (
 	"math"
@@ -53,7 +53,7 @@ func TestCoordString(t *testing.T) {
 	assert.Equal(t, "(2, 7)", Coord{X: 2, Y: 7}.String())
 }
 
-func TestCoordGetUnitVector(t *testing.T) {
+func TestCoordUnitVector(t *testing.T) {
 	tests := []struct {
 		in   Coord
 		want Coord
@@ -66,6 +66,6 @@ func TestCoordGetUnitVector(t *testing.T) {
 		{Coord{X: 4, Y: -2}, Coord{X: 1, Y: -1}},
 	}
 	for _, tc := range tests {
-		assert.Equal(t, tc.want, tc.in.GetUnitVector(), tc.in.String())
+		assert.Equal(t, tc.want, tc.in.UnitVector(), tc.in.String())
 	}
 }

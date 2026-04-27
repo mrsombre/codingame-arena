@@ -1,4 +1,4 @@
-package grid
+package engine
 
 import (
 	"testing"
@@ -21,17 +21,17 @@ func TestCellTypeFromChar(t *testing.T) {
 	for _, tc := range tests {
 		name := string(tc.c)
 		if tc.isWall {
-			assert.Equal(t, CellWall, cellTypeFromChar(tc.c), name)
+			assert.Equal(t, CellWall, CellTypeFromChar(tc.c), name)
 		} else {
-			assert.Equal(t, CellFloor, cellTypeFromChar(tc.c), name)
+			assert.Equal(t, CellFloor, CellTypeFromChar(tc.c), name)
 		}
-		assert.Equal(t, tc.pellet, cellHasPelletFromChar(tc.c), name)
+		assert.Equal(t, tc.pellet, CellHasPelletFromChar(tc.c), name)
 	}
 }
 
 func TestCellTypeFromCharPanicsOnUnknown(t *testing.T) {
-	assert.Panics(t, func() { cellTypeFromChar('Z') })
-	assert.Panics(t, func() { cellHasPelletFromChar('Z') })
+	assert.Panics(t, func() { CellTypeFromChar('Z') })
+	assert.Panics(t, func() { CellHasPelletFromChar('Z') })
 }
 
 func TestNewGridFromRows(t *testing.T) {
@@ -51,13 +51,16 @@ func TestNewGridFromRows(t *testing.T) {
 	assert.False(t, g.GetXY(0, 0).HasPellet)
 }
 
-func TestGridGetOutOfBoundsReturnsNoCell(t *testing.T) {
+func TestGridGetOutOfBoundsReturnsNil(t *testing.T) {
 	g := NewGridFromRows([]string{"   ", "   "}, false)
 	got := g.GetXY(-1, 0)
+	assert.Nil(t, got)
 	assert.False(t, got.IsValid())
 	got = g.GetXY(0, 5)
+	assert.Nil(t, got)
 	assert.False(t, got.IsValid())
 	got = g.Get(Coord{X: 5, Y: 1})
+	assert.Nil(t, got)
 	assert.False(t, got.IsValid())
 }
 
@@ -87,19 +90,19 @@ func TestGridNeighboursWrapsHorizontally(t *testing.T) {
 	assert.Contains(t, n, Coord{X: 1, Y: 0})
 }
 
-func TestGridGetCoordNeighbourWrap(t *testing.T) {
+func TestGridCoordNeighbourWrap(t *testing.T) {
 	g := NewGridFromRows([]string{"   "}, true)
 
-	n, ok := g.GetCoordNeighbour(Coord{X: 0, Y: 0}, Coord{X: -1, Y: 0})
+	n, ok := g.CoordNeighbour(Coord{X: 0, Y: 0}, Coord{X: -1, Y: 0})
 	assert.True(t, ok)
 	assert.Equal(t, Coord{X: 2, Y: 0}, n)
 
-	n, ok = g.GetCoordNeighbour(Coord{X: 2, Y: 0}, Coord{X: 1, Y: 0})
+	n, ok = g.CoordNeighbour(Coord{X: 2, Y: 0}, Coord{X: 1, Y: 0})
 	assert.True(t, ok)
 	assert.Equal(t, Coord{X: 0, Y: 0}, n)
 
 	// Vertical is never wrapped.
-	_, ok = g.GetCoordNeighbour(Coord{X: 0, Y: 0}, Coord{X: 0, Y: -1})
+	_, ok = g.CoordNeighbour(Coord{X: 0, Y: 0}, Coord{X: 0, Y: -1})
 	assert.False(t, ok)
 }
 
@@ -150,6 +153,9 @@ func TestCellCopyFromSource(t *testing.T) {
 	assert.True(t, dst.HasCherry)
 }
 
-func TestNoCellIsInvalid(t *testing.T) {
-	assert.False(t, NoCell.IsValid())
+func TestNilCellMethodsAreSafe(t *testing.T) {
+	var c *Cell
+	assert.False(t, c.IsValid())
+	assert.False(t, c.IsFloor())
+	assert.False(t, c.IsWall())
 }

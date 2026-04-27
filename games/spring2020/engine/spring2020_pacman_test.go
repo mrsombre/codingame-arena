@@ -5,9 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/mrsombre/codingame-arena/games/spring2020/engine/action"
-	"github.com/mrsombre/codingame-arena/games/spring2020/engine/grid"
 )
 
 func TestPacmanTypeName(t *testing.T) {
@@ -115,7 +112,7 @@ func TestPacmanTurnResetSkipsTicksWhenDead(t *testing.T) {
 
 func TestPacmanTurnResetClearsIntentAndPerTurnFlags(t *testing.T) {
 	p := NewPacman(0, 0, nil, TypeRock)
-	p.Intent = action.NewSpeedAction()
+	p.Intent = NewSpeedAction()
 	p.AbilityToUse = AbilitySpeed
 	p.HasAbilityToUse = true
 	p.Blocked = true
@@ -138,7 +135,7 @@ func TestPacmanTurnResetClearsIntentAndPerTurnFlags(t *testing.T) {
 
 func TestPacmanMoveFinished(t *testing.T) {
 	p := NewPacman(0, 0, nil, TypeRock)
-	p.IntendedPath = []grid.Coord{{X: 0, Y: 0}, {X: 1, Y: 0}, {X: 2, Y: 0}}
+	p.IntendedPath = []Coord{{X: 0, Y: 0}, {X: 1, Y: 0}, {X: 2, Y: 0}}
 
 	p.CurrentPathStep = 0
 	assert.False(t, p.MoveFinished())
@@ -159,7 +156,7 @@ func TestPacmanFastEnoughAndIsSpeeding(t *testing.T) {
 	assert.False(t, p.FastEnoughToMoveAt(1))
 	assert.False(t, p.IsSpeeding(&cfg))
 
-	p.Speed = cfg.SpeedBoost
+	p.Speed = cfg.SPEED_BOOST
 	assert.True(t, p.FastEnoughToMoveAt(0))
 	assert.True(t, p.FastEnoughToMoveAt(1))
 	assert.False(t, p.FastEnoughToMoveAt(2))

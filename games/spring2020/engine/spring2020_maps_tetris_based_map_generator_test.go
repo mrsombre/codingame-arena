@@ -131,8 +131,8 @@ func buildInitialInput(seed int64, leagueLevel int) string {
 	game.Init(players)
 
 	lines := make([]string, 0)
-	lines = append(lines, serializeGlobalInfoFor(players[0], game)...)
-	lines = append(lines, serializeFrameInfoFor(players[0], game)...)
+	lines = append(lines, SerializeGlobalInfoFor(players[0], game)...)
+	lines = append(lines, SerializeFrameInfoFor(players[0], game)...)
 	return strings.Join(lines, "\n")
 }
 

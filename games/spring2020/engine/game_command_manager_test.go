@@ -4,24 +4,21 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/mrsombre/codingame-arena/games/spring2020/engine/action"
-	"github.com/mrsombre/codingame-arena/games/spring2020/engine/grid"
 )
 
 // newParseGame builds a minimal game + player for ParseCommands tests.
 func newParseGame(t *testing.T) (*Game, *Player, *CommandManager) {
 	t.Helper()
 	g := &Game{Config: NewConfig(LeagueRulesFromIndex(4))}
-	g.Grid = grid.NewGridFromRows([]string{"#####", "#   #", "#####"}, false)
+	g.Grid = NewGridFromRows([]string{"#####", "#   #", "#####"}, false)
 
 	player := NewPlayer(0)
 	g.Players = []*Player{player, NewPlayer(1)}
 
 	pac0 := NewPacman(0, 0, player, TypeRock)
-	pac0.Position = grid.Coord{X: 1, Y: 1}
+	pac0.Position = Coord{X: 1, Y: 1}
 	pac1 := NewPacman(1, 1, player, TypePaper)
-	pac1.Position = grid.Coord{X: 2, Y: 1}
+	pac1.Position = Coord{X: 2, Y: 1}
 	player.AddPacman(pac0)
 	player.AddPacman(pac1)
 	g.Pacmen = []*Pacman{pac0, pac1}
@@ -35,8 +32,8 @@ func TestParseCommandsMoveSetsIntent(t *testing.T) {
 	cm.ParseCommands(player, []string{"MOVE 0 3 1"})
 	assert.False(t, player.IsDeactivated())
 	pac := player.Pacmen[0]
-	assert.Equal(t, action.ActionMove, pac.Intent.Type)
-	assert.Equal(t, grid.Coord{X: 3, Y: 1}, pac.Intent.Target)
+	assert.Equal(t, ActionMove, pac.Intent.Type)
+	assert.Equal(t, Coord{X: 3, Y: 1}, pac.Intent.Target)
 	_ = g
 }
 
@@ -44,7 +41,7 @@ func TestParseCommandsSpeedSetsAbility(t *testing.T) {
 	_, player, cm := newParseGame(t)
 	cm.ParseCommands(player, []string{"SPEED 0"})
 	pac := player.Pacmen[0]
-	assert.Equal(t, action.ActionSpeed, pac.Intent.Type)
+	assert.Equal(t, ActionSpeed, pac.Intent.Type)
 	assert.True(t, pac.HasAbilityToUse)
 	assert.Equal(t, AbilitySpeed, pac.AbilityToUse)
 }
@@ -53,7 +50,7 @@ func TestParseCommandsSwitchSetsAbility(t *testing.T) {
 	_, player, cm := newParseGame(t)
 	cm.ParseCommands(player, []string{"SWITCH 0 PAPER"})
 	pac := player.Pacmen[0]
-	assert.Equal(t, action.ActionSwitch, pac.Intent.Type)
+	assert.Equal(t, ActionSwitch, pac.Intent.Type)
 	assert.True(t, pac.HasAbilityToUse)
 	assert.Equal(t, AbilitySetPaper, pac.AbilityToUse)
 }
@@ -62,7 +59,7 @@ func TestParseCommandsSwitchToSameTypeIsNoop(t *testing.T) {
 	_, player, cm := newParseGame(t)
 	cm.ParseCommands(player, []string{"SWITCH 0 ROCK"})
 	pac := player.Pacmen[0]
-	assert.Equal(t, action.ActionSwitch, pac.Intent.Type)
+	assert.Equal(t, ActionSwitch, pac.Intent.Type)
 	// Same type → no ability queued.
 	assert.False(t, pac.HasAbilityToUse)
 	assert.Equal(t, AbilityUnset, pac.AbilityToUse)
@@ -80,8 +77,8 @@ func TestParseCommandsMultipleCommandsPipeSeparated(t *testing.T) {
 	_, player, cm := newParseGame(t)
 	cm.ParseCommands(player, []string{"MOVE 0 3 1 | SPEED 1"})
 	assert.False(t, player.IsDeactivated())
-	assert.Equal(t, action.ActionMove, player.Pacmen[0].Intent.Type)
-	assert.Equal(t, action.ActionSpeed, player.Pacmen[1].Intent.Type)
+	assert.Equal(t, ActionMove, player.Pacmen[0].Intent.Type)
+	assert.Equal(t, ActionSpeed, player.Pacmen[1].Intent.Type)
 	assert.True(t, player.Pacmen[1].HasAbilityToUse)
 }
 
@@ -145,20 +142,20 @@ func TestParseCommandsIsCaseInsensitive(t *testing.T) {
 	_, player, cm := newParseGame(t)
 	cm.ParseCommands(player, []string{"move 0 3 1"})
 	assert.False(t, player.IsDeactivated())
-	assert.Equal(t, action.ActionMove, player.Pacmen[0].Intent.Type)
+	assert.Equal(t, ActionMove, player.Pacmen[0].Intent.Type)
 }
 
 func TestExpectedMessageReflectsLeague(t *testing.T) {
 	// League 2: no SPEED or SWITCH.
 	g := &Game{Config: NewConfig(LeagueRulesFromIndex(2))}
-	g.Grid = grid.NewGridFromRows([]string{"#####", "#   #", "#####"}, false)
+	g.Grid = NewGridFromRows([]string{"#####", "#   #", "#####"}, false)
 	cm := NewCommandManager(nil, g)
-	assert.Equal(t, "MOVE <id> <x> <y>", cm.expected())
+	assert.Equal(t, "MOVE <id> <x> <y>", cm.Expected())
 
 	// League 4: full.
 	g4 := &Game{Config: NewConfig(LeagueRulesFromIndex(4))}
 	g4.Grid = g.Grid
 	cm4 := NewCommandManager(nil, g4)
-	assert.Contains(t, cm4.expected(), "SPEED")
-	assert.Contains(t, cm4.expected(), "SWITCH")
+	assert.Contains(t, cm4.Expected(), "SPEED")
+	assert.Contains(t, cm4.Expected(), "SWITCH")
 }

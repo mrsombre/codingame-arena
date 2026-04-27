@@ -7,8 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/mrsombre/codingame-arena/games/spring2020/engine/action"
-	"github.com/mrsombre/codingame-arena/games/spring2020/engine/grid"
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
@@ -22,14 +20,14 @@ import (
 func newScenario(leagueLevel int, rows []string, mapWraps bool) *Game {
 	g := NewGame(0, leagueLevel)
 	// Override MapWraps on the config to match the grid we're building.
-	g.Config.MapWraps = mapWraps
-	g.Grid = grid.NewGridFromRows(rows, mapWraps)
+	g.Config.MAP_WRAPS = mapWraps
+	g.Grid = NewGridFromRows(rows, mapWraps)
 	g.Players = []*Player{NewPlayer(0), NewPlayer(1)}
 	return g
 }
 
 // spawn creates and registers a pacman at pos for player idx.
-func spawn(g *Game, idx, number int, t PacmanType, pos grid.Coord) *Pacman {
+func spawn(g *Game, idx, number int, t PacmanType, pos Coord) *Pacman {
 	owner := g.Players[idx]
 	pac := NewPacman(len(g.Pacmen), number, owner, t)
 	pac.Position = pos
@@ -57,13 +55,13 @@ func TestMoveFirstStepOfShortestPathOnly(t *testing.T) {
 		"#.....#",
 		"#######",
 	}, false)
-	pac := spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
+	pac := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
 
 	runTurn(g, func() {
-		pac.Intent = action.NewMoveAction(grid.Coord{X: 5, Y: 1})
+		pac.Intent = NewMoveAction(Coord{X: 5, Y: 1})
 	})
 
-	assert.Equal(t, grid.Coord{X: 2, Y: 1}, pac.Position, "one step toward target")
+	assert.Equal(t, Coord{X: 2, Y: 1}, pac.Position, "one step toward target")
 	assert.Equal(t, 1, g.Players[0].Pellets, "pellet at destination eaten for 1 pt")
 }
 
@@ -75,16 +73,16 @@ func TestSuperPelletIsWorthTenPoints(t *testing.T) {
 	}, false)
 	// NewGridFromRows treats 'o' as a regular pellet; cherries are marked via
 	// Cell.HasCherry directly.
-	g.Grid.Get(grid.Coord{X: 2, Y: 1}).HasCherry = true
-	pac := spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
+	g.Grid.Get(Coord{X: 2, Y: 1}).HasCherry = true
+	pac := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
 
 	runTurn(g, func() {
-		pac.Intent = action.NewMoveAction(grid.Coord{X: 3, Y: 1})
+		pac.Intent = NewMoveAction(Coord{X: 3, Y: 1})
 	})
 
-	assert.Equal(t, grid.Coord{X: 2, Y: 1}, pac.Position)
-	assert.Equal(t, CherryScore, g.Players[0].Pellets)
-	assert.False(t, g.Grid.Get(grid.Coord{X: 2, Y: 1}).HasCherry)
+	assert.Equal(t, Coord{X: 2, Y: 1}, pac.Position)
+	assert.Equal(t, CHERRY_SCORE, g.Players[0].Pellets)
+	assert.False(t, g.Grid.Get(Coord{X: 2, Y: 1}).HasCherry)
 }
 
 func TestTwoFriendlyPacsStackedCreditOwnerOnce(t *testing.T) {
@@ -96,16 +94,16 @@ func TestTwoFriendlyPacsStackedCreditOwnerOnce(t *testing.T) {
 		"#####",
 	}, false)
 	// Both pacs sit on top of the pellet at (2,1) — hand-place, bypass spawn.
-	pac0 := spawn(g, 0, 0, TypeRock, grid.Coord{X: 2, Y: 1})
-	pac1 := spawn(g, 0, 1, TypePaper, grid.Coord{X: 2, Y: 1})
+	pac0 := spawn(g, 0, 0, TypeRock, Coord{X: 2, Y: 1})
+	pac1 := spawn(g, 0, 1, TypePaper, Coord{X: 2, Y: 1})
 
 	runTurn(g, func() {
-		pac0.Intent = action.NoAction
-		pac1.Intent = action.NoAction
+		pac0.Intent = NoAction
+		pac1.Intent = NoAction
 	})
 
 	assert.Equal(t, 1, g.Players[0].Pellets, "one pellet → one point")
-	assert.False(t, g.Grid.Get(grid.Coord{X: 2, Y: 1}).HasPellet)
+	assert.False(t, g.Grid.Get(Coord{X: 2, Y: 1}).HasPellet)
 }
 
 // ——— wrapping ————————————————————————————————————————————————————————————
@@ -118,13 +116,13 @@ func TestHorizontalWrappingShortestPath(t *testing.T) {
 		"         ",
 		"#########",
 	}, true)
-	pac := spawn(g, 0, 0, TypeRock, grid.Coord{X: 0, Y: 1})
+	pac := spawn(g, 0, 0, TypeRock, Coord{X: 0, Y: 1})
 
 	runTurn(g, func() {
-		pac.Intent = action.NewMoveAction(grid.Coord{X: 8, Y: 1})
+		pac.Intent = NewMoveAction(Coord{X: 8, Y: 1})
 	})
 
-	assert.Equal(t, grid.Coord{X: 8, Y: 1}, pac.Position, "wrap to the right edge")
+	assert.Equal(t, Coord{X: 8, Y: 1}, pac.Position, "wrap to the right edge")
 }
 
 // ——— rock-paper-scissors combat ———————————————————————————————————————————
@@ -136,16 +134,16 @@ func rpsKillCase(t *testing.T, attackerType, victimType PacmanType) {
 		"#   #",
 		"#####",
 	}, false)
-	attacker := spawn(g, 0, 0, attackerType, grid.Coord{X: 1, Y: 1})
-	victim := spawn(g, 1, 0, victimType, grid.Coord{X: 3, Y: 1})
+	attacker := spawn(g, 0, 0, attackerType, Coord{X: 1, Y: 1})
+	victim := spawn(g, 1, 0, victimType, Coord{X: 3, Y: 1})
 
 	runTurn(g, func() {
-		attacker.Intent = action.NewMoveAction(grid.Coord{X: 3, Y: 1})
-		victim.Intent = action.NewMoveAction(grid.Coord{X: 1, Y: 1})
+		attacker.Intent = NewMoveAction(Coord{X: 3, Y: 1})
+		victim.Intent = NewMoveAction(Coord{X: 1, Y: 1})
 	})
 
 	// Both aimed at one-step destinations that collide at (2,1).
-	assert.Equal(t, grid.Coord{X: 2, Y: 1}, attacker.Position, "attacker advances")
+	assert.Equal(t, Coord{X: 2, Y: 1}, attacker.Position, "attacker advances")
 	assert.True(t, victim.Dead, "victim killed by attacker type")
 	assert.True(t, g.Players[1].IsDeactivated(), "no pacs → deactivated")
 }
@@ -160,16 +158,16 @@ func TestSameTypeCollisionBothBlocked(t *testing.T) {
 		"#   #",
 		"#####",
 	}, false)
-	a := spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
-	b := spawn(g, 1, 0, TypeRock, grid.Coord{X: 3, Y: 1})
+	a := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	b := spawn(g, 1, 0, TypeRock, Coord{X: 3, Y: 1})
 
 	runTurn(g, func() {
-		a.Intent = action.NewMoveAction(grid.Coord{X: 3, Y: 1})
-		b.Intent = action.NewMoveAction(grid.Coord{X: 1, Y: 1})
+		a.Intent = NewMoveAction(Coord{X: 3, Y: 1})
+		b.Intent = NewMoveAction(Coord{X: 1, Y: 1})
 	})
 
-	assert.Equal(t, grid.Coord{X: 1, Y: 1}, a.Position, "same type is body-blocked")
-	assert.Equal(t, grid.Coord{X: 3, Y: 1}, b.Position)
+	assert.Equal(t, Coord{X: 1, Y: 1}, a.Position, "same type is body-blocked")
+	assert.Equal(t, Coord{X: 3, Y: 1}, b.Position)
 	assert.False(t, a.Dead)
 	assert.False(t, b.Dead)
 }
@@ -180,41 +178,41 @@ func TestFriendlyPacsCannotOccupySameCell(t *testing.T) {
 		"#   #",
 		"#####",
 	}, false)
-	a := spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
-	b := spawn(g, 0, 1, TypeRock, grid.Coord{X: 3, Y: 1})
+	a := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	b := spawn(g, 0, 1, TypeRock, Coord{X: 3, Y: 1})
 
 	runTurn(g, func() {
-		a.Intent = action.NewMoveAction(grid.Coord{X: 3, Y: 1})
-		b.Intent = action.NewMoveAction(grid.Coord{X: 1, Y: 1})
+		a.Intent = NewMoveAction(Coord{X: 3, Y: 1})
+		b.Intent = NewMoveAction(Coord{X: 1, Y: 1})
 	})
 
-	assert.Equal(t, grid.Coord{X: 1, Y: 1}, a.Position, "friendly body-block")
-	assert.Equal(t, grid.Coord{X: 3, Y: 1}, b.Position)
+	assert.Equal(t, Coord{X: 1, Y: 1}, a.Position, "friendly body-block")
+	assert.Equal(t, Coord{X: 3, Y: 1}, b.Position)
 }
 
 // ——— SWITCH ability ——————————————————————————————————————————————————————
 
 func TestSwitchChangesTypeAndSetsCooldown(t *testing.T) {
 	g := newScenario(4, []string{"###", "# #", "###"}, false)
-	pac := spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
+	pac := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
 
 	runTurn(g, func() {
-		pac.Intent = action.NewSwitchAction(action.PacPaper)
+		pac.Intent = NewSwitchAction(TypePaper)
 		pac.AbilityToUse = AbilitySetPaper
 		pac.HasAbilityToUse = true
 	})
 
 	assert.Equal(t, TypePaper, pac.Type)
-	assert.Equal(t, g.Config.AbilityCool, pac.AbilityCooldown)
+	assert.Equal(t, g.Config.ABILITY_COOLDOWN, pac.AbilityCooldown)
 }
 
 func TestSwitchBlockedByCooldown(t *testing.T) {
 	g := newScenario(4, []string{"###", "# #", "###"}, false)
-	pac := spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
+	pac := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
 
 	// First switch: ROCK → PAPER. Cooldown → 10.
 	runTurn(g, func() {
-		pac.Intent = action.NewSwitchAction(action.PacPaper)
+		pac.Intent = NewSwitchAction(TypePaper)
 		pac.AbilityToUse = AbilitySetPaper
 		pac.HasAbilityToUse = true
 	})
@@ -223,7 +221,7 @@ func TestSwitchBlockedByCooldown(t *testing.T) {
 	// Second switch attempt on the next turn: cooldown was 10, ticks to 9 in
 	// TurnReset, still > 0 at executePacmenAbilities so it gets ignored.
 	runTurn(g, func() {
-		pac.Intent = action.NewSwitchAction(action.PacScissors)
+		pac.Intent = NewSwitchAction(TypeScissors)
 		pac.AbilityToUse = AbilitySetScissors
 		pac.HasAbilityToUse = true
 	})
@@ -236,41 +234,41 @@ func TestSwitchBlockedByCooldown(t *testing.T) {
 
 func TestSpeedActivationSetsDurationAndCooldown(t *testing.T) {
 	g := newScenario(4, []string{"#######", "#     #", "#######"}, false)
-	pac := spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
+	pac := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
 
 	runTurn(g, func() {
-		pac.Intent = action.NewSpeedAction()
+		pac.Intent = NewSpeedAction()
 		pac.AbilityToUse = AbilitySpeed
 		pac.HasAbilityToUse = true
 	})
 
-	assert.Equal(t, g.Config.SpeedBoost, pac.Speed, "speed boosted")
-	assert.Equal(t, g.Config.AbilityDur, pac.AbilityDuration)
-	assert.Equal(t, g.Config.AbilityCool, pac.AbilityCooldown)
+	assert.Equal(t, g.Config.SPEED_BOOST, pac.Speed, "speed boosted")
+	assert.Equal(t, g.Config.ABILITY_DURATION, pac.AbilityDuration)
+	assert.Equal(t, g.Config.ABILITY_COOLDOWN, pac.AbilityCooldown)
 	// The SPEED action itself is not a MOVE — pac stays put.
-	assert.Equal(t, grid.Coord{X: 1, Y: 1}, pac.Position)
+	assert.Equal(t, Coord{X: 1, Y: 1}, pac.Position)
 }
 
 func TestSpeedSubTurnDelivers2Steps(t *testing.T) {
 	g := newScenario(4, []string{"#######", "#     #", "#######"}, false)
-	pac := spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
+	pac := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
 
 	// Turn 1: activate SPEED.
 	runTurn(g, func() {
-		pac.Intent = action.NewSpeedAction()
+		pac.Intent = NewSpeedAction()
 		pac.AbilityToUse = AbilitySpeed
 		pac.HasAbilityToUse = true
 	})
 
 	// Turn 2: MOVE — pac should move 2 steps (one main, one sub-turn).
 	speedTurn := runTurn(g, func() {
-		pac.Intent = action.NewMoveAction(grid.Coord{X: 5, Y: 1})
+		pac.Intent = NewMoveAction(Coord{X: 5, Y: 1})
 	})
-	assert.Equal(t, grid.Coord{X: 2, Y: 1}, pac.Position, "first of two steps")
+	assert.Equal(t, Coord{X: 2, Y: 1}, pac.Position, "first of two steps")
 	assert.True(t, speedTurn, "engine flags speed sub-turn")
 
 	g.PerformGameSpeedUpdate()
-	assert.Equal(t, grid.Coord{X: 3, Y: 1}, pac.Position, "sub-turn second step")
+	assert.Equal(t, Coord{X: 3, Y: 1}, pac.Position, "sub-turn second step")
 	assert.False(t, g.IsSpeedTurn(), "no further sub-turn after 2 steps")
 }
 
@@ -278,23 +276,23 @@ func TestSpeedExpiresAfterDurationTicks(t *testing.T) {
 	// Duration starts at 6 (AbilityDur). After that many cooldown ticks the
 	// pac's speed reverts to base.
 	g := newScenario(4, []string{"#######", "#     #", "#######"}, false)
-	pac := spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
+	pac := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
 
 	runTurn(g, func() {
-		pac.Intent = action.NewSpeedAction()
+		pac.Intent = NewSpeedAction()
 		pac.AbilityToUse = AbilitySpeed
 		pac.HasAbilityToUse = true
 	})
 	assert.Equal(t, 2, pac.Speed)
 
 	// Tick through AbilityDur WAIT turns.
-	for i := 0; i < g.Config.AbilityDur; i++ {
+	for i := 0; i < g.Config.ABILITY_DURATION; i++ {
 		runTurn(g, func() {
-			pac.Intent = action.NoAction
+			pac.Intent = NoAction
 		})
 	}
 
-	assert.Equal(t, g.Config.PacmanBase, pac.Speed, "speed reset after duration")
+	assert.Equal(t, g.Config.PACMAN_BASE_SPEED, pac.Speed, "speed reset after duration")
 	assert.Equal(t, 0, pac.AbilityDuration)
 }
 
@@ -309,12 +307,12 @@ func TestGameOverAwardsRemainingPelletsToSurvivor(t *testing.T) {
 		"# ... #",
 		"#######",
 	}, false)
-	attacker := spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
-	victim := spawn(g, 1, 0, TypeScissors, grid.Coord{X: 3, Y: 1})
+	attacker := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	victim := spawn(g, 1, 0, TypeScissors, Coord{X: 3, Y: 1})
 
 	runTurn(g, func() {
-		attacker.Intent = action.NewMoveAction(grid.Coord{X: 3, Y: 1})
-		victim.Intent = action.NewMoveAction(grid.Coord{X: 1, Y: 1})
+		attacker.Intent = NewMoveAction(Coord{X: 3, Y: 1})
+		victim.Intent = NewMoveAction(Coord{X: 1, Y: 1})
 	})
 
 	assert.True(t, victim.Dead)
@@ -327,6 +325,30 @@ func TestGameOverAwardsRemainingPelletsToSurvivor(t *testing.T) {
 	assert.Equal(t, 3, g.Players[0].Pellets)
 }
 
+func TestRefereeStopsAfterTwoHundredMainTurns(t *testing.T) {
+	g := newScenario(4, []string{
+		"#####",
+		"#   #",
+		"#####",
+	}, false)
+	g.Grid.Get(Coord{X: 2, Y: 1}).HasPellet = true
+	spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	spawn(g, 1, 0, TypeRock, Coord{X: 3, Y: 1})
+	r := NewReferee(g)
+
+	for turn := 0; turn < MaxMainTurns; turn++ {
+		r.ResetGameTurnData()
+		r.PerformGameUpdate(turn)
+	}
+
+	assert.False(t, r.Ended())
+	assert.True(t, r.GameOverFrame)
+	assert.Equal(t, MaxMainTurns, r.MainTurns)
+
+	r.PerformGameUpdate(MaxMainTurns)
+	assert.True(t, r.Ended())
+}
+
 func TestRefereeEndGameAwardsRemainingPelletsAfterEarlyArenaStop(t *testing.T) {
 	// The arena runner may call EndGame immediately after a player is
 	// deactivated. Spring 2020 still needs the Java performGameOver absorption.
@@ -335,8 +357,8 @@ func TestRefereeEndGameAwardsRemainingPelletsAfterEarlyArenaStop(t *testing.T) {
 		"#...#",
 		"#####",
 	}, false)
-	spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
-	spawn(g, 1, 0, TypeScissors, grid.Coord{X: 3, Y: 1})
+	spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	spawn(g, 1, 0, TypeScissors, Coord{X: 3, Y: 1})
 	g.Players[1].Deactivate("bad command")
 
 	r := NewReferee(g)
@@ -349,14 +371,14 @@ func TestRefereeEndGameAwardsRemainingPelletsAfterEarlyArenaStop(t *testing.T) {
 
 func TestCanImproveRankingEndsGameWhenPelletsCannotCloseGap(t *testing.T) {
 	g := newScenario(4, []string{"####", "#  #", "####"}, false)
-	spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
-	spawn(g, 1, 0, TypeRock, grid.Coord{X: 2, Y: 1})
+	spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	spawn(g, 1, 0, TypeRock, Coord{X: 2, Y: 1})
 
 	// No pellets remain (grid has only spaces). Ranking cannot change.
 	assert.True(t, g.IsGameOver())
 
 	// With a pellet introduced, ranking can still change → not over.
-	g.Grid.Get(grid.Coord{X: 1, Y: 1}).HasPellet = true
+	g.Grid.Get(Coord{X: 1, Y: 1}).HasPellet = true
 	assert.False(t, g.IsGameOver())
 }
 
@@ -369,12 +391,12 @@ func TestFogOfWarHidesPelletBehindWall(t *testing.T) {
 		"#####",
 	}, false)
 	// Put a pellet in the far cell, then a wall blocks line of sight.
-	g.Grid.Get(grid.Coord{X: 3, Y: 1}).HasPellet = true
+	g.Grid.Get(Coord{X: 3, Y: 1}).HasPellet = true
 	// Attack pacs must be set up for both players for serialization to work.
-	spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
-	spawn(g, 1, 0, TypeRock, grid.Coord{X: 3, Y: 1})
+	spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	spawn(g, 1, 0, TypeRock, Coord{X: 3, Y: 1})
 
-	lines := serializeFrameInfoFor(g.Players[0], g)
+	lines := SerializeFrameInfoFor(g.Players[0], g)
 	joined := strings.Join(lines, "\n")
 	assert.NotContains(t, joined, "3 1 1", "pellet behind wall must not appear")
 }
@@ -388,11 +410,11 @@ func TestFogOfWarCherriesAlwaysVisible(t *testing.T) {
 		"# # #",
 		"#####",
 	}, false)
-	g.Grid.Get(grid.Coord{X: 3, Y: 1}).HasCherry = true
-	spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
-	spawn(g, 1, 0, TypeRock, grid.Coord{X: 3, Y: 1})
+	g.Grid.Get(Coord{X: 3, Y: 1}).HasCherry = true
+	spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	spawn(g, 1, 0, TypeRock, Coord{X: 3, Y: 1})
 
-	lines := serializeFrameInfoFor(g.Players[0], g)
+	lines := SerializeFrameInfoFor(g.Players[0], g)
 	joined := strings.Join(lines, "\n")
 	assert.Contains(t, joined, "3 1 10", "cherry visible through walls")
 }
@@ -403,10 +425,10 @@ func TestFogOfWarEnemyPacInvisibleBehindWall(t *testing.T) {
 		"# # #",
 		"#####",
 	}, false)
-	spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
-	spawn(g, 1, 0, TypePaper, grid.Coord{X: 3, Y: 1})
+	spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	spawn(g, 1, 0, TypePaper, Coord{X: 3, Y: 1})
 
-	lines := serializeFrameInfoFor(g.Players[0], g)
+	lines := SerializeFrameInfoFor(g.Players[0], g)
 	// Line count: "0 0", "<visible pac count>", then that many pac lines.
 	// Only own pac is visible.
 	assert.Equal(t, "1", lines[1], "only one pac visible")
@@ -418,21 +440,21 @@ func TestSnapshotTurnIncludesEnginePerspectivePellets(t *testing.T) {
 		"# # #",
 		"#####",
 	}, false)
-	g.Grid.Get(grid.Coord{X: 1, Y: 1}).HasPellet = true
-	g.Grid.Get(grid.Coord{X: 3, Y: 1}).HasCherry = true
-	spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
-	spawn(g, 1, 0, TypePaper, grid.Coord{X: 3, Y: 1})
+	g.Grid.Get(Coord{X: 1, Y: 1}).HasPellet = true
+	g.Grid.Get(Coord{X: 3, Y: 1}).HasCherry = true
+	spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	spawn(g, 1, 0, TypePaper, Coord{X: 3, Y: 1})
 	g.Players[0].Pellets = 7
 	g.Players[1].Pellets = 5
 
-	var snapshot traceSnapshot
+	var snapshot TraceSnapshot
 	err := json.Unmarshal(NewReferee(g).SnapshotTurn(0, nil), &snapshot)
 
 	assert.NoError(t, err)
 	assert.Equal(t, [2]int{7, 5}, snapshot.Scores)
 	assert.Len(t, snapshot.Pacs, 2)
-	assert.Contains(t, snapshot.Pellets, tracePellet{X: 1, Y: 1, Value: 1})
-	assert.Contains(t, snapshot.Pellets, tracePellet{X: 3, Y: 1, Value: CherryScore})
+	assert.Contains(t, snapshot.Pellets, TracePellet{X: 1, Y: 1, Value: 1})
+	assert.Contains(t, snapshot.Pellets, TracePellet{X: 3, Y: 1, Value: CHERRY_SCORE})
 }
 
 // ——— serialization / referee smoke test ————————————————————————————————————
@@ -444,8 +466,8 @@ func TestReferePerformGameUpdateAdvancesScoreViaCommandParse(t *testing.T) {
 		"#######",
 	}, false)
 	// Directly craft initial state without Init.
-	pac0 := spawn(g, 0, 0, TypeRock, grid.Coord{X: 1, Y: 1})
-	pac1 := spawn(g, 1, 0, TypePaper, grid.Coord{X: 5, Y: 1})
+	pac0 := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	pac1 := spawn(g, 1, 0, TypePaper, Coord{X: 5, Y: 1})
 	_ = pac1
 
 	r := NewReferee(g)
@@ -459,12 +481,12 @@ func TestReferePerformGameUpdateAdvancesScoreViaCommandParse(t *testing.T) {
 	r.ParsePlayerOutputs(asArena)
 
 	// Before update, no movement.
-	assert.Equal(t, grid.Coord{X: 1, Y: 1}, pac0.Position)
+	assert.Equal(t, Coord{X: 1, Y: 1}, pac0.Position)
 
 	r.PerformGameUpdate(0)
 
-	assert.Equal(t, grid.Coord{X: 2, Y: 1}, pac0.Position)
-	assert.Equal(t, grid.Coord{X: 4, Y: 1}, pac1.Position)
+	assert.Equal(t, Coord{X: 2, Y: 1}, pac0.Position)
+	assert.Equal(t, Coord{X: 4, Y: 1}, pac1.Position)
 	assert.Equal(t, 1, g.Players[0].Pellets)
 	assert.Equal(t, 1, g.Players[1].Pellets)
 }
