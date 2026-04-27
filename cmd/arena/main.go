@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -40,6 +41,14 @@ func main() {
 		command, rest = "run", args
 	}
 
+	if command == "help" {
+		if err := printHelp(rest, games); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	fs := arena.NewBaseFlagSet("arena")
 
 	var handler handlerFunc
@@ -71,15 +80,12 @@ func main() {
 		case "leaderboard":
 			commands.AddReplayLeaderboardFlags(fs)
 			handler = commands.ReplayLeaderboard
-		case "--help", "-h":
-			fmt.Println(commands.ReplayUsage())
-			return
 		default:
-			fmt.Fprintf(os.Stderr, "unknown replay subcommand %q; run `arena replay --help` for usage\n", sub)
+			fmt.Fprintf(os.Stderr, "unknown replay subcommand %q; run `arena help replay` for usage\n", sub)
 			os.Exit(1)
 		}
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command %q; run `arena --help` for usage\n", command)
+		fmt.Fprintf(os.Stderr, "unknown command %q; run `arena help` for usage\n", command)
 		os.Exit(1)
 	}
 
@@ -99,9 +105,53 @@ func main() {
 	}
 
 	if err := handler(rest, os.Stdout, factory, fs, v); err != nil {
+		if errors.Is(err, pflag.ErrHelp) {
+			fmt.Fprintln(os.Stderr, `run "arena help" for usage`)
+			os.Exit(1)
+		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+// printHelp dispatches `arena help [command [subcommand]]` and prints the
+// matching usage text to stdout.
+func printHelp(args []string, games []string) error {
+	if len(args) == 0 {
+		fmt.Println(arena.Usage(games))
+		return nil
+	}
+
+	fs := arena.NewBaseFlagSet("arena")
+	switch args[0] {
+	case "run":
+		commands.AddRunFlags(fs)
+		fmt.Println(commands.RunUsage(fs))
+	case "serve":
+		commands.AddServeFlags(fs)
+		fmt.Println(commands.ServeUsage(fs))
+	case "serialize":
+		commands.AddSerializeFlags(fs)
+		fmt.Println(commands.SerializeUsage(fs))
+	case "replay":
+		if len(args) < 2 {
+			fmt.Println(commands.ReplayUsage())
+			return nil
+		}
+		switch args[1] {
+		case "get":
+			commands.AddReplayGetFlags(fs)
+			fmt.Println(commands.ReplayGetUsage(fs))
+		case "leaderboard":
+			commands.AddReplayLeaderboardFlags(fs)
+			fmt.Println(commands.ReplayLeaderboardUsage(fs))
+		default:
+			return fmt.Errorf("unknown replay subcommand %q; run `arena help replay` for usage", args[1])
+		}
+	default:
+		return fmt.Errorf("unknown command %q; run `arena help` for usage", args[0])
+	}
+	return nil
 }
 
 // resolveFactory picks the active game factory from config or auto-selects

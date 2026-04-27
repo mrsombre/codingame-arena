@@ -2,7 +2,6 @@ package commands
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 
 	"github.com/spf13/pflag"
@@ -34,15 +33,15 @@ type runnerMetadata struct {
 	P0Right       int    `json:"p0_right"`
 }
 
+// RunUsage returns the help text shown for `arena help run`.
+func RunUsage(fs *pflag.FlagSet) string {
+	return arena.CommandUsage("run", "Run one or more match simulations against a player binary.", fs, "")
+}
+
 // Run is the entry point for the "run" subcommand.
 func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
 	parsed, err := parseRunOptions(args, fs, v)
 	if err != nil {
-		return err
-	}
-
-	if parsed.Help {
-		_, err = fmt.Fprintln(stdout, arena.CommandUsage("run", "Run one or more match simulations against a player binary.", fs, ""))
 		return err
 	}
 

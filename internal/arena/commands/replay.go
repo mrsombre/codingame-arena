@@ -20,11 +20,37 @@ import (
 func ReplayUsage() string {
 	return `arena replay - Download raw replay JSON from codingame.com.
 
-Subcommands:
-  get <url|id> [<url|id>...]            Download one or more replays by ID/URL
-  leaderboard <leaderboard-url> <nick>  Download every replay from a player's last battles list
+Usage: arena replay <subcommand> [OPTIONS]
 
-Use "arena replay <subcommand> --help" for subcommand-specific flags.`
+Subcommands:
+  get          Download one or more replays by ID/URL
+  leaderboard  Download every replay from a player's last battles list
+
+Use "arena help replay <subcommand>" for more information about a subcommand.
+
+Env vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_GAME, ARENA_SEED).
+Config: arena.yml in current directory (e.g. game: winter2026).`
+}
+
+// ReplayGetUsage returns the help text shown for `arena help replay get`.
+func ReplayGetUsage(fs *pflag.FlagSet) string {
+	return arena.CommandUsage(
+		"replay get <url|id> [<url|id>...]",
+		"Download raw replay JSON for one or more CodinGame games.",
+		fs,
+		"",
+	)
+}
+
+// ReplayLeaderboardUsage returns the help text shown for
+// `arena help replay leaderboard`.
+func ReplayLeaderboardUsage(fs *pflag.FlagSet) string {
+	return arena.CommandUsage(
+		"replay leaderboard <leaderboard-url> <nickname>",
+		"Download every replay from a player's last battles list.",
+		fs,
+		"",
+	)
 }
 
 // ReplayGet is the entry point for the "replay get" subcommand. It downloads
@@ -33,16 +59,6 @@ Use "arena replay <subcommand> --help" for subcommand-specific flags.`
 func ReplayGet(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
 	opts, err := parseReplayGetOptions(args, fs, v)
 	if err != nil {
-		return err
-	}
-
-	if opts.Help {
-		_, err := fmt.Fprintln(stdout, arena.CommandUsage(
-			"replay get <url|id> [<url|id>...]",
-			"Download raw replay JSON for one or more CodinGame games.",
-			fs,
-			"",
-		))
 		return err
 	}
 
@@ -56,16 +72,6 @@ func ReplayGet(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.F
 func ReplayLeaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
 	opts, err := parseReplayLeaderboardOptions(args, fs, v)
 	if err != nil {
-		return err
-	}
-
-	if opts.Help {
-		_, err := fmt.Fprintln(stdout, arena.CommandUsage(
-			"replay leaderboard <leaderboard-url> <nickname>",
-			"Download every replay from a player's last battles list.",
-			fs,
-			"",
-		))
 		return err
 	}
 

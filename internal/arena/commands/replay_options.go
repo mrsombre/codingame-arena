@@ -39,7 +39,6 @@ type ReplayGetOptions struct {
 	OutDir string
 	Limit  int
 	Delay  time.Duration
-	Help   bool
 }
 
 func parseReplayGetOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (ReplayGetOptions, error) {
@@ -47,12 +46,7 @@ func parseReplayGetOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (Re
 		return ReplayGetOptions{}, err
 	}
 
-	opts := ReplayGetOptions{
-		Help: v.GetBool("help"),
-	}
-	if opts.Help {
-		return opts, nil
-	}
+	var opts ReplayGetOptions
 
 	if fs.NArg() < 1 {
 		return ReplayGetOptions{}, fmt.Errorf("at least one replay URL or ID is required")
@@ -85,7 +79,6 @@ type ReplayLeaderboardOptions struct {
 	OutDir   string
 	Limit    int
 	Delay    time.Duration
-	Help     bool
 }
 
 func parseReplayLeaderboardOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (ReplayLeaderboardOptions, error) {
@@ -93,12 +86,7 @@ func parseReplayLeaderboardOptions(args []string, fs *pflag.FlagSet, v *viper.Vi
 		return ReplayLeaderboardOptions{}, err
 	}
 
-	opts := ReplayLeaderboardOptions{
-		Help: v.GetBool("help"),
-	}
-	if opts.Help {
-		return opts, nil
-	}
+	var opts ReplayLeaderboardOptions
 
 	if fs.NArg() < 2 {
 		return ReplayLeaderboardOptions{}, fmt.Errorf("leaderboard URL and nickname are required")

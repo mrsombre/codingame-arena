@@ -39,7 +39,6 @@ type RunOptions struct {
 	Debug    bool
 	NoSwap   bool
 	Verbose  bool
-	Help     bool
 }
 
 func parseRunOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (RunOptions, error) {
@@ -61,7 +60,6 @@ func parseRunOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (RunOptio
 		Debug:    v.GetBool("debug"),
 		NoSwap:   v.GetBool("no-swap"),
 		Verbose:  v.GetBool("verbose"),
-		Help:     v.GetBool("help"),
 	}
 
 	if raw := v.GetString("seed"); raw != "" {
@@ -86,7 +84,7 @@ func parseRunOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (RunOptio
 	if opts.SeedIncrement < 1 {
 		return RunOptions{}, fmt.Errorf("--seedx must be >= 1")
 	}
-	if !opts.Help && opts.P0Bin == "" {
+	if opts.P0Bin == "" {
 		return RunOptions{}, fmt.Errorf("--p0 is required")
 	}
 	if opts.Debug {

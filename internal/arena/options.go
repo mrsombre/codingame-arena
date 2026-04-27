@@ -18,7 +18,6 @@ func NewBaseFlagSet(name string) *pflag.FlagSet {
 	fs := pflag.NewFlagSet(name, pflag.ContinueOnError)
 	fs.SortFlags = false
 	fs.SetOutput(io.Discard)
-	fs.BoolP("help", "h", false, "Show this help")
 	fs.String("game", "", "Active game")
 	return fs
 }
@@ -60,7 +59,7 @@ Commands:
   replay       Download replay JSON (sub: get <url|id>..., leaderboard <url> <nick>)
   serve        Serve the embedded web viewer
 
-Use "arena <command> --help" for more information about a command.
+Use "arena help <command>" for more information about a command.
 
 Env vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_GAME, ARENA_SEED).
 Config: arena.yml in current directory (e.g. game: winter2026).`, strings.Join(games, ", ")))

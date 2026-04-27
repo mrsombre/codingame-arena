@@ -27,19 +27,19 @@ import (
 	"github.com/mrsombre/codingame-arena/viewer"
 )
 
+// ServeUsage returns the help text shown for `arena help serve`.
+func ServeUsage(fs *pflag.FlagSet) string {
+	extra := "API: GET /api/game, GET /api/games, GET /api/bots, GET /api/matches, GET /api/matches/{id},\n" +
+		"     GET /api/replays, GET /api/replays/{id}, POST /api/run\n" +
+		"Stdin keys: o<enter> open in default browser   q<enter> quit"
+	return arena.CommandUsage("serve", "Serve the embedded web viewer.", fs, extra)
+}
+
 // Serve is the entry point for the "serve" subcommand. It serves the embedded
 // viewer bundle over HTTP and listens on stdin for single-letter commands.
 func Serve(args []string, stdout io.Writer, factory arena.GameFactory, flags *pflag.FlagSet, v *viper.Viper) error {
 	opts, err := parseServeOptions(args, flags, v)
 	if err != nil {
-		return err
-	}
-
-	if opts.Help {
-		extra := "API: GET /api/game, GET /api/games, GET /api/bots, GET /api/matches, GET /api/matches/{id},\n" +
-			"     GET /api/replays, GET /api/replays/{id}, POST /api/run\n" +
-			"Stdin keys: o<enter> open in default browser   q<enter> quit"
-		_, err := fmt.Fprintln(stdout, arena.CommandUsage("serve", "Serve the embedded web viewer.", flags, extra))
 		return err
 	}
 

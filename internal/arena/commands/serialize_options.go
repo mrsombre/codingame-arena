@@ -20,7 +20,6 @@ func AddSerializeFlags(fs *pflag.FlagSet) {
 type SerializeOptions struct {
 	Seed   int64
 	Player int
-	Help   bool
 }
 
 func parseSerializeOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (SerializeOptions, error) {
@@ -28,12 +27,7 @@ func parseSerializeOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (Se
 		return SerializeOptions{}, err
 	}
 
-	opts := SerializeOptions{
-		Help: v.GetBool("help"),
-	}
-	if opts.Help {
-		return opts, nil
-	}
+	var opts SerializeOptions
 
 	seedRaw := v.GetString("seed")
 	if seedRaw == "" {

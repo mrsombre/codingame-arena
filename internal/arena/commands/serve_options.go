@@ -23,7 +23,6 @@ type ServeOptions struct {
 	TraceDir  string
 	ReplayDir string
 	BinDir    string
-	Help      bool
 }
 
 func parseServeOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (ServeOptions, error) {
@@ -31,13 +30,7 @@ func parseServeOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (ServeO
 		return ServeOptions{}, err
 	}
 
-	opts := ServeOptions{
-		Help: v.GetBool("help"),
-	}
-	if opts.Help {
-		return opts, nil
-	}
-
+	var opts ServeOptions
 	opts.Port = v.GetInt("port")
 	opts.Host = v.GetString("host")
 	opts.TraceDir = v.GetString("trace-dir")
