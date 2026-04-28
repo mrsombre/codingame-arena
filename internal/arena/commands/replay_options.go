@@ -19,6 +19,7 @@ func addReplayBatchFlags(fs *pflag.FlagSet) {
 	fs.StringP("out", "o", filepath.Clean("./replays"), "Directory to save replays as <gameId>.json")
 	fs.IntP("limit", "l", 0, "Maximum number of replays to download (0 = all)")
 	fs.Duration("delay", 500*time.Millisecond, "Delay between replay downloads")
+	fs.BoolP("force", "f", false, "Re-download replays even if they already exist on disk")
 }
 
 // AddReplayGetFlags registers flags used by the "replay get" subcommand on fs.
@@ -39,6 +40,7 @@ type ReplayGetOptions struct {
 	OutDir string
 	Limit  int
 	Delay  time.Duration
+	Force  bool
 }
 
 func parseReplayGetOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (ReplayGetOptions, error) {
@@ -67,6 +69,7 @@ func parseReplayGetOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (Re
 	}
 	opts.Limit = v.GetInt("limit")
 	opts.Delay = v.GetDuration("delay")
+	opts.Force = v.GetBool("force")
 
 	return opts, nil
 }
@@ -79,6 +82,7 @@ type ReplayLeaderboardOptions struct {
 	OutDir   string
 	Limit    int
 	Delay    time.Duration
+	Force    bool
 }
 
 func parseReplayLeaderboardOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (ReplayLeaderboardOptions, error) {
@@ -109,6 +113,7 @@ func parseReplayLeaderboardOptions(args []string, fs *pflag.FlagSet, v *viper.Vi
 	}
 	opts.Limit = v.GetInt("limit")
 	opts.Delay = v.GetDuration("delay")
+	opts.Force = v.GetBool("force")
 
 	return opts, nil
 }

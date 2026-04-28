@@ -54,8 +54,8 @@ func ReplayLeaderboardUsage(fs *pflag.FlagSet) string {
 }
 
 // ReplayGet is the entry point for the "replay get" subcommand. It downloads
-// the raw replay JSON for one or more CodinGame games and writes each to disk
-// untouched.
+// the raw replay JSON for one or more CodinGame games, strips the unused
+// top-level viewer payload, and writes each replay back as pretty-printed JSON.
 func ReplayGet(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
 	opts, err := parseReplayGetOptions(args, fs, v)
 	if err != nil {
@@ -63,12 +63,12 @@ func ReplayGet(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.F
 	}
 
 	client := codingame.New()
-	return downloadReplays(client, opts.IDs, opts.OutDir, opts.Limit, opts.Delay, stdout)
+	return downloadReplays(client, opts.IDs, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
 }
 
 // ReplayLeaderboard is the entry point for the "replay leaderboard"
 // subcommand. It resolves a CodinGame leaderboard URL plus nickname into the
-// player's last battles and downloads each replay's raw JSON to disk.
+// player's last battles and downloads each replay as pretty-printed JSON.
 func ReplayLeaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
 	opts, err := parseReplayLeaderboardOptions(args, fs, v)
 	if err != nil {
@@ -101,12 +101,12 @@ func ReplayLeaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs 
 	}
 	_, _ = fmt.Fprintf(stdout, "battles: %d\n", len(gameIDs))
 
-	return downloadReplays(client, gameIDs, opts.OutDir, opts.Limit, opts.Delay, stdout)
+	return downloadReplays(client, gameIDs, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
 }
 
-// downloadReplays runs the shared per-ID download loop: skip-if-exists,
-// inter-request delay, soft failure, and a final summary line.
-func downloadReplays(client *codingame.Client, ids []int64, outDir string, limit int, delay time.Duration, stdout io.Writer) error {
+// downloadReplays runs the shared per-ID download loop: skip-if-exists (unless
+// force is set), inter-request delay, soft failure, and a final summary line.
+func downloadReplays(client *codingame.Client, ids []int64, outDir string, limit int, delay time.Duration, force bool, stdout io.Writer) error {
 	if limit > 0 && len(ids) > limit {
 		ids = ids[:limit]
 	}
@@ -119,10 +119,12 @@ func downloadReplays(client *codingame.Client, ids []int64, outDir string, limit
 	first := true
 	for i, id := range ids {
 		path := filepath.Join(outDir, fmt.Sprintf("%d.json", id))
-		if _, err := os.Stat(path); err == nil {
-			skipped++
-			_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (exists)\n", i+1, len(ids), id)
-			continue
+		if !force {
+			if _, err := os.Stat(path); err == nil {
+				skipped++
+				_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (exists)\n", i+1, len(ids), id)
+				continue
+			}
 		}
 
 		if !first && delay > 0 {
@@ -135,6 +137,10 @@ func downloadReplays(client *codingame.Client, ids []int64, outDir string, limit
 			failed++
 			_, _ = fmt.Fprintf(stdout, "[%d/%d] fail %d: %v\n", i+1, len(ids), id, err)
 			continue
+		}
+		body, err = arena.StripReplayViewer(body)
+		if err != nil {
+			return fmt.Errorf("strip replay %d: %w", id, err)
 		}
 		if err := os.WriteFile(path, body, 0644); err != nil {
 			return fmt.Errorf("write %s: %w", path, err)
