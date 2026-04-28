@@ -30,7 +30,7 @@ type Game struct {
 	Losses        [2]int
 	ended         bool
 	summary       []string
-	traces        []arena.TurnEvent
+	traces        []arena.TurnTrace
 }
 
 func NewGame(seed int64, leagueLevel int) *Game {

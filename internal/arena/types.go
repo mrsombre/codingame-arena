@@ -8,8 +8,8 @@ type Metric struct {
 	Value float64 `json:"value"`
 }
 
-// TurnEvent is a structured game event produced by the engine per turn.
-type TurnEvent struct {
+// TurnTrace is a structured game event produced by the engine per turn.
+type TurnTrace struct {
 	Label   string `json:"label"`
 	Payload string `json:"payload"`
 }

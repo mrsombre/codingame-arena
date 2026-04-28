@@ -23,7 +23,7 @@ sibling types whose only consumer is the CodinGame frontend. If a method on
 `Game`/`Referee` exists purely to feed the viewer (`SnapshotJSON`,
 `ViewerEvents`, `TurnEvents`, `FrameData`, `GlobalData`), omit it — the arena
 `Referee` interface does not require it and the optional
-`TurnEventProvider` interface can be left unimplemented.
+`TurnTraceProvider` interface can be left unimplemented.
 
 Parity applies to simulation behavior (turn order, RNG, deactivation reasons,
 command validation, scoring), not to viewer output.
@@ -280,7 +280,7 @@ just calls `SendInputLine` to queue input and reads `GetOutputs` after execution
 The `Referee` may also implement these for richer output:
 
 - `MetricsProvider` — `Metrics() []Metric` — game-specific per-match stats.
-- `TurnEventProvider` — `TurnEvents(turn, players) []TurnEvent` — structured per-turn events.
+- `TurnTraceProvider` — `TurnTraces(turn, players) []TurnTrace` — structured per-turn traces.
 - `RawScoresProvider` — `RawScores() [2]int` — scores before arena/endgame adjustments.
 
 ## Conversion Principles
@@ -653,7 +653,7 @@ dependency graph:
 - [ ] Add the engine blank import to `games/game.go`
 - [ ] Implement `Referee` interface (match the CodinGame SDK lifecycle)
 - [ ] Implement `Player` interface (concrete struct with I/O buffer fields)
-- [ ] Optionally implement `MetricsProvider`, `TurnEventProvider`, `RawScoresProvider`
+- [ ] Optionally implement `MetricsProvider`, `TurnTraceProvider`, `RawScoresProvider`
 - [ ] Add unit tests for all isolated rule mechanics and Java edge cases
 - [ ] Add acceptance tests for all cross-turn rules in `rules.md`
 - [ ] Add seed/parity fixtures for random generation or setup behavior

@@ -55,10 +55,10 @@ type MetricsProvider interface {
 	Metrics() []Metric
 }
 
-// TurnEventProvider produces structured game events per turn.
-// Optional — if Referee also implements this, match captures events.
-type TurnEventProvider interface {
-	TurnEvents(turn int, players []Player) []TurnEvent
+// TurnTraceProvider produces structured game traces per turn.
+// Optional — if Referee also implements this, match captures traces.
+type TurnTraceProvider interface {
+	TurnTraces(turn int, players []Player) []TurnTrace
 }
 
 // RawScoresProvider returns per-player raw scores before any end-of-game

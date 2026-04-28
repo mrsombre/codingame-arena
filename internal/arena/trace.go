@@ -83,7 +83,7 @@ type TraceTurn struct {
 	P0Output  string           `json:"p0_output,omitempty"`
 	P1Output  string           `json:"p1_output,omitempty"`
 	Timing    *TraceTurnTiming `json:"timing,omitempty"`
-	Events    []TurnEvent      `json:"events,omitempty"`
+	Traces    []TurnTrace      `json:"traces,omitempty"`
 }
 
 // TraceTurnTiming carries per-side response time for one turn in milliseconds.

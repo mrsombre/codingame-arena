@@ -109,14 +109,14 @@ export interface TraceTurn {
   p0_output: string
   p1_output: string
   timing?: TraceTurnTiming
-  events?: TraceTurnEvent[]
+  traces?: TurnTrace[]
 }
 
 export interface TraceTurnTiming {
   response: [number, number]
 }
 
-export interface TraceTurnEvent {
+export interface TurnTrace {
   label: string
   payload: string
 }

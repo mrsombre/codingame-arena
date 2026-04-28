@@ -76,9 +76,9 @@ func TestRefereeSmokeFullTurn(t *testing.T) {
 	m := r.Metrics()
 	assert.NotEmpty(t, m, "metrics emitted")
 
-	// Turn events should be a copy, not the backing slice.
-	events := r.TurnEvents(0, players)
-	_ = events
+	// Turn traces should be a copy, not the backing slice.
+	traces := r.TurnTraces(0, players)
+	_ = traces
 
 	assert.False(t, r.Ended())
 	assert.False(t, r.ShouldSkipPlayerTurn(players[0]))

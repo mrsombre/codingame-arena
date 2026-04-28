@@ -124,7 +124,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			}
 		}
 
-		// Trace snapshot (pre-parse). Events are attached after PerformGameUpdate,
+		// Trace snapshot (pre-parse). Traces are attached after PerformGameUpdate,
 		// since they describe outcomes of this turn's moves.
 		if tracing {
 			traceTurns = append(traceTurns, TraceTurn{
@@ -162,8 +162,8 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		referee.PerformGameUpdate(turn)
 
 		if tracing {
-			if tep, ok := referee.(TurnEventProvider); ok {
-				traceTurns[len(traceTurns)-1].Events = tep.TurnEvents(turn, players)
+			if ttp, ok := referee.(TurnTraceProvider); ok {
+				traceTurns[len(traceTurns)-1].Traces = ttp.TurnTraces(turn, players)
 			}
 		}
 	}

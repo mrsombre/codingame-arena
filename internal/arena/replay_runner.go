@@ -112,8 +112,8 @@ func RunReplay(
 
 		referee.PerformGameUpdate(turn)
 
-		if tep, ok := referee.(TurnEventProvider); ok {
-			tt.Events = tep.TurnEvents(turn, players)
+		if ttp, ok := referee.(TurnTraceProvider); ok {
+			tt.Traces = ttp.TurnTraces(turn, players)
 		}
 		traceTurns = append(traceTurns, tt)
 	}
