@@ -12,17 +12,15 @@ Java: SpringChallenge2020/src/main/java/com/codingame/game/Referee.java:21-22
 private static final int MAX_TURNS = 200;
 */
 
-// MaxMainTurns mirrors Java Referee.MAX_TURNS — the cap on main turns
-// (speed sub-turns are extra and do not count toward this limit).
+// MaxMainTurns mirrors Java Referee.MAX_TURNS — the cap on main turns. We
+// fold speed sub-steps into the same PerformGameUpdate call, so a "turn"
+// here corresponds 1:1 to a Java main turn.
 const MaxMainTurns = 200
 
-// Referee drives the Game through the arena runner lifecycle. It tracks the
-// Spring 2020 "speed sub-turn" mechanic locally so the arena can treat every
-// iteration of its main loop uniformly.
+// Referee drives the Game through the arena runner lifecycle.
 type Referee struct {
 	Game           *Game
 	CommandManager *CommandManager
-	SpeedTurn      bool
 	GameOverFrame  bool
 	MainTurns      int
 }
@@ -80,9 +78,6 @@ private void handlePlayerCommands() {
 */
 
 func (r *Referee) ParsePlayerOutputs(players []arena.Player) {
-	if r.SpeedTurn {
-		return
-	}
 	for _, player := range players {
 		p := player.(*Player)
 		if p.IsDeactivated() {
@@ -117,6 +112,10 @@ public void gameTurn(int turn) {
         gameManager.endGame();
     }
 }
+
+We deviate from the Java frame split: PerformGameUpdate folds the speed
+sub-turn into a single call (see Game.PerformGameUpdate). Each arena turn
+maps 1:1 to a Java main turn, no skip-input bookkeeping needed.
 */
 
 func (r *Referee) PerformGameUpdate(turn int) {
@@ -128,23 +127,15 @@ func (r *Referee) PerformGameUpdate(turn int) {
 		return
 	}
 
-	if r.SpeedTurn {
-		r.Game.PerformGameSpeedUpdate()
-	} else {
-		r.MainTurns++
-		r.Game.PerformGameUpdate()
-	}
+	r.MainTurns++
+	r.Game.PerformGameUpdate()
 
 	if r.Game.IsGameOver() || r.MainTurns >= MaxMainTurns {
 		r.GameOverFrame = true
 	}
-	r.SpeedTurn = r.Game.IsSpeedTurn()
 }
 
 func (r *Referee) ResetGameTurnData() {
-	if r.SpeedTurn {
-		return
-	}
 	r.Game.ResetGameTurnData()
 }
 
@@ -174,7 +165,7 @@ func (r *Referee) OnEnd() {
 }
 
 func (r *Referee) ShouldSkipPlayerTurn(player arena.Player) bool {
-	return r.SpeedTurn
+	return false
 }
 
 func (r *Referee) ActivePlayers(players []arena.Player) int {

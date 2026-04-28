@@ -36,13 +36,12 @@ func spawn(g *Game, idx, number int, t PacmanType, pos Coord) *Pacman {
 }
 
 // runTurn ticks cooldowns/durations, applies the provided setup to set fresh
-// intents, then runs one main turn. Returns whether the engine flagged a
-// follow-up speed sub-turn.
-func runTurn(g *Game, setup func()) bool {
+// intents, then runs one main turn. PerformGameUpdate folds any speed
+// sub-step into the same call.
+func runTurn(g *Game, setup func()) {
 	g.ResetGameTurnData()
 	setup()
 	g.PerformGameUpdate()
-	return g.IsSpeedTurn()
 }
 
 // ——— movement / pellets ————————————————————————————————————————————————————
@@ -259,16 +258,12 @@ func TestSpeedSubTurnDelivers2Steps(t *testing.T) {
 		pac.HasAbilityToUse = true
 	})
 
-	// Turn 2: MOVE — pac should move 2 steps (one main, one sub-turn).
-	speedTurn := runTurn(g, func() {
+	// Turn 2: MOVE — both movement steps resolve in the same PerformGameUpdate.
+	runTurn(g, func() {
 		pac.Intent = NewMoveAction(Coord{X: 5, Y: 1})
 	})
-	assert.Equal(t, Coord{X: 2, Y: 1}, pac.Position, "first of two steps")
-	assert.True(t, speedTurn, "engine flags speed sub-turn")
-
-	g.PerformGameSpeedUpdate()
-	assert.Equal(t, Coord{X: 3, Y: 1}, pac.Position, "sub-turn second step")
-	assert.False(t, g.IsSpeedTurn(), "no further sub-turn after 2 steps")
+	assert.Equal(t, Coord{X: 3, Y: 1}, pac.Position, "two steps in one turn")
+	assert.False(t, g.IsSpeedTurn(), "no follow-up sub-turn pending")
 }
 
 func TestSpeedExpiresAfterDurationTicks(t *testing.T) {

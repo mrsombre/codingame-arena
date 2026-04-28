@@ -9,10 +9,10 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-// MaxTurns gives the arena some headroom over Java's 200 main-turn limit so
-// speed sub-turns (which Java inserts on top of 200) still fit within a single
-// arena loop.
-const MaxTurns = 400
+// MaxTurns matches Java's 200 main-turn cap. Speed sub-steps are folded into
+// a single PerformGameUpdate call (see Game.PerformGameUpdate), so an arena
+// turn maps 1:1 to a Java main turn — no extra headroom needed.
+const MaxTurns = 200
 
 type Factory struct{}
 

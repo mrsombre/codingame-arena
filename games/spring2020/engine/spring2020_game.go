@@ -406,14 +406,25 @@ public void performGameUpdate() {
     processPacmenIntent();
     resolveMovement();
 }
+
+The Java referee splits the speed sub-turn (a second movement step for SPEED
+pacs) into a separate `gameTurn` frame that does not read player input. We
+fold that loop into a single PerformGameUpdate: bots are read once, all
+movement steps for the turn (1 or 2) resolve before the next read. Mechanics
+are identical because Java never reads input between steps either —
+performGameSpeedUpdate only re-runs resolveMovement against the already
+sliced intendedPath.
 */
 
-// PerformGameUpdate runs one normal turn of the simulation.
+// PerformGameUpdate runs one full main turn including any speed sub-steps.
 func (g *Game) PerformGameUpdate() {
 	g.ExecutePacmenAbilities()
 	g.UpdateAbilityModifiers()
 	g.ProcessPacmenIntent()
 	g.ResolveMovement()
+	for g.IsSpeedTurn() {
+		g.PerformGameSpeedUpdate()
+	}
 }
 
 /*
