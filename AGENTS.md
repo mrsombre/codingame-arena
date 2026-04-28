@@ -10,7 +10,7 @@ CodinGame Arena — local game engine runner for CodinGame challenges. Runs bot-
 cmd/arena/              # CLI entrypoint
 internal/
 ├─ arena/               # Match runner, batching, tracing, server
-│  ├─ commands/          # CLI subcommands (run, replay, front, serialize)
+│  ├─ commands/          # CLI subcommands (run, serialize, replay, serve)
 │  └─ server/            # HTTP server for viewer
 ├─ util/
 │  ├─ javarand/          # Java random port
@@ -39,8 +39,8 @@ replays/                 # Replay JSON files (gitignored)
 - NEVER run `go run` directly — use `make build-arena` then run the binary from `bin/`
 - NEVER modify files under `source/` — these are upstream subtree imports
 - NEVER commit `matches/`, `replays/`, or `bin/` directories
-- ALWAYS run `make test` and `make test-games` before considering Go changes complete
-- ALWAYS run `make lint` before considering Go changes complete
+- ALWAYS run `make test-arena` and `make test-games` before considering Go changes complete
+- ALWAYS run `make lint-arena` before considering Go changes complete
 - ALWAYS use `pnpm` for the viewer (not npm/yarn)
 - ALWAYS use Biome for TypeScript linting/formatting (not ESLint/Prettier)
 
@@ -48,9 +48,9 @@ replays/                 # Replay JSON files (gitignored)
 
 ```shell
 # Go
-make test                        # Run arena tests (internal/)
+make test-arena                  # Run arena tests (internal/)
 make test-games                  # Run game engine tests (games/)
-make lint                        # Run golangci-lint
+make lint-arena                  # Run golangci-lint
 make build-arena                 # Build arena binary to bin/
 make clean                       # Remove bin/, tmp/, replays/, matches/
 

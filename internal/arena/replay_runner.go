@@ -3,6 +3,8 @@ package arena
 import (
 	"path/filepath"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 // ReplayMoves holds per-turn outputs for each side during a replay.
@@ -23,7 +25,7 @@ type ReplayMoves struct {
 func RunReplay(
 	factory GameFactory,
 	seed int64,
-	gameOptions map[string]string,
+	gameOptions *viper.Viper,
 	moves ReplayMoves,
 	botNames [2]string,
 	maxTurns int,
@@ -97,6 +99,10 @@ func RunReplay(
 			GameInput: turnInput,
 			P0Output:  playerOutputs[0],
 			P1Output:  playerOutputs[1],
+			Timing:    &TraceTurnTiming{Response: [2]float64{}},
+		}
+		if tp, ok := referee.(TraceProvider); ok {
+			tt.GameState = tp.SnapshotTurn(turn, players)
 		}
 
 		handlePlayerCommands(players, referee)
@@ -141,11 +147,14 @@ func RunReplay(
 	}
 
 	return TraceMatch{
-		MatchID: 0,
-		Seed:    seed,
-		Winner:  winner,
-		Scores:  scores,
-		Players: [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
-		Turns:   traceTurns,
+		MatchID:  0,
+		GameID:   factory.Name(),
+		PuzzleID: factory.PuzzleID(),
+		Seed:     seed,
+		Scores:   [2]TraceScore{TraceScore(scores[0]), TraceScore(scores[1])},
+		Ranks:    RanksFromWinner(winner),
+		Players:  [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
+		Timing:   &TraceTiming{},
+		Turns:    traceTurns,
 	}
 }

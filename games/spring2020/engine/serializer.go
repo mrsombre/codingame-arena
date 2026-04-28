@@ -1,5 +1,11 @@
 // Package engine
 // Source: SpringChallenge2020/src/main/java/com/codingame/spring2020/Game.java
+//
+// This file ports the input-line serialization methods from Game.java
+// (getGlobalInfoFor, getCurrentFrameInfoFor, findVisiblePacmen,
+// findVisibleItems, findVisiblePellets, getPacmanLineInfo, getPelletLineInfo,
+// cellToCharater). The simulation methods from the same Java source live in
+// spring2020_game.go.
 package engine
 
 import (
@@ -7,13 +13,28 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/mrsombre/codingame-arena/games/spring2020/engine/grid"
 )
 
-// serializeGlobalInfoFor builds the initial input lines for a player.
+/*
+Java: SpringChallenge2020/src/main/java/com/codingame/spring2020/Game.java:320-339,399-405
+
+public List<String> getGlobalInfoFor(Player player) {
+    List<String> lines = new ArrayList<String>();
+    lines.add(String.format("%d %d", grid.width, grid.height));
+    for (int y = 0; y < grid.getHeight(); ++y) {
+        // join cellToCharater(cell) for x in [0, width)
+    }
+    return lines;
+}
+
+public String cellToCharater(Cell cell) {
+    return cell.isWall() ? "#" : " ";
+}
+*/
+
+// SerializeGlobalInfoFor builds the initial input lines for a player.
 // Format: "width height" followed by height rows of '#' or ' '.
-func serializeGlobalInfoFor(player *Player, game *Game) []string {
+func SerializeGlobalInfoFor(player *Player, game *Game) []string {
 	lines := make([]string, 0, game.Grid.Height+1)
 	lines = append(lines, strconv.Itoa(game.Grid.Width)+" "+strconv.Itoa(game.Grid.Height))
 	for y := 0; y < game.Grid.Height; y++ {
@@ -30,14 +51,40 @@ func serializeGlobalInfoFor(player *Player, game *Game) []string {
 	return lines
 }
 
-// serializeFrameInfoFor builds the per-turn input lines for a player.
-func serializeFrameInfoFor(player *Player, game *Game) []string {
-	opponent := opponentOf(player, game.Players)
+/*
+Java: SpringChallenge2020/src/main/java/com/codingame/spring2020/Game.java:363-397
+
+public List<String> getCurrentFrameInfoFor(Player player) {
+    Player opponentPlayer = gameManager.getActivePlayers().get((player.getIndex() + 1) % 2);
+    List<String> lines = new ArrayList<String>();
+    lines.add(String.format("%d %d", player.pellets, opponentPlayer.pellets));
+
+    List<Pacman> visiblePacmen = Config.FOG_OF_WAR ? findVisiblePacmen(player) : pacmen;
+    if (Config.PROVIDE_DEAD_PACS) {
+        Stream.concat(player.getDeadPacmen(), opponentPlayer.getDeadPacmen())
+            .forEach(visiblePacmen::add);
+    }
+    lines.add(Integer.toString(visiblePacmen.size()));
+    visiblePacmen.stream().sorted(Comparator.comparing(Pacman::getId))
+        .map(pac -> getPacmanLineInfo(player, pac)).forEach(lines::add);
+
+    List<Coord> visiblePellets = Config.FOG_OF_WAR ? findVisiblePellets(player) : grid.getAllPellets();
+    List<Coord> visibleCherries = grid.getAllCherries();
+    lines.add(Integer.toString(visiblePellets.size() + visibleCherries.size()));
+    for (Coord pellet : visiblePellets)  lines.add(getPelletLineInfo(pellet, 1));
+    for (Coord cherry : visibleCherries) lines.add(getPelletLineInfo(cherry, Config.CHERRY_SCORE));
+    return lines;
+}
+*/
+
+// SerializeFrameInfoFor builds the per-turn input lines for a player.
+func SerializeFrameInfoFor(player *Player, game *Game) []string {
+	opponent := OpponentOf(player, game.Players)
 	lines := make([]string, 0)
 	lines = append(lines, fmt.Sprintf("%d %d", player.Pellets, opponent.Pellets))
 
-	visible := visiblePacmen(player, game)
-	if game.Config.DeadPacs {
+	visible := VisiblePacmen(player, game)
+	if game.Config.PROVIDE_DEAD_PACS {
 		visible = append(visible, player.DeadPacmen()...)
 		visible = append(visible, opponent.DeadPacmen()...)
 	}
@@ -48,22 +95,38 @@ func serializeFrameInfoFor(player *Player, game *Game) []string {
 
 	lines = append(lines, strconv.Itoa(len(visible)))
 	for _, pac := range visible {
-		lines = append(lines, pacmanLine(player, pac))
+		lines = append(lines, PacmanLine(player, pac))
 	}
 
-	pellets := visiblePellets(player, game)
+	pellets := VisiblePellets(player, game)
 	cherries := game.Grid.AllCherries()
 	lines = append(lines, strconv.Itoa(len(pellets)+len(cherries)))
 	for _, p := range pellets {
 		lines = append(lines, fmt.Sprintf("%d %d %d", p.X, p.Y, 1))
 	}
 	for _, c := range cherries {
-		lines = append(lines, fmt.Sprintf("%d %d %d", c.X, c.Y, CherryScore))
+		lines = append(lines, fmt.Sprintf("%d %d %d", c.X, c.Y, CHERRY_SCORE))
 	}
 	return lines
 }
 
-func pacmanLine(player *Player, pac *Pacman) string {
+/*
+Java: SpringChallenge2020/src/main/java/com/codingame/spring2020/Game.java:341-352
+
+private String getPacmanLineInfo(Player player, Pacman pac) {
+    return String.format(
+        "%d %d %d %d %s %d %d",
+        pac.getNumber(),
+        pac.getOwner() == player ? 1 : 0,
+        pac.getPosition().x, pac.getPosition().y,
+        pac.isDead() ? "DEAD" : pac.getType().name().toUpperCase(),
+        pac.getAbilityDuration(),
+        pac.getAbilityCooldown()
+    );
+}
+*/
+
+func PacmanLine(player *Player, pac *Pacman) string {
 	owned := 0
 	if pac.Owner == player {
 		owned = 1
@@ -82,7 +145,8 @@ func pacmanLine(player *Player, pac *Pacman) string {
 	)
 }
 
-func opponentOf(player *Player, players []*Player) *Player {
+// OpponentOf returns the other Player. Go-only helper.
+func OpponentOf(player *Player, players []*Player) *Player {
 	for _, p := range players {
 		if p != player {
 			return p
@@ -91,11 +155,22 @@ func opponentOf(player *Player, players []*Player) *Player {
 	return player
 }
 
-func visiblePacmen(player *Player, game *Game) []*Pacman {
-	if !game.Config.FogOfWar {
+/*
+Java: SpringChallenge2020/src/main/java/com/codingame/spring2020/Game.java:967-974
+
+private List<Pacman> findVisiblePacmen(Player player) {
+    List<Coord> coords = findVisibleItems(player, coord -> pacmen.stream().anyMatch(pac -> pac.getPosition().equals(coord)));
+    return pacmen.stream()
+        .filter(pac -> coords.contains(pac.getPosition()))
+        .collect(Collectors.toList());
+}
+*/
+
+func VisiblePacmen(player *Player, game *Game) []*Pacman {
+	if !game.Config.FOG_OF_WAR {
 		return append([]*Pacman(nil), game.Pacmen...)
 	}
-	visibleCoords := findVisibleCoords(player, game, func(c grid.Coord) bool {
+	visibleCoords := FindVisibleCoords(player, game, func(c Coord) bool {
 		for _, pac := range game.Pacmen {
 			if pac.Position == c {
 				return true
@@ -103,7 +178,7 @@ func visiblePacmen(player *Player, game *Game) []*Pacman {
 		}
 		return false
 	})
-	coordSet := make(map[grid.Coord]struct{}, len(visibleCoords))
+	coordSet := make(map[Coord]struct{}, len(visibleCoords))
 	for _, c := range visibleCoords {
 		coordSet[c] = struct{}{}
 	}
@@ -116,20 +191,54 @@ func visiblePacmen(player *Player, game *Game) []*Pacman {
 	return out
 }
 
-func visiblePellets(player *Player, game *Game) []grid.Coord {
-	if !game.Config.FogOfWar {
+/*
+Java: SpringChallenge2020/src/main/java/com/codingame/spring2020/Game.java:1000-1002
+
+private List<Coord> findVisiblePellets(Player player) {
+    return findVisibleItems(player, coord -> grid.get(coord).hasPellet());
+}
+*/
+
+func VisiblePellets(player *Player, game *Game) []Coord {
+	if !game.Config.FOG_OF_WAR {
 		return game.Grid.AllPellets()
 	}
-	return findVisibleCoords(player, game, func(c grid.Coord) bool {
+	return FindVisibleCoords(player, game, func(c Coord) bool {
 		return game.Grid.Get(c).HasPellet
 	})
 }
 
-func findVisibleCoords(player *Player, game *Game, hasItem func(grid.Coord) bool) []grid.Coord {
-	visible := make([]grid.Coord, 0)
-	seen := make(map[grid.Coord]struct{})
+/*
+Java: SpringChallenge2020/src/main/java/com/codingame/spring2020/Game.java:976-998
+
+private List<Coord> findVisibleItems(Player player, Function<Coord, Boolean> hasItem) {
+    List<Coord> visibleItems = new ArrayList<Coord>();
+    player.getAlivePacmen().forEach(playerPac -> {
+        for (Coord unitMove : Config.ADJACENCY) {
+            Coord currentCoord = playerPac.getPosition();
+            while (grid.get(currentCoord).isFloor()) {
+                if (hasItem.apply(currentCoord) && !visibleItems.contains(currentCoord)) {
+                    visibleItems.add(currentCoord);
+                }
+                Optional<Coord> nextCoord = grid.getCoordNeighbour(currentCoord, unitMove);
+                if (nextCoord.isPresent()) {
+                    currentCoord = nextCoord.get();
+                } else {
+                    break;
+                }
+                if (playerPac.getPosition().equals(currentCoord)) break;
+            }
+        }
+    });
+    return visibleItems;
+}
+*/
+
+func FindVisibleCoords(player *Player, game *Game, hasItem func(Coord) bool) []Coord {
+	visible := make([]Coord, 0)
+	seen := make(map[Coord]struct{})
 	for _, pac := range player.AlivePacmen() {
-		for _, delta := range grid.Adjacency4 {
+		for _, delta := range ADJACENCY {
 			current := pac.Position
 			for game.Grid.Get(current).IsFloor() {
 				if hasItem(current) {
@@ -138,7 +247,7 @@ func findVisibleCoords(player *Player, game *Game, hasItem func(grid.Coord) bool
 						visible = append(visible, current)
 					}
 				}
-				next, ok := game.Grid.GetCoordNeighbour(current, delta)
+				next, ok := game.Grid.CoordNeighbour(current, delta)
 				if !ok {
 					break
 				}

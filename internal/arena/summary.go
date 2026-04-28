@@ -158,14 +158,18 @@ func (r MatchResult) RenderMatch() string {
 	return string(data)
 }
 
-func WriteShortSummary(w io.Writer, s MatchSummary) error {
+func WriteShortSummary(w io.Writer, s MatchSummary, elapsed time.Duration) error {
 	get := func(label string) float64 {
 		if m := s.Get(label); m != nil {
 			return m.Avg
 		}
 		return 0
 	}
-	_, err := fmt.Fprintf(w, "wins=%.0f%% losses=%.0f%% draws=%.0f%% avg_score=%.1fx%.1f avg_turns=%.0f\n",
+	_, err := fmt.Fprintf(w, "Summary: %d matches played (%s)\n", s.Simulations, elapsed.Round(time.Millisecond))
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(w, "Stats: wins=%.0f%% losses=%.0f%% draws=%.0f%% avg_score=%.1fx%.1f avg_turns=%.0f\n",
 		get("wins_p0")*100,
 		get("loses_p0")*100,
 		get("draws")*100,
@@ -176,7 +180,7 @@ func WriteShortSummary(w io.Writer, s MatchSummary) error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(w, "avg_first_response=%.0fmsx%.0fms avg_turn_response=%.0fmsx%.0fms\n",
+	_, err = fmt.Fprintf(w, "Timing: avg_first_response=%.0fmsx%.0fms avg_turn_response=%.0fmsx%.0fms\n",
 		get("ttfo_p0"),
 		get("ttfo_p1"),
 		get("aot_p0"),

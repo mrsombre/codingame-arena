@@ -2,7 +2,7 @@ import { Button } from "@shared/components/ui/button.tsx"
 import { Link } from "@tanstack/react-router"
 import { ArrowLeftIcon } from "lucide-react"
 import { useEffect, useState } from "react"
-import { type MapData, parseSerializeResponse, type TraceMatch } from "./parser.ts"
+import { type MapData, parseSerializeResponse, type TraceMatch, winnerFromRanks } from "./parser.ts"
 import { ReplayViewer } from "./ReplayViewer.tsx"
 
 interface ReplayResponse extends TraceMatch {
@@ -63,8 +63,9 @@ export function ReplayView({ replayId }: ReplayViewProps) {
     const p0 = trace.players[0] ?? "p0"
     const p1 = trace.players[1] ?? "p1"
     const shortId = replayId.startsWith("replay-") ? replayId.slice("replay-".length) : replayId
-    const winnerName = trace.winner === 0 ? p0 : trace.winner === 1 ? p1 : null
-    const winnerClass = trace.winner === 0 ? "text-sky-400" : trace.winner === 1 ? "text-red-400" : "text-muted-foreground"
+    const winner = winnerFromRanks(trace.ranks)
+    const winnerName = winner === 0 ? p0 : winner === 1 ? p1 : null
+    const winnerClass = winner === 0 ? "text-sky-400" : winner === 1 ? "text-red-400" : "text-muted-foreground"
     const replayStatus = (
       <>
         replay: {shortId}&nbsp;&nbsp;seed={trace.seed}&nbsp;&nbsp;<span className="text-sky-400">{p0}</span> vs <span className="text-red-400">{p1}</span>&nbsp;&nbsp;winner=

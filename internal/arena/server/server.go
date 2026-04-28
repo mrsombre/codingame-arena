@@ -1,4 +1,4 @@
-// Package server wires the `arena front` HTTP API and static asset handler.
+// Package server wires the `arena serve` HTTP API and static asset handler.
 package server
 
 import (
@@ -15,8 +15,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/viper"
+
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
+
+// gameOptionsViper builds a viper instance carrying the per-request
+// gameOptions map so it can be passed to GameFactory.NewGame.
+func gameOptionsViper(opts map[string]string) *viper.Viper {
+	v := viper.New()
+	for k, val := range opts {
+		v.Set(k, val)
+	}
+	return v
+}
 
 // Options configures a Handler built by New.
 type Options struct {
@@ -133,7 +145,7 @@ func handleSerialize(factory arena.GameFactory) http.HandlerFunc {
 			}
 		}
 
-		referee, players := factory.NewGame(seed, gameOptions)
+		referee, players := factory.NewGame(seed, gameOptionsViper(gameOptions))
 		referee.Init(players)
 		player := players[playerIdx]
 
@@ -151,6 +163,8 @@ func handleSerialize(factory arena.GameFactory) http.HandlerFunc {
 
 type matchListEntry struct {
 	ID    string    `json:"id"`
+	Type  string    `json:"type"`
+	File  string    `json:"file"`
 	Size  int64     `json:"size"`
 	MTime time.Time `json:"mtime"`
 }
@@ -181,6 +195,8 @@ func handleMatchList(traceDir string) http.HandlerFunc {
 			}
 			out = append(out, matchListEntry{
 				ID:    strings.TrimSuffix(entry.Name(), ".json"),
+				Type:  arena.TraceTypeFromFileName(entry.Name()),
+				File:  entry.Name(),
 				Size:  info.Size(),
 				MTime: info.ModTime(),
 			})
@@ -194,7 +210,7 @@ var matchIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 func handleMatchGet(traceDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if traceDir == "" {
-			writeError(w, http.StatusNotFound, "no trace-dir configured; start arena front with --trace-dir <path>")
+			writeError(w, http.StatusNotFound, "no trace-dir configured; start arena serve with --trace-dir <path>")
 			return
 		}
 		id := r.PathValue("id")
@@ -248,8 +264,8 @@ func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			P0Bin:       req.P0Bin,
 			P1Bin:       req.P1Bin,
 			NoSwap:      req.NoSwap,
-			TraceWriter: arena.NewTraceWriter(traceDir),
-			GameOptions: req.GameOptions,
+			TraceWriter: arena.NewTraceWriter(traceDir, time.Now().Unix()),
+			GameOptions: gameOptionsViper(req.GameOptions),
 		})
 		result := runner.RunMatch(0, seed)
 		w.Header().Set("Content-Type", "application/json")
@@ -330,7 +346,7 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			seed = *req.Seed
 		}
 		if traceDir == "" {
-			writeError(w, http.StatusBadRequest, "no trace-dir configured; start arena front with --trace-dir <path>")
+			writeError(w, http.StatusBadRequest, "no trace-dir configured; start arena serve with --trace-dir <path>")
 			return
 		}
 		if err := cleanupTraceDir(traceDir); err != nil {
@@ -342,8 +358,8 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			P0Bin:       req.P0Bin,
 			P1Bin:       req.P1Bin,
 			NoSwap:      req.NoSwap,
-			TraceWriter: arena.NewTraceWriter(traceDir),
-			GameOptions: req.GameOptions,
+			TraceWriter: arena.NewTraceWriter(traceDir, time.Now().Unix()),
+			GameOptions: gameOptionsViper(req.GameOptions),
 		})
 		parallel := runtime.NumCPU()
 		if parallel > 4 {

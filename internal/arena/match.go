@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 // MatchOptions configures a single match execution.
@@ -17,7 +19,7 @@ type MatchOptions struct {
 	Debug       bool
 	NoSwap      bool
 	TraceWriter *TraceWriter
-	GameOptions map[string]string
+	GameOptions *viper.Viper
 }
 
 // Runner executes matches using a GameFactory.
@@ -63,6 +65,15 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			for _, line := range lines {
 				fmt.Fprintln(os.Stderr, line)
 			}
+		}
+	}
+
+	// Flush global info to subprocess stdin immediately so the bot can begin
+	// reading while it warms up; turn 0 timing then reflects post-startup
+	// response time rather than interpreter init.
+	for _, controller := range controllers {
+		if err := controller.FlushInput(); err != nil {
+			panic(err)
 		}
 	}
 
@@ -238,13 +249,15 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			},
 		}
 		traceMatch := TraceMatch{
-			MatchID: simulationID,
-			Seed:    seed,
-			Winner:  traceWinner,
-			Scores:  traceScores,
-			Players: [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
-			Timing:  traceTiming,
-			Turns:   traceTurns,
+			MatchID:  simulationID,
+			GameID:   runner.Factory.Name(),
+			PuzzleID: runner.Factory.PuzzleID(),
+			Seed:     seed,
+			Scores:   [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
+			Ranks:    RanksFromWinner(traceWinner),
+			Players:  [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
+			Timing:   traceTiming,
+			Turns:    traceTurns,
 		}
 		if err := runner.Options.TraceWriter.WriteMatch(traceMatch); err != nil {
 			panic(err)
@@ -279,6 +292,16 @@ func attachCommandPlayers(options MatchOptions, players []Player) ([]*commandPla
 	for i, path := range bins {
 		cp, err := newCommandPlayer(players[i], path)
 		if err != nil {
+			for _, controller := range controllers {
+				_ = controller.Close()
+			}
+			return nil, nil, fmt.Errorf("failed to start player %d session: %w", i, err)
+		}
+		// Spawn eagerly so subprocess startup runs in parallel with referee
+		// setup and global-info dispatch instead of being charged to the
+		// first-turn timer.
+		if err := cp.start(); err != nil {
+			_ = cp.Close()
 			for _, controller := range controllers {
 				_ = controller.Close()
 			}

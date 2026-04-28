@@ -3,6 +3,7 @@ package arena
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -65,10 +66,11 @@ func TestWriteShortSummary(t *testing.T) {
 		},
 	}
 	var buf bytes.Buffer
-	err := WriteShortSummary(&buf, summary)
+	err := WriteShortSummary(&buf, summary, 1234*time.Millisecond)
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "wins=70%")
+	assert.Contains(t, buf.String(), "Summary: 10 matches played (1.234s)")
+	assert.Contains(t, buf.String(), "Stats: wins=70%")
 	assert.Contains(t, buf.String(), "losses=20%")
-	assert.Contains(t, buf.String(), "avg_first_response=820msx900ms")
+	assert.Contains(t, buf.String(), "Timing: avg_first_response=820msx900ms")
 	assert.Contains(t, buf.String(), "avg_turn_response=12msx14ms")
 }

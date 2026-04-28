@@ -75,7 +75,7 @@ func handleReplayList(replayDir string) http.HandlerFunc {
 							e.P1Name = a.CodinGamer.Pseudo
 						}
 					}
-					e.League = parseReplayLeague(r.QuestionTitle)
+					e.League = arena.ParseReplayLeague(r.QuestionTitle)
 					if len(r.GameResult.Scores) > 0 {
 						e.ScoreP0 = int(r.GameResult.Scores[0])
 					}
@@ -130,29 +130,20 @@ func handleReplayGet(replayDir string, factory arena.GameFactory) http.HandlerFu
 			return
 		}
 
-		seed, ok := parseReplaySeed(replay.GameResult.RefereeInput)
+		seed, ok := arena.ParseReplaySeed(replay.GameResult.RefereeInput)
 		if !ok {
 			writeError(w, http.StatusBadRequest, "replay missing seed in refereeInput")
 			return
 		}
 
-		league := parseReplayLeague(replay.QuestionTitle)
-		gameOptions := map[string]string{}
+		league := arena.ParseReplayLeague(replay.QuestionTitle)
+		gameOptions := gameOptionsViper(nil)
 		if league > 0 {
-			gameOptions["league"] = strconv.Itoa(league)
+			gameOptions.Set("league", strconv.Itoa(league))
 		}
 
-		moves := extractReplayMoves(replay)
-
-		names := [2]string{"p0", "p1"}
-		for _, a := range replay.GameResult.Agents {
-			switch a.Index {
-			case 0:
-				names[0] = a.CodinGamer.Pseudo
-			case 1:
-				names[1] = a.CodinGamer.Pseudo
-			}
-		}
+		moves := arena.ReplayMovesFromFrames(replay)
+		names := arena.ReplayPlayerNames(replay)
 
 		trace := arena.RunReplay(factory, seed, gameOptions, moves, names, 0)
 		// Keep the original replay id so the client can use it as a stable key.
@@ -161,46 +152,4 @@ func handleReplayGet(replayDir string, factory arena.GameFactory) http.HandlerFu
 		}
 		writeJSON(w, http.StatusOK, replayResponse{TraceMatch: trace, League: league})
 	}
-}
-
-func parseReplaySeed(refereeInput string) (int64, bool) {
-	for _, tok := range strings.Fields(refereeInput) {
-		if strings.HasPrefix(tok, "seed=") {
-			n, err := strconv.ParseInt(strings.TrimPrefix(tok, "seed="), 10, 64)
-			if err == nil {
-				return n, true
-			}
-		}
-	}
-	return 0, false
-}
-
-var leaguePattern = regexp.MustCompile(`(?i)level(\d)`)
-
-func parseReplayLeague(questionTitle string) int {
-	m := leaguePattern.FindStringSubmatch(questionTitle)
-	if m == nil {
-		return 0
-	}
-	n, err := strconv.Atoi(m[1])
-	if err != nil {
-		return 0
-	}
-	return n
-}
-
-func extractReplayMoves(replay arena.CodinGameReplay[arena.CodinGameReplayFrame]) arena.ReplayMoves {
-	var moves arena.ReplayMoves
-	for _, f := range replay.GameResult.Frames {
-		if strings.TrimSpace(f.Stdout) == "" {
-			continue
-		}
-		switch f.AgentID {
-		case 0:
-			moves.P0 = append(moves.P0, f.Stdout)
-		case 1:
-			moves.P1 = append(moves.P1, f.Stdout)
-		}
-	}
-	return moves
 }

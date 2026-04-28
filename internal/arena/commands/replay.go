@@ -1,162 +1,198 @@
 package commands
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
+	"github.com/mrsombre/codingame-arena/internal/arena/codingame"
+	"github.com/mrsombre/codingame-arena/internal/arena/db"
 )
 
-const codingameReplayAPI = "https://www.codingame.com/services/gameResult/findInformationById"
+// ReplayUsage returns the help text shown for `arena replay` without a
+// recognized sub-subcommand.
+func ReplayUsage() string {
+	return `arena replay - Download raw replay JSON from codingame.com.
 
-// Replay is the entry point for the "replay" subcommand. It downloads the
-// raw replay JSON for a Codingame game and writes it to disk.
-func Replay(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	knownArgs, _, err := arena.SplitArgs(args, fs)
+Usage: arena replay <subcommand> [OPTIONS]
+
+Subcommands:
+  get          Download one or more replays by ID/URL
+  leaderboard  Download every replay from a player's last battles list
+
+Use "arena help replay <subcommand>" for more information about a subcommand.
+
+Env vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_GAME, ARENA_SEED).
+Config: arena.yml in current directory (e.g. game: winter2026).`
+}
+
+// ReplayGetUsage returns the help text shown for `arena help replay get`.
+func ReplayGetUsage(fs *pflag.FlagSet) string {
+	return arena.CommandUsage(
+		"replay get <url|id> [<url|id>...]",
+		"Download raw replay JSON for one or more CodinGame games.",
+		fs,
+		"",
+	)
+}
+
+// ReplayLeaderboardUsage returns the help text shown for
+// `arena help replay leaderboard`.
+func ReplayLeaderboardUsage(fs *pflag.FlagSet) string {
+	return arena.CommandUsage(
+		"replay leaderboard <leaderboard-url> <nickname>",
+		"Download every replay from a player's last battles list.",
+		fs,
+		"",
+	)
+}
+
+// ReplayGet is the entry point for the "replay get" subcommand. It downloads
+// the raw replay JSON for one or more CodinGame games, strips the unused
+// top-level viewer payload, and writes each replay back as pretty-printed JSON.
+func ReplayGet(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
+	opts, err := parseReplayGetOptions(args, fs, v)
 	if err != nil {
 		return err
 	}
-	if err := fs.Parse(knownArgs); err != nil {
-		return err
-	}
 
-	if v.GetBool("help") {
-		_, err := fmt.Fprintln(stdout, arena.CommandUsage("replay <url|id>", "Download raw replay JSON from codingame.com.", fs, ""))
-		return err
-	}
+	client := codingame.New()
+	return downloadReplays(client, opts.IDs, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
+}
 
-	if fs.NArg() < 1 {
-		return fmt.Errorf("replay URL or ID is required")
-	}
-
-	id, err := parseReplayID(fs.Arg(0))
+// ReplayLeaderboard is the entry point for the "replay leaderboard"
+// subcommand. It resolves a CodinGame leaderboard URL plus nickname into the
+// player's last battles and downloads each replay as pretty-printed JSON.
+func ReplayLeaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
+	opts, err := parseReplayLeaderboardOptions(args, fs, v)
 	if err != nil {
 		return err
 	}
 
-	body, err := fetchReplay(id)
+	store, err := db.Open("")
 	if err != nil {
 		return err
 	}
+	defer func() { _ = store.Close() }()
 
-	var decoded map[string]any
-	if err := json.Unmarshal(body, &decoded); err != nil {
-		return fmt.Errorf("parse replay json: %w", err)
-	}
-	delete(decoded, "viewer")
-	stripFrameViews(decoded)
+	client := codingame.New()
 
-	pretty, err := json.MarshalIndent(decoded, "", "  ")
-	if err != nil {
-		return fmt.Errorf("format replay json: %w", err)
-	}
-
-	outPath, err := resolveOutPath(v.GetString("out"), id)
+	apiSlug, puzzleHit, err := resolvePuzzle(client, store, opts.Slug)
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(outPath, pretty, 0644); err != nil {
-		return fmt.Errorf("write %s: %w", outPath, err)
+	_, _ = fmt.Fprintf(stdout, "puzzle: %s -> %s%s\n", opts.Slug, apiSlug, cacheTag(puzzleHit))
+
+	agentID, playerHit, err := resolveAgent(client, store, apiSlug, opts.Nickname)
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stdout, "player: %s -> agentId %d%s\n", opts.Nickname, agentID, cacheTag(playerHit))
+
+	gameIDs, err := client.FindLastBattles(agentID)
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stdout, "battles: %d\n", len(gameIDs))
+
+	return downloadReplays(client, gameIDs, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
+}
+
+// downloadReplays runs the shared per-ID download loop: skip-if-exists (unless
+// force is set), inter-request delay, soft failure, and a final summary line.
+func downloadReplays(client *codingame.Client, ids []int64, outDir string, limit int, delay time.Duration, force bool, stdout io.Writer) error {
+	if limit > 0 && len(ids) > limit {
+		ids = ids[:limit]
 	}
 
-	_, _ = fmt.Fprintf(stdout, "saved %d bytes to %s\n", len(pretty), outPath)
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return fmt.Errorf("create %s: %w", outDir, err)
+	}
+
+	var saved, skipped, failed int
+	first := true
+	for i, id := range ids {
+		path := filepath.Join(outDir, fmt.Sprintf("%d.json", id))
+		if !force {
+			if _, err := os.Stat(path); err == nil {
+				skipped++
+				_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (exists)\n", i+1, len(ids), id)
+				continue
+			}
+		}
+
+		if !first && delay > 0 {
+			time.Sleep(delay)
+		}
+		first = false
+
+		body, err := client.FetchReplay(id)
+		if err != nil {
+			failed++
+			_, _ = fmt.Fprintf(stdout, "[%d/%d] fail %d: %v\n", i+1, len(ids), id, err)
+			continue
+		}
+		body, err = arena.StripReplayViewer(body)
+		if err != nil {
+			return fmt.Errorf("strip replay %d: %w", id, err)
+		}
+		if err := os.WriteFile(path, body, 0644); err != nil {
+			return fmt.Errorf("write %s: %w", path, err)
+		}
+		saved++
+		_, _ = fmt.Fprintf(stdout, "[%d/%d] save %d (%d bytes)\n", i+1, len(ids), id, len(body))
+	}
+
+	_, _ = fmt.Fprintf(stdout, "done: %d saved, %d skipped, %d failed (out=%s)\n", saved, skipped, failed, outDir)
 	return nil
 }
 
-// stripFrameViews removes the verbose "view" field from every frame in
-// gameResult.frames. The view holds per-turn graphics payloads we do not use.
-func stripFrameViews(root map[string]any) {
-	gr, ok := root["gameResult"].(map[string]any)
-	if !ok {
-		return
+// cacheTag returns a short " (cached)" suffix when hit is true.
+func cacheTag(hit bool) string {
+	if hit {
+		return " (cached)"
 	}
-	frames, ok := gr["frames"].([]any)
-	if !ok {
-		return
-	}
-	for _, f := range frames {
-		if frame, ok := f.(map[string]any); ok {
-			delete(frame, "view")
-		}
-	}
+	return ""
 }
 
-// resolveOutPath decides the final output file path based on user input.
-//
-//   - empty               → ./replays/replay-<id>.json (creates ./replays if missing)
-//   - trailing "/"        → <out>/replay-<id>.json (creates <out> if missing)
-//   - existing directory  → <out>/replay-<id>.json
-//   - anything else       → treated as a file path, written as-is
-func resolveOutPath(out string, id int64) (string, error) {
-	filename := fmt.Sprintf("replay-%d.json", id)
-
-	if out == "" {
-		dir := "replays"
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return "", fmt.Errorf("create %s: %w", dir, err)
-		}
-		return filepath.Join(dir, filename), nil
+// resolvePuzzle reads from cache, falling back to a CodinGame API lookup and
+// persisting the result.
+func resolvePuzzle(client *codingame.Client, store *db.DB, prettyID string) (string, bool, error) {
+	if cached, err := store.Puzzles.Find(prettyID); err != nil {
+		return "", false, err
+	} else if cached != nil {
+		return cached.LeaderboardID, true, nil
 	}
-
-	if strings.HasSuffix(out, string(os.PathSeparator)) {
-		dir := strings.TrimRight(out, string(os.PathSeparator))
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return "", fmt.Errorf("create %s: %w", dir, err)
-		}
-		return filepath.Join(dir, filename), nil
+	apiSlug, err := client.ResolvePuzzle(prettyID)
+	if err != nil {
+		return "", false, err
 	}
-
-	if info, err := os.Stat(out); err == nil && info.IsDir() {
-		return filepath.Join(out, filename), nil
+	if err := store.Puzzles.Save(prettyID, apiSlug); err != nil {
+		return "", false, fmt.Errorf("cache puzzle: %w", err)
 	}
-
-	return out, nil
+	return apiSlug, false, nil
 }
 
-var replayURLPattern = regexp.MustCompile(`(\d+)/?$`)
-
-func parseReplayID(raw string) (int64, error) {
-	raw = strings.TrimSpace(raw)
-	if id, err := strconv.ParseInt(raw, 10, 64); err == nil {
-		return id, nil
+// resolveAgent reads from cache, falling back to a CodinGame leaderboard
+// search and persisting the result.
+func resolveAgent(client *codingame.Client, store *db.DB, apiSlug, nickname string) (int64, bool, error) {
+	if cached, err := store.Players.Find(apiSlug, nickname); err != nil {
+		return 0, false, err
+	} else if cached != nil {
+		return cached.AgentID, true, nil
 	}
-	m := replayURLPattern.FindStringSubmatch(raw)
-	if m == nil {
-		return 0, fmt.Errorf("cannot extract replay ID from %q", raw)
-	}
-	return strconv.ParseInt(m[1], 10, 64)
-}
-
-func fetchReplay(id int64) ([]byte, error) {
-	payload := fmt.Sprintf("[%d,null]", id)
-	req, err := http.NewRequest(http.MethodPost, codingameReplayAPI, strings.NewReader(payload))
+	agentID, err := client.FindAgent(apiSlug, nickname)
 	if err != nil {
-		return nil, err
+		return 0, false, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
+	if err := store.Players.Save(apiSlug, nickname, agentID); err != nil {
+		return 0, false, fmt.Errorf("cache player: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("codingame API %d: %s", resp.StatusCode, body)
-	}
-	return body, nil
+	return agentID, false, nil
 }

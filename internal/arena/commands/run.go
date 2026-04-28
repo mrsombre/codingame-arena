@@ -2,8 +2,8 @@ package commands
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
+	"time"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -34,19 +34,25 @@ type runnerMetadata struct {
 	P0Right       int    `json:"p0_right"`
 }
 
+// RunUsage returns the help text shown for `arena help run`.
+func RunUsage(fs *pflag.FlagSet) string {
+	return arena.CommandUsage("run", "Run one or more match simulations against a player binary.", fs, "")
+}
+
 // Run is the entry point for the "run" subcommand.
 func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	parsed, err := arena.ParseRunArgs(args, fs, v)
+	parsed, err := parseRunOptions(args, fs, v)
 	if err != nil {
 		return err
 	}
 
-	if parsed.Help {
-		_, err = fmt.Fprintln(stdout, arena.CommandUsage("run", "Run one or more match simulations against a player binary.", fs, ""))
-		return err
-	}
+	startedAt := time.Now()
 
-	traceWriter := arena.NewTraceWriter(parsed.TraceDir)
+	traceDir := ""
+	if parsed.Trace {
+		traceDir = parsed.TraceDir
+	}
+	traceWriter := arena.NewTraceWriter(traceDir, startedAt.Unix())
 
 	runner := arena.NewRunner(factory, arena.MatchOptions{
 		MaxTurns:    parsed.MaxTurns,
@@ -55,10 +61,16 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 		Debug:       parsed.Debug,
 		NoSwap:      parsed.NoSwap,
 		TraceWriter: traceWriter,
-		GameOptions: parsed.GameOptions,
+		GameOptions: v,
 	})
 
 	results := arena.RunMatches(parsed.BatchOptions, runner.RunMatch)
+	elapsed := time.Since(startedAt)
+
+	if parsed.Debug {
+		_, err := io.WriteString(stdout, results[0].RenderMatch())
+		return err
+	}
 
 	p0Left := 0
 	for _, r := range results {
@@ -81,7 +93,7 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 			Seed:          parsed.Seed,
 			SeedIncrement: parsed.SeedIncrement,
 			OutputMatches: parsed.OutputMatches,
-			TraceDir:      parsed.TraceDir,
+			TraceDir:      traceDir,
 			MaxTurns:      parsed.MaxTurns,
 			NoSwap:        parsed.NoSwap,
 			P0Left:        p0Left,
@@ -107,7 +119,7 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 	}
 
 	if !parsed.Verbose {
-		return arena.WriteShortSummary(stdout, out.Summary)
+		return arena.WriteShortSummary(stdout, out.Summary, elapsed)
 	}
 
 	enc := json.NewEncoder(stdout)
