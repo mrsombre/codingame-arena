@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/mrsombre/codingame-arena/games/winter2026/engine/grid"
 )
 
 func TestPlayerAddMarkCapsAtFour(t *testing.T) {
@@ -13,10 +11,10 @@ func TestPlayerAddMarkCapsAtFour(t *testing.T) {
 	p.Init()
 
 	for i := 0; i < 4; i++ {
-		assert.True(t, p.AddMark(grid.Coord{X: i, Y: 0}), "mark #%d", i)
+		assert.True(t, p.AddMark(Coord{X: i, Y: 0}), "mark #%d", i)
 	}
-	assert.False(t, p.AddMark(grid.Coord{X: 99, Y: 0}), "5th mark rejected")
-	assert.Len(t, p.marks, 4)
+	assert.False(t, p.AddMark(Coord{X: 99, Y: 0}), "5th mark rejected")
+	assert.Len(t, p.Marks, 4)
 }
 
 func TestPlayerBirdByIDReturnsMatch(t *testing.T) {
@@ -24,7 +22,7 @@ func TestPlayerBirdByIDReturnsMatch(t *testing.T) {
 	p.Init()
 	b1 := NewBird(1, p)
 	b2 := NewBird(2, p)
-	p.birds = []*Bird{b1, b2}
+	p.Birds = []*Bird{b1, b2}
 
 	assert.Same(t, b1, p.BirdByID(1))
 	assert.Same(t, b2, p.BirdByID(2))
@@ -35,20 +33,20 @@ func TestPlayerResetClearsBirdDirectionAndMarks(t *testing.T) {
 	p := NewPlayer(0)
 	p.Init()
 	b := NewBird(0, p)
-	b.Direction = grid.DirNorth
+	b.Direction = DirNorth
 	b.HasMove = true
 	b.Message = "hello"
 	b.HasMsg = true
-	p.birds = append(p.birds, b)
-	p.AddMark(grid.Coord{X: 1, Y: 1})
+	p.Birds = append(p.Birds, b)
+	p.AddMark(Coord{X: 1, Y: 1})
 
 	p.Reset()
 
-	assert.Equal(t, grid.DirUnset, b.Direction)
+	assert.Equal(t, DirUnset, b.Direction)
 	assert.False(t, b.HasMove)
 	assert.Equal(t, "", b.Message)
 	assert.False(t, b.HasMsg)
-	assert.Empty(t, p.marks)
+	assert.Empty(t, p.Marks)
 }
 
 func TestPlayerDeactivateAndScore(t *testing.T) {

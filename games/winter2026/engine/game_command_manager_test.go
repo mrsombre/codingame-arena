@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/mrsombre/codingame-arena/games/winter2026/engine/grid"
 )
 
 // newCmdPlayer returns a player owning a single bird facing UP, ready to
@@ -15,8 +13,8 @@ func newCmdPlayer(birdID int) (*Player, *Bird) {
 	p.Init()
 	b := NewBird(birdID, p)
 	// Body with head NORTH of neck → Facing() = DirNorth.
-	b.Body = []grid.Coord{{X: 5, Y: 5}, {X: 5, Y: 6}, {X: 5, Y: 7}}
-	p.birds = []*Bird{b}
+	b.Body = []Coord{{X: 5, Y: 5}, {X: 5, Y: 6}, {X: 5, Y: 7}}
+	p.Birds = []*Bird{b}
 	return p, b
 }
 
@@ -28,7 +26,7 @@ func TestParseCommandsMoveSetsDirection(t *testing.T) {
 	cm.ParseCommands(p, []string{"0 RIGHT"})
 
 	assert.False(t, p.IsDeactivated())
-	assert.Equal(t, grid.DirEast, b.Direction)
+	assert.Equal(t, DirEast, b.Direction)
 	assert.True(t, b.HasMove)
 }
 
@@ -39,7 +37,7 @@ func TestParseCommandsMoveWithMessage(t *testing.T) {
 
 	cm.ParseCommands(p, []string{"0 LEFT hey"})
 
-	assert.Equal(t, grid.DirWest, b.Direction)
+	assert.Equal(t, DirWest, b.Direction)
 	assert.Equal(t, "hey", b.Message)
 	assert.True(t, b.HasMessage())
 }
@@ -52,9 +50,9 @@ func TestParseCommandsSemicolonSeparated(t *testing.T) {
 	cm.ParseCommands(p, []string{"0 RIGHT;MARK 3 4"})
 
 	assert.False(t, p.IsDeactivated())
-	assert.Equal(t, grid.DirEast, b.Direction)
-	assert.Len(t, p.marks, 1)
-	assert.Equal(t, grid.Coord{X: 3, Y: 4}, p.marks[0])
+	assert.Equal(t, DirEast, b.Direction)
+	assert.Len(t, p.Marks, 1)
+	assert.Equal(t, Coord{X: 3, Y: 4}, p.Marks[0])
 }
 
 func TestParseCommandsInvalidSyntaxDeactivates(t *testing.T) {
@@ -90,7 +88,7 @@ func TestParseCommandsBackwardsMoveRejected(t *testing.T) {
 
 	assert.False(t, p.IsDeactivated(), "backwards is a soft error, not a kick")
 	assert.False(t, b.HasMove, "bird is not given a new move")
-	assert.Equal(t, grid.DirUnset, b.Direction)
+	assert.Equal(t, DirUnset, b.Direction)
 	assert.NotEmpty(t, summary, "summary records the error")
 }
 
@@ -102,7 +100,7 @@ func TestParseCommandsDoubleMoveOnSameBirdRejected(t *testing.T) {
 	cm.ParseCommands(p, []string{"0 RIGHT;0 LEFT"})
 
 	// First command succeeds — second is rejected (bird already has a move).
-	assert.Equal(t, grid.DirEast, b.Direction)
+	assert.Equal(t, DirEast, b.Direction)
 	assert.False(t, p.IsDeactivated())
 	assert.NotEmpty(t, summary)
 }
@@ -137,7 +135,7 @@ func TestParseCommandsMarkOverflowReportsError(t *testing.T) {
 
 	cm.ParseCommands(p, []string{"MARK 0 0;MARK 1 0;MARK 2 0;MARK 3 0;MARK 4 0"})
 
-	assert.Len(t, p.marks, 4, "only first four accepted")
+	assert.Len(t, p.Marks, 4, "only first four accepted")
 	assert.False(t, p.IsDeactivated())
 	assert.NotEmpty(t, summary, "overflow mark recorded as an error")
 }
@@ -149,5 +147,5 @@ func TestSplitCommandsDropsTrailingEmpty(t *testing.T) {
 }
 
 func TestEscapeHTMLEntities(t *testing.T) {
-	assert.Equal(t, "<b>x</b>", escapeHTMLEntities("&lt;b&gt;x&lt;/b&gt;"))
+	assert.Equal(t, "<b>x</b>", EscapeHTMLEntities("&lt;b&gt;x&lt;/b&gt;"))
 }

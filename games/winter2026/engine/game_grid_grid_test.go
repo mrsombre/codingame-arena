@@ -1,4 +1,4 @@
-package grid
+package engine
 
 import (
 	"testing"
@@ -18,11 +18,12 @@ func TestNewGridDefaultsAndGet(t *testing.T) {
 	assert.Equal(t, Coord{X: 2, Y: 2}, tile.Coord)
 }
 
-func TestGridGetOutOfBoundsReturnsNoTile(t *testing.T) {
+func TestGridGetOutOfBoundsReturnsNil(t *testing.T) {
 	g := NewGrid(3, 2)
+	assert.Nil(t, g.GetXY(-1, 0))
+	assert.Nil(t, g.GetXY(0, 5))
+	assert.Nil(t, g.Get(Coord{X: 5, Y: 1}))
 	assert.False(t, g.GetXY(-1, 0).IsValid())
-	assert.False(t, g.GetXY(0, 5).IsValid())
-	assert.False(t, g.Get(Coord{X: 5, Y: 1}).IsValid())
 }
 
 func TestGridCoordsInsertionOrder(t *testing.T) {

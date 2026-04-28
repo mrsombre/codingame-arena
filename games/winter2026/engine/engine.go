@@ -1,6 +1,4 @@
-// Package winter2026
-// Source: WinterChallenge2026-Exotec/src/main/java/com/codingame/game/Game.java
-// Source: WinterChallenge2026-Exotec/src/main/java/com/codingame/game/Referee.java
+// Package engine
 package engine
 
 import (

@@ -457,30 +457,60 @@ type Command struct {
 
 ### Sentinel Values
 
-For "no result" returns, prefer `(T, bool)` for value types:
+For "no result" returns of pure value types, prefer `(T, bool)`:
 
 ```go
-func (g *Grid) Get(c Coord) (Tile, bool) {
+func (g *Grid) Find(c Coord) (Tile, bool) {
     if outOfBounds { return Tile{}, false }
     return g.cells[idx], true
 }
 ```
 
-Use a sentinel only when it matches the Java shape better. Keep sentinels
-immutable and never return a writable pointer to a shared package variable:
+For grid-cell lookups where Java returns a `NO_TILE` / `NO_CELL` sentinel and
+callers may also mutate the returned tile (e.g. `grid.get(c).setType(...)`),
+**return `*T` and use `nil` for out-of-bounds**. Make the cell methods
+nil-tolerant so out-of-bounds reads still report the same booleans Java's
+sentinel did:
 
 ```go
-var NoTile = Tile{Valid: false}
+func (g *Grid) Get(c Coord) *Tile {
+    if outOfBounds { return nil }
+    return &g.cells[idx]
+}
 
-func (g *Grid) Get(c Coord) Tile {
-    if outOfBounds { return NoTile }
-    return g.cells[idx]
+func (t *Tile) IsValid() bool { return t != nil }
+func (t *Tile) IsWall() bool  { return t != nil && t.Type == TileWall }
+func (t *Tile) IsEmpty() bool { return t != nil && t.Type == TileEmpty }
+```
+
+For every Java sentinel-shaped predicate (`tile == NO_TILE`, `cell.isFloor()`,
+`cell.isWall()`, etc.) port a nil-tolerant `*T` method. Replace direct field
+chains like `grid.Get(c).Type == TileWall` with the predicate (`grid.Get(c).IsWall()`)
+so out-of-bounds lookups don't nil-panic.
+
+**Anti-pattern — never do this:**
+
+```go
+// BAD: returns a pointer to a stack-local copy of the sentinel.
+// Each call hands out a different pointer, mutations through it are
+// silently discarded, and the compiler will not catch nil-style bugs.
+func (g *Grid) Get(c Coord) *Tile {
+    if outOfBounds {
+        noTile := NoTile
+        return &noTile
+    }
+    return &g.cells[idx]
 }
 ```
 
-Callers check `tile.IsValid()` instead of `tile != null`. If callers must
-mutate the returned tile, return an index or a pointer to real grid storage
-only, and use `nil` for out-of-bounds.
+Do not introduce a package-level `var NoTile = Tile{...}` either: a shared
+mutable sentinel is one accidental `SetType` away from corrupting every
+out-of-bounds reader. The only correct out-of-bounds answer is `nil`.
+
+Mutating callers (`grid.Get(c).SetType(...)`, `Clear()`, etc.) must guard with
+`IsValid()` or hold a structural in-bounds invariant before the call. Pointer-
+receiver methods on `*Tile` that *write* should not be made nil-tolerant —
+let them panic if a caller tries to mutate an out-of-bounds tile.
 
 ### Collections as Flat Arrays
 

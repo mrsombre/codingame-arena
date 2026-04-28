@@ -1,4 +1,4 @@
-package grid
+package engine
 
 import (
 	"testing"

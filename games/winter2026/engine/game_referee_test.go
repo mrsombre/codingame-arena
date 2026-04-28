@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/mrsombre/codingame-arena/games/winter2026/engine/grid"
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
@@ -31,19 +30,19 @@ func TestRefereeSmokeFullTurn(t *testing.T) {
 	r.Init(players)
 
 	// Overwrite the random-generated state with a hand-crafted one.
-	g.grid = grid.NewGrid(10, 6)
+	g.Grid = NewGrid(10, 6)
 	for x := 0; x < 10; x++ {
-		g.grid.Get(grid.Coord{X: x, Y: 5}).SetType(grid.TileWall)
+		g.Grid.Get(Coord{X: x, Y: 5}).SetType(TileWall)
 	}
 	// Reset both players, wipe their randomly-made birds.
-	g.players[0].birds = nil
-	g.players[1].birds = nil
-	g.birdByIDCache = make(map[int]*Bird)
+	g.Players[0].Birds = nil
+	g.Players[1].Birds = nil
+	g.BirdByIDCache = make(map[int]*Bird)
 
-	b0 := spawn(g, 0, 0, []grid.Coord{{X: 1, Y: 4}, {X: 0, Y: 4}})
+	b0 := spawn(g, 0, 0, []Coord{{X: 1, Y: 4}, {X: 0, Y: 4}})
 	// Needs length ≥ 2 so Facing() works; both birds face east by shape.
-	b1 := spawn(g, 1, 1, []grid.Coord{{X: 8, Y: 4}, {X: 9, Y: 4}})
-	g.grid.Apples = []grid.Coord{{X: 3, Y: 4}, {X: 6, Y: 4}}
+	b1 := spawn(g, 1, 1, []Coord{{X: 8, Y: 4}, {X: 9, Y: 4}})
+	g.Grid.Apples = []Coord{{X: 3, Y: 4}, {X: 6, Y: 4}}
 
 	// Global + frame serialization exercised through the referee interface.
 	global := r.GlobalInfoFor(players[0])
@@ -67,8 +66,8 @@ func TestRefereeSmokeFullTurn(t *testing.T) {
 
 	r.PerformGameUpdate(0)
 
-	assert.Equal(t, grid.Coord{X: 2, Y: 4}, b0.HeadPos())
-	assert.Equal(t, grid.Coord{X: 7, Y: 4}, b1.HeadPos())
+	assert.Equal(t, Coord{X: 2, Y: 4}, b0.HeadPos())
+	assert.Equal(t, Coord{X: 7, Y: 4}, b1.HeadPos())
 
 	raw := r.RawScores()
 	assert.Equal(t, len(b0.Body), raw[0])
@@ -116,12 +115,12 @@ func TestNewGameWiresUpGridAndPlayers(t *testing.T) {
 	players := []*Player{NewPlayer(0), NewPlayer(1)}
 	g.Init(players)
 
-	assert.NotNil(t, g.grid, "grid generated")
-	assert.Greater(t, g.grid.Width, 0)
-	assert.Greater(t, g.grid.Height, 0)
-	assert.Len(t, g.players, 2)
-	assert.Len(t, g.players[0].birds, len(g.players[1].birds))
-	assert.Greater(t, len(g.players[0].birds), 0, "at least one bird per player")
+	assert.NotNil(t, g.Grid, "grid generated")
+	assert.Greater(t, g.Grid.Width, 0)
+	assert.Greater(t, g.Grid.Height, 0)
+	assert.Len(t, g.Players, 2)
+	assert.Len(t, g.Players[0].Birds, len(g.Players[1].Birds))
+	assert.Greater(t, len(g.Players[0].Birds), 0, "at least one bird per player")
 }
 
 // TestGameErrorAndInvalidInputError covers the Error formatters.

@@ -1,18 +1,16 @@
-package action
+package engine
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/mrsombre/codingame-arena/games/winter2026/engine/grid"
 )
 
 func TestParseMoveUp(t *testing.T) {
 	a, err := Parse("3 UP")
 	assert.NoError(t, err)
 	assert.Equal(t, TypeMoveUp, a.Type)
-	assert.Equal(t, grid.DirNorth, a.Direction)
+	assert.Equal(t, DirNorth, a.Direction)
 	assert.Equal(t, 3, a.BirdID)
 	assert.True(t, a.HasBirdID)
 	assert.True(t, a.IsMove())
@@ -21,11 +19,11 @@ func TestParseMoveUp(t *testing.T) {
 }
 
 func TestParseAllMoveDirections(t *testing.T) {
-	cases := map[string]grid.Direction{
-		"0 UP":    grid.DirNorth,
-		"0 DOWN":  grid.DirSouth,
-		"0 LEFT":  grid.DirWest,
-		"0 RIGHT": grid.DirEast,
+	cases := map[string]Direction{
+		"0 UP":    DirNorth,
+		"0 DOWN":  DirSouth,
+		"0 LEFT":  DirWest,
+		"0 RIGHT": DirEast,
 	}
 	for raw, want := range cases {
 		a, err := Parse(raw)
@@ -45,7 +43,7 @@ func TestParseMoveWithMessage(t *testing.T) {
 func TestParseMoveIsCaseInsensitive(t *testing.T) {
 	a, err := Parse("1 up")
 	assert.NoError(t, err)
-	assert.Equal(t, grid.DirNorth, a.Direction)
+	assert.Equal(t, DirNorth, a.Direction)
 }
 
 func TestParseMark(t *testing.T) {
@@ -53,7 +51,7 @@ func TestParseMark(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, TypeMark, a.Type)
 	assert.True(t, a.IsMark())
-	assert.Equal(t, grid.Coord{X: 12, Y: 3}, a.Coord)
+	assert.Equal(t, Coord{X: 12, Y: 3}, a.Coord)
 }
 
 func TestParseWait(t *testing.T) {
@@ -78,7 +76,7 @@ func TestParseRejectsLeadingGarbage(t *testing.T) {
 }
 
 func TestActionStringIncludesFields(t *testing.T) {
-	a := Action{Type: TypeMoveUp, Direction: grid.DirNorth, BirdID: 7}
+	a := Action{Type: TypeMoveUp, Direction: DirNorth, BirdID: 7}
 	s := a.String()
 	assert.Contains(t, s, "direction=N")
 	assert.Contains(t, s, "birdId=7")

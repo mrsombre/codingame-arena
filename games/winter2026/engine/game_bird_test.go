@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/mrsombre/codingame-arena/games/winter2026/engine/grid"
 )
 
 func TestNewBirdDefaults(t *testing.T) {
@@ -15,38 +13,38 @@ func TestNewBirdDefaults(t *testing.T) {
 	assert.Equal(t, 7, b.ID)
 	assert.Same(t, owner, b.Owner)
 	assert.True(t, b.Alive)
-	assert.Equal(t, grid.DirUnset, b.Direction)
+	assert.Equal(t, DirUnset, b.Direction)
 	assert.NotNil(t, b.Body)
 	assert.Len(t, b.Body, 0)
 }
 
 func TestBirdHeadPosReturnsFirstBodyCell(t *testing.T) {
 	b := NewBird(0, nil)
-	b.Body = []grid.Coord{{X: 5, Y: 5}, {X: 5, Y: 6}}
-	assert.Equal(t, grid.Coord{X: 5, Y: 5}, b.HeadPos())
+	b.Body = []Coord{{X: 5, Y: 5}, {X: 5, Y: 6}}
+	assert.Equal(t, Coord{X: 5, Y: 5}, b.HeadPos())
 }
 
 func TestBirdFacingRequiresTwoSegments(t *testing.T) {
 	b := NewBird(0, nil)
-	assert.Equal(t, grid.DirUnset, b.Facing(), "empty body")
+	assert.Equal(t, DirUnset, b.Facing(), "empty body")
 
-	b.Body = []grid.Coord{{X: 5, Y: 5}}
-	assert.Equal(t, grid.DirUnset, b.Facing(), "single segment")
+	b.Body = []Coord{{X: 5, Y: 5}}
+	assert.Equal(t, DirUnset, b.Facing(), "single segment")
 }
 
 func TestBirdFacingComputesFromHeadAndNeck(t *testing.T) {
 	b := NewBird(0, nil)
 	// Head is one cell north of neck → facing UP.
-	b.Body = []grid.Coord{{X: 5, Y: 5}, {X: 5, Y: 6}, {X: 5, Y: 7}}
-	assert.Equal(t, grid.DirNorth, b.Facing())
+	b.Body = []Coord{{X: 5, Y: 5}, {X: 5, Y: 6}, {X: 5, Y: 7}}
+	assert.Equal(t, DirNorth, b.Facing())
 
 	// Head east of neck → facing EAST.
-	b.Body = []grid.Coord{{X: 6, Y: 5}, {X: 5, Y: 5}}
-	assert.Equal(t, grid.DirEast, b.Facing())
+	b.Body = []Coord{{X: 6, Y: 5}, {X: 5, Y: 5}}
+	assert.Equal(t, DirEast, b.Facing())
 
 	// Head south of neck.
-	b.Body = []grid.Coord{{X: 5, Y: 6}, {X: 5, Y: 5}}
-	assert.Equal(t, grid.DirSouth, b.Facing())
+	b.Body = []Coord{{X: 5, Y: 6}, {X: 5, Y: 5}}
+	assert.Equal(t, DirSouth, b.Facing())
 }
 
 func TestBirdSetMessageTruncates(t *testing.T) {

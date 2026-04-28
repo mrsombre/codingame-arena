@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/mrsombre/codingame-arena/games/winter2026/engine/grid"
 )
 
 // Acceptance tests exercise the full rules of WinterChallenge2026-Exotec on
@@ -22,11 +20,11 @@ import (
 // is floor-only; callers add walls via wall() and apples via apple().
 func newScenario(width, height int) *Game {
 	g := &Game{
-		birdByIDCache: make(map[int]*Bird),
+		BirdByIDCache: make(map[int]*Bird),
 	}
-	g.grid = grid.NewGrid(width, height)
-	g.players = []*Player{NewPlayer(0), NewPlayer(1)}
-	for _, p := range g.players {
+	g.Grid = NewGrid(width, height)
+	g.Players = []*Player{NewPlayer(0), NewPlayer(1)}
+	for _, p := range g.Players {
 		p.Init()
 	}
 	return g
@@ -34,45 +32,45 @@ func newScenario(width, height int) *Game {
 
 // floorRow paints the last row as platform tiles (impassable floor).
 func floorRow(g *Game) {
-	y := g.grid.Height - 1
-	for x := 0; x < g.grid.Width; x++ {
-		g.grid.Get(grid.Coord{X: x, Y: y}).SetType(grid.TileWall)
+	y := g.Grid.Height - 1
+	for x := 0; x < g.Grid.Width; x++ {
+		g.Grid.Get(Coord{X: x, Y: y}).SetType(TileWall)
 	}
 }
 
-func wall(g *Game, c grid.Coord) {
-	g.grid.Get(c).SetType(grid.TileWall)
+func wall(g *Game, c Coord) {
+	g.Grid.Get(c).SetType(TileWall)
 }
 
-func apple(g *Game, c grid.Coord) {
-	g.grid.Apples = append(g.grid.Apples, c)
+func apple(g *Game, c Coord) {
+	g.Grid.Apples = append(g.Grid.Apples, c)
 }
 
 // spawn attaches a bird with the given body to a player. Body[0] is the head.
-func spawn(g *Game, playerIdx, birdID int, body []grid.Coord) *Bird {
-	owner := g.players[playerIdx]
+func spawn(g *Game, playerIdx, birdID int, body []Coord) *Bird {
+	owner := g.Players[playerIdx]
 	b := NewBird(birdID, owner)
-	b.Body = append([]grid.Coord(nil), body...)
-	owner.birds = append(owner.birds, b)
-	g.birdByIDCache[b.ID] = b
+	b.Body = append([]Coord(nil), body...)
+	owner.Birds = append(owner.Birds, b)
+	g.BirdByIDCache[b.ID] = b
 	return b
 }
 
 // groundedRow spawns a bird on y=floorY-1 (directly above the floor) with the
 // head at `headX` facing in the direction specified by `dir`. The tail extends
 // opposite to `dir`. All body cells lie on floorY-1 so the snake is grounded.
-func groundedRow(g *Game, playerIdx, birdID, headX, floorY, length int, dir grid.Direction) *Bird {
+func groundedRow(g *Game, playerIdx, birdID, headX, floorY, length int, dir Direction) *Bird {
 	y := floorY - 1
-	body := make([]grid.Coord, 0, length)
+	body := make([]Coord, 0, length)
 	dx := 0
 	switch dir {
-	case grid.DirEast:
+	case DirEast:
 		dx = -1 // tail to the west of head
-	case grid.DirWest:
+	case DirWest:
 		dx = 1 // tail to the east of head
 	}
 	for i := 0; i < length; i++ {
-		body = append(body, grid.Coord{X: headX + i*dx, Y: y})
+		body = append(body, Coord{X: headX + i*dx, Y: y})
 	}
 	return spawn(g, playerIdx, birdID, body)
 }
@@ -96,10 +94,10 @@ func advanceWith(g *Game, turn int, setup func()) {
 func TestSpawnFacesUpByDefault(t *testing.T) {
 	// Rules: "The starting direction is up." A vertically-stacked body with
 	// head above neck has Facing() = North, which doMoves uses by default.
-	b := spawn(newScenario(10, 10), 0, 0, []grid.Coord{
+	b := spawn(newScenario(10, 10), 0, 0, []Coord{
 		{X: 5, Y: 3}, {X: 5, Y: 4}, {X: 5, Y: 5}, {X: 5, Y: 6},
 	})
-	assert.Equal(t, grid.DirNorth, b.Facing(), "spawn body shape encodes UP")
+	assert.Equal(t, DirNorth, b.Facing(), "spawn body shape encodes UP")
 }
 
 func TestDefaultMoveUsesFacingWhenNoCommand(t *testing.T) {
@@ -110,16 +108,16 @@ func TestDefaultMoveUsesFacingWhenNoCommand(t *testing.T) {
 	floorRow(g)
 
 	// Head at (5,3), neck at (5,4), body rests on floor-1 row (y=4).
-	b := spawn(g, 0, 0, []grid.Coord{
+	b := spawn(g, 0, 0, []Coord{
 		{X: 5, Y: 3}, {X: 5, Y: 4}, {X: 4, Y: 4}, {X: 3, Y: 4}, {X: 2, Y: 4},
 	})
-	groundedRow(g, 1, 1, 8, g.grid.Height-1, 3, grid.DirEast)
-	apple(g, grid.Coord{X: 0, Y: 0})
+	groundedRow(g, 1, 1, 8, g.Grid.Height-1, 3, DirEast)
+	apple(g, Coord{X: 0, Y: 0})
 
 	advance(g, 0)
 
 	assert.True(t, b.Alive)
-	assert.Equal(t, grid.Coord{X: 5, Y: 2}, b.HeadPos(), "head moved north one step")
+	assert.Equal(t, Coord{X: 5, Y: 2}, b.HeadPos(), "head moved north one step")
 	assert.Len(t, b.Body, 5, "no eating, length preserved")
 }
 
@@ -129,30 +127,30 @@ func TestMovePerpetuallyContinuesLastDirection(t *testing.T) {
 	g := newScenario(20, 6)
 	floorRow(g)
 
-	b := groundedRow(g, 0, 0, 5, g.grid.Height-1, 4, grid.DirEast)
-	groundedRow(g, 1, 1, 15, g.grid.Height-1, 4, grid.DirWest)
-	apple(g, grid.Coord{X: 0, Y: 0})
+	b := groundedRow(g, 0, 0, 5, g.Grid.Height-1, 4, DirEast)
+	groundedRow(g, 1, 1, 15, g.Grid.Height-1, 4, DirWest)
+	apple(g, Coord{X: 0, Y: 0})
 
 	advance(g, 0)
-	assert.Equal(t, grid.Coord{X: 6, Y: 4}, b.HeadPos(), "turn 1 east")
+	assert.Equal(t, Coord{X: 6, Y: 4}, b.HeadPos(), "turn 1 east")
 
 	advance(g, 1)
-	assert.Equal(t, grid.Coord{X: 7, Y: 4}, b.HeadPos(), "turn 2 still east — no command required")
+	assert.Equal(t, Coord{X: 7, Y: 4}, b.HeadPos(), "turn 2 still east — no command required")
 }
 
 func TestMoveFollowsCommandedDirection(t *testing.T) {
 	g := newScenario(20, 6)
 	floorRow(g)
 
-	b := groundedRow(g, 0, 0, 5, g.grid.Height-1, 3, grid.DirEast)
-	groundedRow(g, 1, 1, 15, g.grid.Height-1, 3, grid.DirWest)
-	apple(g, grid.Coord{X: 0, Y: 0})
+	b := groundedRow(g, 0, 0, 5, g.Grid.Height-1, 3, DirEast)
+	groundedRow(g, 1, 1, 15, g.Grid.Height-1, 3, DirWest)
+	apple(g, Coord{X: 0, Y: 0})
 
 	advanceWith(g, 0, func() {
-		b.Direction = grid.DirNorth
+		b.Direction = DirNorth
 		b.HasMove = true
 	})
-	assert.Equal(t, grid.Coord{X: 5, Y: 3}, b.HeadPos(), "commanded N overrides eastward facing")
+	assert.Equal(t, Coord{X: 5, Y: 3}, b.HeadPos(), "commanded N overrides eastward facing")
 }
 
 // ——— eating ——————————————————————————————————————————————————————————————
@@ -163,16 +161,16 @@ func TestHeadEatingApplePowersGrowth(t *testing.T) {
 	g := newScenario(20, 6)
 	floorRow(g)
 
-	b := groundedRow(g, 0, 0, 5, g.grid.Height-1, 3, grid.DirEast)
-	groundedRow(g, 1, 1, 15, g.grid.Height-1, 3, grid.DirWest)
+	b := groundedRow(g, 0, 0, 5, g.Grid.Height-1, 3, DirEast)
+	groundedRow(g, 1, 1, 15, g.Grid.Height-1, 3, DirWest)
 	// Apple directly east of head (6, 4).
-	apple(g, grid.Coord{X: 6, Y: 4})
+	apple(g, Coord{X: 6, Y: 4})
 
 	advance(g, 0)
 
-	assert.Equal(t, grid.Coord{X: 6, Y: 4}, b.HeadPos(), "head moved onto apple")
+	assert.Equal(t, Coord{X: 6, Y: 4}, b.HeadPos(), "head moved onto apple")
 	assert.Len(t, b.Body, 4, "body grew by one (tail was NOT trimmed)")
-	assert.False(t, g.grid.HasApple(grid.Coord{X: 6, Y: 4}), "apple removed")
+	assert.False(t, g.Grid.HasApple(Coord{X: 6, Y: 4}), "apple removed")
 }
 
 func TestMultipleHeadsOnSameAppleBothEat(t *testing.T) {
@@ -182,13 +180,13 @@ func TestMultipleHeadsOnSameAppleBothEat(t *testing.T) {
 	g := newScenario(20, 6)
 	floorRow(g)
 
-	a := groundedRow(g, 0, 0, 4, g.grid.Height-1, 5, grid.DirEast)
-	b := groundedRow(g, 1, 1, 6, g.grid.Height-1, 5, grid.DirWest)
-	apple(g, grid.Coord{X: 5, Y: 4})
+	a := groundedRow(g, 0, 0, 4, g.Grid.Height-1, 5, DirEast)
+	b := groundedRow(g, 1, 1, 6, g.Grid.Height-1, 5, DirWest)
+	apple(g, Coord{X: 5, Y: 4})
 
 	advance(g, 0)
 
-	assert.False(t, g.grid.HasApple(grid.Coord{X: 5, Y: 4}), "apple gone")
+	assert.False(t, g.Grid.HasApple(Coord{X: 5, Y: 4}), "apple gone")
 	assert.True(t, a.Alive)
 	assert.True(t, b.Alive)
 	assert.Len(t, a.Body, 5, "bird A: grew to 6, beheaded to 5")
@@ -203,11 +201,11 @@ func TestHeadIntoWallBeheadIfLongEnough(t *testing.T) {
 	g := newScenario(20, 6)
 	floorRow(g)
 	// Wall one cell east of the head.
-	wall(g, grid.Coord{X: 6, Y: 4})
+	wall(g, Coord{X: 6, Y: 4})
 
-	b := groundedRow(g, 0, 0, 5, g.grid.Height-1, 4, grid.DirEast)
-	groundedRow(g, 1, 1, 15, g.grid.Height-1, 3, grid.DirWest)
-	apple(g, grid.Coord{X: 0, Y: 0})
+	b := groundedRow(g, 0, 0, 5, g.Grid.Height-1, 4, DirEast)
+	groundedRow(g, 1, 1, 15, g.Grid.Height-1, 3, DirWest)
+	apple(g, Coord{X: 0, Y: 0})
 
 	advance(g, 0)
 
@@ -219,11 +217,11 @@ func TestHeadIntoWallKillsIfThreeOrFewerParts(t *testing.T) {
 	// Rules Case 1: "If not, the whole snakebot is removed."
 	g := newScenario(20, 6)
 	floorRow(g)
-	wall(g, grid.Coord{X: 6, Y: 4})
+	wall(g, Coord{X: 6, Y: 4})
 
-	b := groundedRow(g, 0, 0, 5, g.grid.Height-1, 3, grid.DirEast)
-	groundedRow(g, 1, 1, 15, g.grid.Height-1, 3, grid.DirWest)
-	apple(g, grid.Coord{X: 0, Y: 0})
+	b := groundedRow(g, 0, 0, 5, g.Grid.Height-1, 3, DirEast)
+	groundedRow(g, 1, 1, 15, g.Grid.Height-1, 3, DirWest)
+	apple(g, Coord{X: 0, Y: 0})
 
 	advance(g, 0)
 
@@ -235,9 +233,9 @@ func TestHeadIntoEnemyBodyBeheads(t *testing.T) {
 	floorRow(g)
 
 	// Attacker heading east — its head will run into defender's body cell.
-	attacker := groundedRow(g, 0, 0, 4, g.grid.Height-1, 4, grid.DirEast)
+	attacker := groundedRow(g, 0, 0, 4, g.Grid.Height-1, 4, DirEast)
 	// Defender occupies (5, 4). spawn manually since shape is vertical tails don't apply.
-	defender := spawn(g, 1, 1, []grid.Coord{{X: 5, Y: 4}, {X: 6, Y: 4}, {X: 7, Y: 4}, {X: 8, Y: 4}})
+	defender := spawn(g, 1, 1, []Coord{{X: 5, Y: 4}, {X: 6, Y: 4}, {X: 7, Y: 4}, {X: 8, Y: 4}})
 	// Stabilise defender's facing so it doesn't collide with the attacker head
 	// on the same cell: body head is east of floor-placed neck? Actually body
 	// is (5,4),(6,4) — head (5,4) minus neck (6,4) = (-1, 0) = West. Defender
@@ -249,7 +247,7 @@ func TestHeadIntoEnemyBodyBeheads(t *testing.T) {
 	// manager. So just let defender move. Both move toward each other.
 	_ = defender
 
-	apple(g, grid.Coord{X: 0, Y: 0})
+	apple(g, Coord{X: 0, Y: 0})
 
 	advance(g, 0)
 
@@ -269,14 +267,14 @@ func TestHeadIntoOwnBodyBeheads(t *testing.T) {
 	g := newScenario(20, 10)
 	floorRow(g)
 
-	b := spawn(g, 0, 0, []grid.Coord{
+	b := spawn(g, 0, 0, []Coord{
 		{X: 5, Y: 6}, {X: 4, Y: 6}, {X: 4, Y: 7}, {X: 5, Y: 7}, {X: 6, Y: 7},
 	})
-	groundedRow(g, 1, 1, 15, g.grid.Height-1, 3, grid.DirWest)
-	apple(g, grid.Coord{X: 0, Y: 0})
+	groundedRow(g, 1, 1, 15, g.Grid.Height-1, 3, DirWest)
+	apple(g, Coord{X: 0, Y: 0})
 
 	advanceWith(g, 0, func() {
-		b.Direction = grid.DirSouth
+		b.Direction = DirSouth
 		b.HasMove = true
 	})
 
@@ -289,15 +287,15 @@ func TestHeadIntoOwnBodyBeheads(t *testing.T) {
 func TestGravityBirdStaysOnGround(t *testing.T) {
 	g := newScenario(10, 6)
 	floorRow(g)
-	b := groundedRow(g, 0, 0, 5, g.grid.Height-1, 3, grid.DirEast)
-	groundedRow(g, 1, 1, 8, g.grid.Height-1, 2, grid.DirEast)
-	apple(g, grid.Coord{X: 0, Y: 0})
+	b := groundedRow(g, 0, 0, 5, g.Grid.Height-1, 3, DirEast)
+	groundedRow(g, 1, 1, 8, g.Grid.Height-1, 2, DirEast)
+	apple(g, Coord{X: 0, Y: 0})
 
 	advance(g, 0)
 
 	assert.True(t, b.Alive)
 	for _, c := range b.Body {
-		assert.Less(t, c.Y, g.grid.Height, "no cell dropped into the wall row")
+		assert.Less(t, c.Y, g.Grid.Height, "no cell dropped into the wall row")
 	}
 }
 
@@ -325,10 +323,10 @@ func TestGravityAirborneBirdFallsUntilLanded(t *testing.T) {
 	// directly under. So final body [(5,8),(5,7),(5,6)] (tail below floor
 	// row y=9 would be wall, so bird grounded when head (5,3+k) cell has
 	// (5,4+k)=wall → at k=5, head=(5,8), below (5,9)=wall → grounded.
-	b := spawn(g, 0, 0, []grid.Coord{{X: 5, Y: 2}, {X: 5, Y: 1}, {X: 5, Y: 0}})
+	b := spawn(g, 0, 0, []Coord{{X: 5, Y: 2}, {X: 5, Y: 1}, {X: 5, Y: 0}})
 
-	groundedRow(g, 1, 1, 1, g.grid.Height-1, 3, grid.DirEast)
-	apple(g, grid.Coord{X: 0, Y: 0})
+	groundedRow(g, 1, 1, 1, g.Grid.Height-1, 3, DirEast)
+	apple(g, Coord{X: 0, Y: 0})
 
 	advance(g, 0)
 
@@ -342,14 +340,14 @@ func TestGravityKillsBirdThatFallsOutOfGrid(t *testing.T) {
 	// No floor row — snake has no ground to catch it.
 	g := newScenario(10, 6)
 	// Opponent on a small platform so the game remains valid.
-	wall(g, grid.Coord{X: 0, Y: 5})
-	wall(g, grid.Coord{X: 1, Y: 5})
-	wall(g, grid.Coord{X: 2, Y: 5})
-	spawn(g, 1, 1, []grid.Coord{{X: 0, Y: 4}, {X: 1, Y: 4}, {X: 2, Y: 4}})
+	wall(g, Coord{X: 0, Y: 5})
+	wall(g, Coord{X: 1, Y: 5})
+	wall(g, Coord{X: 2, Y: 5})
+	spawn(g, 1, 1, []Coord{{X: 0, Y: 4}, {X: 1, Y: 4}, {X: 2, Y: 4}})
 
 	// Hover body high, no solid support beneath it.
-	b := spawn(g, 0, 0, []grid.Coord{{X: 6, Y: 2}, {X: 6, Y: 1}, {X: 6, Y: 0}})
-	apple(g, grid.Coord{X: 0, Y: 0})
+	b := spawn(g, 0, 0, []Coord{{X: 6, Y: 2}, {X: 6, Y: 1}, {X: 6, Y: 0}})
+	apple(g, Coord{X: 0, Y: 0})
 
 	advance(g, 0)
 
@@ -364,14 +362,14 @@ func TestBirdStackOnOtherGroundedBirdIsGrounded(t *testing.T) {
 	floorRow(g)
 
 	// Bottom bird on the floor-1 row (y=6), spanning x=3..7.
-	bottom := spawn(g, 1, 1, []grid.Coord{
+	bottom := spawn(g, 1, 1, []Coord{
 		{X: 7, Y: 6}, {X: 6, Y: 6}, {X: 5, Y: 6}, {X: 4, Y: 6}, {X: 3, Y: 6},
 	})
 	// Top bird on y=5 (directly above bottom), spanning x=3..6.
-	top := spawn(g, 0, 0, []grid.Coord{
+	top := spawn(g, 0, 0, []Coord{
 		{X: 6, Y: 5}, {X: 5, Y: 5}, {X: 4, Y: 5}, {X: 3, Y: 5},
 	})
-	apple(g, grid.Coord{X: 0, Y: 0})
+	apple(g, Coord{X: 0, Y: 0})
 
 	// Freeze movement by sending them along their facing (bottom west, top west).
 	// Their bodies overlap vertically, so top remains grounded on bottom.
@@ -390,8 +388,8 @@ func TestBirdStackOnOtherGroundedBirdIsGrounded(t *testing.T) {
 func TestIsGameOverNoApples(t *testing.T) {
 	g := newScenario(10, 6)
 	floorRow(g)
-	groundedRow(g, 0, 0, 2, g.grid.Height-1, 3, grid.DirEast)
-	groundedRow(g, 1, 1, 7, g.grid.Height-1, 3, grid.DirEast)
+	groundedRow(g, 0, 0, 2, g.Grid.Height-1, 3, DirEast)
+	groundedRow(g, 1, 1, 7, g.Grid.Height-1, 3, DirEast)
 
 	assert.True(t, g.IsGameOver(), "no power sources remain")
 }
@@ -399,10 +397,10 @@ func TestIsGameOverNoApples(t *testing.T) {
 func TestIsGameOverPlayerHasNoLiveBirds(t *testing.T) {
 	g := newScenario(10, 6)
 	floorRow(g)
-	groundedRow(g, 0, 0, 2, g.grid.Height-1, 3, grid.DirEast)
-	dead := groundedRow(g, 1, 1, 7, g.grid.Height-1, 3, grid.DirEast)
+	groundedRow(g, 0, 0, 2, g.Grid.Height-1, 3, DirEast)
+	dead := groundedRow(g, 1, 1, 7, g.Grid.Height-1, 3, DirEast)
 	dead.Alive = false
-	apple(g, grid.Coord{X: 5, Y: 2})
+	apple(g, Coord{X: 5, Y: 2})
 
 	assert.True(t, g.IsGameOver(), "opponent has no live birds")
 }
@@ -410,9 +408,9 @@ func TestIsGameOverPlayerHasNoLiveBirds(t *testing.T) {
 func TestIsGameOverFalseWhenBothPlayersAliveAndApplesLeft(t *testing.T) {
 	g := newScenario(10, 6)
 	floorRow(g)
-	groundedRow(g, 0, 0, 2, g.grid.Height-1, 3, grid.DirEast)
-	groundedRow(g, 1, 1, 7, g.grid.Height-1, 3, grid.DirEast)
-	apple(g, grid.Coord{X: 5, Y: 2})
+	groundedRow(g, 0, 0, 2, g.Grid.Height-1, 3, DirEast)
+	groundedRow(g, 1, 1, 7, g.Grid.Height-1, 3, DirEast)
+	apple(g, Coord{X: 5, Y: 2})
 
 	assert.False(t, g.IsGameOver())
 }
@@ -423,62 +421,62 @@ func TestOnEndScoreIsSumOfLiveBodyParts(t *testing.T) {
 	g := newScenario(10, 6)
 	floorRow(g)
 	// p0: 4 parts total (one bird).
-	spawn(g, 0, 0, []grid.Coord{{X: 0, Y: 4}, {X: 1, Y: 4}, {X: 2, Y: 4}, {X: 3, Y: 4}})
+	spawn(g, 0, 0, []Coord{{X: 0, Y: 4}, {X: 1, Y: 4}, {X: 2, Y: 4}, {X: 3, Y: 4}})
 	// p1: 3-part live bird + 2-part dead bird.
-	spawn(g, 1, 1, []grid.Coord{{X: 6, Y: 4}, {X: 7, Y: 4}, {X: 8, Y: 4}})
-	dead := spawn(g, 1, 2, []grid.Coord{{X: 5, Y: 4}, {X: 5, Y: 3}})
+	spawn(g, 1, 1, []Coord{{X: 6, Y: 4}, {X: 7, Y: 4}, {X: 8, Y: 4}})
+	dead := spawn(g, 1, 2, []Coord{{X: 5, Y: 4}, {X: 5, Y: 3}})
 	dead.Alive = false
 
 	g.OnEnd()
 
-	assert.Equal(t, 4, g.players[0].GetScore())
-	assert.Equal(t, 3, g.players[1].GetScore(), "only live bird counted")
+	assert.Equal(t, 4, g.Players[0].GetScore())
+	assert.Equal(t, 3, g.Players[1].GetScore(), "only live bird counted")
 }
 
 func TestOnEndTieBreakSubtractsLosses(t *testing.T) {
 	g := newScenario(10, 6)
 	floorRow(g)
-	spawn(g, 0, 0, []grid.Coord{{X: 0, Y: 4}, {X: 1, Y: 4}, {X: 2, Y: 4}})
-	spawn(g, 1, 1, []grid.Coord{{X: 6, Y: 4}, {X: 7, Y: 4}, {X: 8, Y: 4}})
-	g.losses[0] = 2
-	g.losses[1] = 5
+	spawn(g, 0, 0, []Coord{{X: 0, Y: 4}, {X: 1, Y: 4}, {X: 2, Y: 4}})
+	spawn(g, 1, 1, []Coord{{X: 6, Y: 4}, {X: 7, Y: 4}, {X: 8, Y: 4}})
+	g.Losses[0] = 2
+	g.Losses[1] = 5
 
 	g.OnEnd()
 
-	assert.Equal(t, 3-2, g.players[0].GetScore(), "tie-break: p0 score minus p0 losses")
-	assert.Equal(t, 3-5, g.players[1].GetScore(), "tie-break: p1 score minus p1 losses")
+	assert.Equal(t, 3-2, g.Players[0].GetScore(), "tie-break: p0 score minus p0 losses")
+	assert.Equal(t, 3-5, g.Players[1].GetScore(), "tie-break: p1 score minus p1 losses")
 }
 
 func TestOnEndDeactivatedPlayerScoresMinusOne(t *testing.T) {
 	g := newScenario(10, 6)
 	floorRow(g)
-	spawn(g, 0, 0, []grid.Coord{{X: 0, Y: 4}, {X: 1, Y: 4}, {X: 2, Y: 4}})
-	spawn(g, 1, 1, []grid.Coord{{X: 6, Y: 4}, {X: 7, Y: 4}, {X: 8, Y: 4}})
-	g.players[1].Deactivate("bad input")
+	spawn(g, 0, 0, []Coord{{X: 0, Y: 4}, {X: 1, Y: 4}, {X: 2, Y: 4}})
+	spawn(g, 1, 1, []Coord{{X: 6, Y: 4}, {X: 7, Y: 4}, {X: 8, Y: 4}})
+	g.Players[1].Deactivate("bad input")
 
 	g.OnEnd()
 
-	assert.Equal(t, 3, g.players[0].GetScore())
-	assert.Equal(t, -1, g.players[1].GetScore())
+	assert.Equal(t, 3, g.Players[0].GetScore())
+	assert.Equal(t, -1, g.Players[1].GetScore())
 }
 
-// ——— events ————————————————————————————————————————————————————————————
+// ——— traces ————————————————————————————————————————————————————————————
 
-func TestEatEmitsEventWithBirdAndCoord(t *testing.T) {
+func TestEatEmitsTraceWithBirdAndCoord(t *testing.T) {
 	g := newScenario(10, 6)
 	floorRow(g)
-	groundedRow(g, 0, 0, 2, g.grid.Height-1, 3, grid.DirEast)
-	groundedRow(g, 1, 1, 7, g.grid.Height-1, 3, grid.DirEast)
-	apple(g, grid.Coord{X: 3, Y: g.grid.Height - 2})
-	apple(g, grid.Coord{X: 0, Y: 0}) // keep game from ending
+	groundedRow(g, 0, 0, 2, g.Grid.Height-1, 3, DirEast)
+	groundedRow(g, 1, 1, 7, g.Grid.Height-1, 3, DirEast)
+	apple(g, Coord{X: 3, Y: g.Grid.Height - 2})
+	apple(g, Coord{X: 0, Y: 0}) // keep game from ending
 
 	advance(g, 0)
 
-	labels := make([]string, 0, len(g.events))
-	for _, e := range g.events {
+	labels := make([]string, 0, len(g.traces))
+	for _, e := range g.traces {
 		labels = append(labels, e.Label)
 	}
-	assert.Contains(t, labels, EventEat)
+	assert.Contains(t, labels, TraceEat)
 }
 
 // ——— serialization smoke ————————————————————————————————————————————————
@@ -486,11 +484,11 @@ func TestEatEmitsEventWithBirdAndCoord(t *testing.T) {
 func TestSerializeFrameIncludesApplesAndBodies(t *testing.T) {
 	g := newScenario(10, 6)
 	floorRow(g)
-	groundedRow(g, 0, 0, 2, g.grid.Height-1, 3, grid.DirEast)
-	groundedRow(g, 1, 1, 7, g.grid.Height-1, 3, grid.DirEast)
-	apple(g, grid.Coord{X: 5, Y: 2})
+	groundedRow(g, 0, 0, 2, g.Grid.Height-1, 3, DirEast)
+	groundedRow(g, 1, 1, 7, g.Grid.Height-1, 3, DirEast)
+	apple(g, Coord{X: 5, Y: 2})
 
-	lines := serializeFrameInfoFor(g.players[0], g)
+	lines := SerializeFrameInfoFor(g.Players[0], g)
 
 	assert.Equal(t, "1", lines[0], "apple count")
 	assert.Equal(t, "5 2", lines[1], "apple coord")
@@ -503,12 +501,12 @@ func TestSerializeFrameIncludesApplesAndBodies(t *testing.T) {
 func TestSerializeGlobalIncludesPlayerIdAndGrid(t *testing.T) {
 	g := newScenario(4, 3)
 	for x := 0; x < 4; x++ {
-		wall(g, grid.Coord{X: x, Y: 2})
+		wall(g, Coord{X: x, Y: 2})
 	}
-	spawn(g, 0, 0, []grid.Coord{{X: 0, Y: 0}})
-	spawn(g, 1, 1, []grid.Coord{{X: 3, Y: 0}})
+	spawn(g, 0, 0, []Coord{{X: 0, Y: 0}})
+	spawn(g, 1, 1, []Coord{{X: 3, Y: 0}})
 
-	lines := serializeGlobalInfoFor(g.players[0], g)
+	lines := SerializeGlobalInfoFor(g.Players[0], g)
 
 	assert.Equal(t, "0", lines[0], "player id")
 	assert.Equal(t, "4", lines[1], "width")

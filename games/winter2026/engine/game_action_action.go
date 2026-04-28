@@ -1,28 +1,61 @@
-// Package action
+// Package engine
 // Source: WinterChallenge2026-Exotec/src/main/java/com/codingame/game/action/Action.java
-// Source: WinterChallenge2026-Exotec/src/main/java/com/codingame/game/action/ActionException.java
-package action
+package engine
 
 import (
 	"fmt"
-
-	"github.com/mrsombre/codingame-arena/games/winter2026/engine/grid"
 )
+
+/*
+Java: WinterChallenge2026-Exotec/src/main/java/com/codingame/game/action/Action.java:6-16
+
+public class Action {
+    final ActionType type;
+    private Direction direction;
+    private Integer birdId;
+    private Coord coord;
+    private String message;
+
+    public Action(ActionType type) {
+        this.type = type;
+    }
+*/
 
 // Action holds a parsed player command.
 type Action struct {
 	Type       ActionType
-	Direction  grid.Direction
+	Direction  Direction
 	BirdID     int
 	HasBirdID  bool
-	Coord      grid.Coord
+	Coord      Coord
 	HasCoord   bool
 	Message    string
 	HasMessage bool
 }
 
-func (a Action) IsMove() bool { return a.HasBirdID && a.Direction != grid.DirUnset }
+/*
+Java: WinterChallenge2026-Exotec/src/main/java/com/codingame/game/action/Action.java:35-41
+
+public boolean isMove() {
+    return direction != null;
+}
+
+public boolean isMark() {
+    return coord != null;
+}
+*/
+
+func (a Action) IsMove() bool { return a.HasBirdID && a.Direction != DirUnset }
 func (a Action) IsMark() bool { return a.HasCoord }
+
+/*
+Java: WinterChallenge2026-Exotec/src/main/java/com/codingame/game/action/Action.java:31-34
+
+@Override
+public String toString() {
+    return "Action [type=" + type + ", direction=" + direction + ", birdId=" + birdId + "]";
+}
+*/
 
 func (a Action) String() string {
 	return fmt.Sprintf("Action [type=%d, direction=%s, birdId=%d]", a.Type, a.Direction, a.BirdID)

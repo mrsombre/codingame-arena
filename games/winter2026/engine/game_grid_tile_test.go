@@ -1,4 +1,4 @@
-package grid
+package engine
 
 import (
 	"testing"
@@ -27,7 +27,9 @@ func TestTileSetTypeAndClear(t *testing.T) {
 	assert.Equal(t, TileEmpty, tile.Type)
 }
 
-func TestNoTileIsInvalid(t *testing.T) {
-	assert.False(t, NoTile.IsValid())
-	assert.Equal(t, -1, NoTile.Type)
+func TestNilTileMethodsAreSafe(t *testing.T) {
+	var tile *Tile
+	assert.False(t, tile.IsValid())
+	assert.False(t, tile.IsWall())
+	assert.False(t, tile.IsEmpty())
 }
