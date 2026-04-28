@@ -83,11 +83,18 @@ export function lerpFrame(from: FrameData, to: FrameData, t: number): FrameData 
 export interface TraceMatch {
   match_id: number
   seed: string
-  winner: number
+  /** CodinGame-style ranks: 0 = first place, [0,0] = draw. */
+  ranks: [number, number]
   scores: [number, number]
   players: [string, string]
   timing?: TraceTiming
   turns: TraceTurn[]
+}
+
+/** Returns 0/1 winner index, or -1 for a draw, given a TraceMatch.ranks pair. */
+export function winnerFromRanks(ranks: [number, number]): number {
+  if (ranks[0] === 0 && ranks[1] === 0) return -1
+  return ranks[0] === 0 ? 0 : 1
 }
 
 export interface TraceTiming {
