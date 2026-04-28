@@ -89,6 +89,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := fs.Parse(rest); err != nil {
+		if errors.Is(err, pflag.ErrHelp) {
+			fmt.Fprintln(os.Stderr, `run "arena help" for usage`)
+			os.Exit(1)
+		}
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	v, err := arena.NewViper(fs)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "config error:", err)
@@ -105,10 +114,6 @@ func main() {
 	}
 
 	if err := handler(rest, os.Stdout, factory, fs, v); err != nil {
-		if errors.Is(err, pflag.ErrHelp) {
-			fmt.Fprintln(os.Stderr, `run "arena help" for usage`)
-			os.Exit(1)
-		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
