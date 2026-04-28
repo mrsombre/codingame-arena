@@ -46,7 +46,13 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 		return err
 	}
 
-	traceWriter := arena.NewTraceWriter(parsed.TraceDir)
+	startedAt := time.Now()
+
+	traceDir := ""
+	if parsed.Trace {
+		traceDir = parsed.TraceDir
+	}
+	traceWriter := arena.NewTraceWriter(traceDir, startedAt.Unix())
 
 	runner := arena.NewRunner(factory, arena.MatchOptions{
 		MaxTurns:    parsed.MaxTurns,
@@ -58,9 +64,13 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 		GameOptions: v,
 	})
 
-	startedAt := time.Now()
 	results := arena.RunMatches(parsed.BatchOptions, runner.RunMatch)
 	elapsed := time.Since(startedAt)
+
+	if parsed.Debug {
+		_, err := io.WriteString(stdout, results[0].RenderMatch())
+		return err
+	}
 
 	p0Left := 0
 	for _, r := range results {
@@ -83,7 +93,7 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 			Seed:          parsed.Seed,
 			SeedIncrement: parsed.SeedIncrement,
 			OutputMatches: parsed.OutputMatches,
-			TraceDir:      parsed.TraceDir,
+			TraceDir:      traceDir,
 			MaxTurns:      parsed.MaxTurns,
 			NoSwap:        parsed.NoSwap,
 			P0Left:        p0Left,

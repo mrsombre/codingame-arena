@@ -2,6 +2,7 @@ package arena
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,7 +13,8 @@ import (
 
 func TestTraceWriterWritesMatchFile(t *testing.T) {
 	dir := t.TempDir()
-	writer := NewTraceWriter(dir)
+	const traceID int64 = 1717000000
+	writer := NewTraceWriter(dir, traceID)
 
 	match := TraceMatch{
 		MatchID: 3,
@@ -43,12 +45,13 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 
 	require.NoError(t, writer.WriteMatch(match))
 
-	path := filepath.Join(dir, "3.json")
+	path := filepath.Join(dir, fmt.Sprintf("trace-%d-3.json", traceID))
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 
 	var got TraceMatch
 	require.NoError(t, json.Unmarshal(data, &got))
+	assert.Equal(t, traceID, got.TraceID)
 	assert.Equal(t, int64(12345), got.Seed)
 	assert.Equal(t, 0, got.Winner)
 	require.NotNil(t, got.Timing)

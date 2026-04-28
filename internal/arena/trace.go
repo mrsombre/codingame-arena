@@ -16,6 +16,7 @@ import (
 // -1 for draw. Random side-swap is intentionally not recorded — the bot→side
 // mapping here is ground truth for downstream trace consumers (e.g. training).
 type TraceMatch struct {
+	TraceID int64        `json:"trace_id,omitempty"`
 	MatchID int          `json:"match_id"`
 	Seed    int64        `json:"seed,string"`
 	Winner  int          `json:"winner"`
@@ -58,22 +59,26 @@ type traceTurnInput struct {
 	P1 []string `json:"p1,omitempty"`
 }
 
-// TraceWriter writes per-match JSON trace files to a directory.
+// TraceWriter writes per-match JSON trace files to a directory. All matches in
+// a batch share traceID (typically the batch start timestamp); each file is
+// keyed by traceID + per-match MatchID so multiple batches can coexist.
 type TraceWriter struct {
-	mu  sync.Mutex
-	dir string
+	mu      sync.Mutex
+	dir     string
+	traceID int64
 }
 
-// NewTraceWriter creates a TraceWriter that writes to the given directory.
-// Returns nil if dir is empty.
-func NewTraceWriter(dir string) *TraceWriter {
+// NewTraceWriter creates a TraceWriter that writes to the given directory and
+// stamps every match with traceID. Returns nil if dir is empty.
+func NewTraceWriter(dir string, traceID int64) *TraceWriter {
 	if dir == "" {
 		return nil
 	}
-	return &TraceWriter{dir: dir}
+	return &TraceWriter{dir: dir, traceID: traceID}
 }
 
-// WriteMatch writes a single match trace as a JSON file: <dir>/<match_id>.json
+// WriteMatch writes a single match trace as a JSON file:
+// <dir>/trace-<trace_id>-<match_id>.json
 func (w *TraceWriter) WriteMatch(match TraceMatch) error {
 	if w == nil {
 		return nil
@@ -85,7 +90,8 @@ func (w *TraceWriter) WriteMatch(match TraceMatch) error {
 		return fmt.Errorf("create trace directory: %w", err)
 	}
 
-	path := filepath.Join(w.dir, fmt.Sprintf("%d.json", match.MatchID))
+	match.TraceID = w.traceID
+	path := filepath.Join(w.dir, fmt.Sprintf("trace-%d-%d.json", w.traceID, match.MatchID))
 	data, err := json.MarshalIndent(match, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal trace: %w", err)

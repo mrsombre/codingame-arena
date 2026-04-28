@@ -260,7 +260,7 @@ func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			P0Bin:       req.P0Bin,
 			P1Bin:       req.P1Bin,
 			NoSwap:      req.NoSwap,
-			TraceWriter: arena.NewTraceWriter(traceDir),
+			TraceWriter: arena.NewTraceWriter(traceDir, time.Now().Unix()),
 			GameOptions: gameOptionsViper(req.GameOptions),
 		})
 		result := runner.RunMatch(0, seed)
@@ -354,7 +354,7 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			P0Bin:       req.P0Bin,
 			P1Bin:       req.P1Bin,
 			NoSwap:      req.NoSwap,
-			TraceWriter: arena.NewTraceWriter(traceDir),
+			TraceWriter: arena.NewTraceWriter(traceDir, time.Now().Unix()),
 			GameOptions: gameOptionsViper(req.GameOptions),
 		})
 		parallel := runtime.NumCPU()
