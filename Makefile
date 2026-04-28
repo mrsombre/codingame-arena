@@ -41,6 +41,7 @@ SPRING2020_PYBOT  := $(BIN_DIR)/bot-spring2020-py
 .PHONY: build-spring2020-agents match-spring2020
 
 build-spring2020-agents:
+	rm -f $(BIN_DIR)/bot-*
 	g++ -std=c++17 -O2 -o $(SPRING2020_CPPBOT) $(SPRING2020_AGENTS)/bot.cpp
 	cp -f $(SPRING2020_AGENTS)/bot.py $(SPRING2020_PYBOT)
 
@@ -57,6 +58,7 @@ WINTER2026_PYBOT  := $(BIN_DIR)/bot-winter2026-py
 .PHONY: build-winter2026-agents match-winter2026
 
 build-winter2026-agents:
+	rm -f $(BIN_DIR)/bot-*
 	g++ -std=c++17 -O2 -o $(WINTER2026_CPPBOT) $(WINTER2026_AGENTS)/bot.cpp
 	cp -f $(WINTER2026_AGENTS)/bot.py $(WINTER2026_PYBOT)
 
