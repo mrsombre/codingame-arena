@@ -17,6 +17,8 @@ func NewFactory() arena.GameFactory {
 
 func (f *factory) Name() string { return "winter2026" }
 
+func (f *factory) PuzzleID() int { return 13771 }
+
 func (f *factory) MaxTurns() int { return 200 }
 
 func (f *factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []arena.Player) {

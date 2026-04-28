@@ -46,6 +46,7 @@ type Player interface {
 // GameFactory creates game instances for each match.
 type GameFactory interface {
 	Name() string
+	PuzzleID() int
 	NewGame(seed int64, options *viper.Viper) (Referee, []Player)
 	MaxTurns() int
 }
