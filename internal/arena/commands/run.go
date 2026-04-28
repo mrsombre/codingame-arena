@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"io"
+	"time"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -57,7 +58,9 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 		GameOptions: v,
 	})
 
+	startedAt := time.Now()
 	results := arena.RunMatches(parsed.BatchOptions, runner.RunMatch)
+	elapsed := time.Since(startedAt)
 
 	p0Left := 0
 	for _, r := range results {
@@ -106,7 +109,7 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 	}
 
 	if !parsed.Verbose {
-		return arena.WriteShortSummary(stdout, out.Summary)
+		return arena.WriteShortSummary(stdout, out.Summary, elapsed)
 	}
 
 	enc := json.NewEncoder(stdout)
