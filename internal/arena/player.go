@@ -97,10 +97,8 @@ func (cp *commandPlayer) Execute() error {
 		return nil
 	}
 
-	if cp.cmd.Process == nil {
-		if err := cp.cmd.Start(); err != nil {
-			return fmt.Errorf("external player start failed (%s): %w", cp.path, err)
-		}
+	if err := cp.start(); err != nil {
+		return err
 	}
 
 	for _, line := range lines {
@@ -184,6 +182,40 @@ func (cp *commandPlayer) recordOutputDuration(duration time.Duration) {
 // (deactivated or skipped) instead of returning a stale prior-turn value.
 func (cp *commandPlayer) BeginTurn() {
 	cp.lastDuration = 0
+}
+
+// start spawns the subprocess if not already running. Idempotent.
+func (cp *commandPlayer) start() error {
+	if cp.cmd.Process != nil {
+		return nil
+	}
+	if err := cp.cmd.Start(); err != nil {
+		return fmt.Errorf("external player start failed (%s): %w", cp.path, err)
+	}
+	return nil
+}
+
+// FlushInput drains the player's queued input lines and writes them to the
+// subprocess stdin without waiting for output. Used to push global info to the
+// bot ahead of turn 0 so subprocess startup (Python imports, JVM warmup) hides
+// behind referee setup instead of being charged to the first-turn timer.
+func (cp *commandPlayer) FlushInput() error {
+	cp.writeMu.Lock()
+	defer cp.writeMu.Unlock()
+
+	lines := cp.player.ConsumeInputLines()
+	if len(lines) == 0 {
+		return nil
+	}
+	if err := cp.start(); err != nil {
+		return err
+	}
+	for _, line := range lines {
+		if _, err := fmt.Fprintln(cp.stdin, line); err != nil {
+			return fmt.Errorf("external player write failed (%s): %w", cp.path, err)
+		}
+	}
+	return nil
 }
 
 // LastOutputDuration returns the duration recorded by the most recent Execute

@@ -68,6 +68,15 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		}
 	}
 
+	// Flush global info to subprocess stdin immediately so the bot can begin
+	// reading while it warms up; turn 0 timing then reflects post-startup
+	// response time rather than interpreter init.
+	for _, controller := range controllers {
+		if err := controller.FlushInput(); err != nil {
+			panic(err)
+		}
+	}
+
 	maxTurns := runner.Options.MaxTurns
 	turn := 0
 	var badCommands []BadCommandInfo
@@ -281,6 +290,16 @@ func attachCommandPlayers(options MatchOptions, players []Player) ([]*commandPla
 	for i, path := range bins {
 		cp, err := newCommandPlayer(players[i], path)
 		if err != nil {
+			for _, controller := range controllers {
+				_ = controller.Close()
+			}
+			return nil, nil, fmt.Errorf("failed to start player %d session: %w", i, err)
+		}
+		// Spawn eagerly so subprocess startup runs in parallel with referee
+		// setup and global-info dispatch instead of being charged to the
+		// first-turn timer.
+		if err := cp.start(); err != nil {
+			_ = cp.Close()
 			for _, controller := range controllers {
 				_ = controller.Close()
 			}
