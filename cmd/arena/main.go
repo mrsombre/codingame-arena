@@ -58,6 +58,10 @@ func main() {
 		commands.AddRunFlags(fs)
 		handler = commands.Run
 		needsFactory = true
+	case "convert":
+		commands.AddConvertFlags(fs)
+		handler = commands.Convert
+		needsFactory = true
 	case "serve":
 		commands.AddServeFlags(fs)
 		handler = commands.Serve
@@ -132,6 +136,9 @@ func printHelp(args []string, games []string) error {
 	case "run":
 		commands.AddRunFlags(fs)
 		fmt.Println(commands.RunUsage(fs))
+	case "convert":
+		commands.AddConvertFlags(fs)
+		fmt.Println(commands.ConvertUsage(fs))
 	case "serve":
 		commands.AddServeFlags(fs)
 		fmt.Println(commands.ServeUsage(fs))

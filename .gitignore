@@ -6,8 +6,7 @@
 /tmp/
 
 replays/
-replay*.json
-matches/
+traces/
 
 arena.yml
 db.sqlite3

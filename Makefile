@@ -4,7 +4,7 @@ BIN_DIR := bin
 .PHONY: clean
 
 clean:
-	rm -rf bin/* tmp/* replays/* matches/*
+	rm -rf bin/* tmp/* replays/* traces/*
 
 # backend
 .PHONY: test-arena test-games lint-arena build-arena build-viewer clean
