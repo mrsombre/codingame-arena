@@ -163,6 +163,8 @@ func handleSerialize(factory arena.GameFactory) http.HandlerFunc {
 
 type matchListEntry struct {
 	ID    string    `json:"id"`
+	Type  string    `json:"type"`
+	File  string    `json:"file"`
 	Size  int64     `json:"size"`
 	MTime time.Time `json:"mtime"`
 }
@@ -193,6 +195,8 @@ func handleMatchList(traceDir string) http.HandlerFunc {
 			}
 			out = append(out, matchListEntry{
 				ID:    strings.TrimSuffix(entry.Name(), ".json"),
+				Type:  arena.TraceTypeFromFileName(entry.Name()),
+				File:  entry.Name(),
 				Size:  info.Size(),
 				MTime: info.ModTime(),
 			})

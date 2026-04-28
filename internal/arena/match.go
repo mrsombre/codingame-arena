@@ -249,13 +249,15 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			},
 		}
 		traceMatch := TraceMatch{
-			MatchID: simulationID,
-			Seed:    seed,
-			Winner:  traceWinner,
-			Scores:  traceScores,
-			Players: [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
-			Timing:  traceTiming,
-			Turns:   traceTurns,
+			MatchID:  simulationID,
+			GameID:   runner.Factory.Name(),
+			PuzzleID: runner.Factory.PuzzleID(),
+			Seed:     seed,
+			Scores:   [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
+			Ranks:    RanksFromWinner(traceWinner),
+			Players:  [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
+			Timing:   traceTiming,
+			Turns:    traceTurns,
 		}
 		if err := runner.Options.TraceWriter.WriteMatch(traceMatch); err != nil {
 			panic(err)
