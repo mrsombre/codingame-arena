@@ -3,8 +3,6 @@
 package engine
 
 import (
-	"encoding/json"
-
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
@@ -189,72 +187,8 @@ func (r *Referee) ActivePlayers(players []arena.Player) int {
 	return active
 }
 
-// TraceSnapshot, TracePac, TracePellet, SnapshotTurn, RawScores and Metrics
-// have no Java counterpart — they wire optional arena interfaces for replay
-// trace, pre-adjustment scores, and per-match metrics.
-
-type TraceSnapshot struct {
-	Scores  [2]int        `json:"scores"`
-	Pacs    []TracePac    `json:"pacs"`
-	Pellets []TracePellet `json:"pellets"`
-}
-
-type TracePac struct {
-	ID              int    `json:"id"`
-	Owner           int    `json:"owner"`
-	X               int    `json:"x"`
-	Y               int    `json:"y"`
-	Type            string `json:"type"`
-	AbilityDuration int    `json:"abilityDuration"`
-	AbilityCooldown int    `json:"abilityCooldown"`
-}
-
-type TracePellet struct {
-	X     int `json:"x"`
-	Y     int `json:"y"`
-	Value int `json:"value"`
-}
-
-// SnapshotTurn emits the full engine perspective for trace replay god mode.
-func (r *Referee) SnapshotTurn(_ int, _ []arena.Player) json.RawMessage {
-	snapshot := TraceSnapshot{}
-	for _, p := range r.Game.Players {
-		idx := p.GetIndex()
-		if idx >= 0 && idx < len(snapshot.Scores) {
-			snapshot.Scores[idx] = p.Pellets
-		}
-	}
-	for _, pac := range r.Game.Pacmen {
-		typeName := pac.Type.Name()
-		if pac.Dead {
-			typeName = "DEAD"
-		}
-		owner := 0
-		if pac.Owner != nil {
-			owner = pac.Owner.GetIndex()
-		}
-		snapshot.Pacs = append(snapshot.Pacs, TracePac{
-			ID:              pac.Number,
-			Owner:           owner,
-			X:               pac.Position.X,
-			Y:               pac.Position.Y,
-			Type:            typeName,
-			AbilityDuration: pac.AbilityDuration,
-			AbilityCooldown: pac.AbilityCooldown,
-		})
-	}
-	for _, p := range r.Game.Grid.AllPellets() {
-		snapshot.Pellets = append(snapshot.Pellets, TracePellet{X: p.X, Y: p.Y, Value: 1})
-	}
-	for _, p := range r.Game.Grid.AllCherries() {
-		snapshot.Pellets = append(snapshot.Pellets, TracePellet{X: p.X, Y: p.Y, Value: CHERRY_SCORE})
-	}
-	data, err := json.Marshal(snapshot)
-	if err != nil {
-		return nil
-	}
-	return data
-}
+// RawScores and Metrics have no Java counterpart — they wire optional arena
+// interfaces for pre-adjustment scores and per-match metrics.
 
 // RawScores returns per-player pellet counts — the raw in-match score.
 func (r *Referee) RawScores() [2]int {

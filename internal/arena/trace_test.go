@@ -53,7 +53,6 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &got))
 	assert.Equal(t, traceID, got.TraceID)
 	assert.Equal(t, TraceTypeTrace, got.Type)
-	assert.Equal(t, fmt.Sprintf("trace-%d-3.json", traceID), got.File)
 	assert.Equal(t, int64(12345), got.Seed)
 	assert.Equal(t, [2]int{0, 1}, got.Ranks)
 	require.NotNil(t, got.Timing)
@@ -92,7 +91,6 @@ func TestTraceWriterWritesReplayFile(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &got))
 	assert.Equal(t, traceID, got.TraceID)
 	assert.Equal(t, TraceTypeReplay, got.Type)
-	assert.Equal(t, fmt.Sprintf("replay-%d.json", traceID), got.File)
 }
 
 func TestTraceWriterNilIsNoop(t *testing.T) {

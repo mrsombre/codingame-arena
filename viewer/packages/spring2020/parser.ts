@@ -109,7 +109,6 @@ export interface TraceTurn {
   p0_output: string
   p1_output: string
   timing?: TraceTurnTiming
-  game_state?: TraceGameState
   events?: TraceTurnEvent[]
 }
 
@@ -120,22 +119,6 @@ export interface TraceTurnTiming {
 export interface TraceTurnEvent {
   label: string
   payload: string
-}
-
-export interface TraceGameState {
-  scores: [number, number]
-  pacs: TracePac[]
-  pellets: Pellet[]
-}
-
-export interface TracePac {
-  id: number
-  owner: number
-  x: number
-  y: number
-  type: PacType
-  abilityDuration: number
-  abilityCooldown: number
 }
 
 function pacKey(pac: Pac): string {

@@ -1,8 +1,6 @@
 package arena
 
 import (
-	"encoding/json"
-
 	"github.com/spf13/viper"
 )
 
@@ -55,12 +53,6 @@ type GameFactory interface {
 // Referee should implement this.
 type MetricsProvider interface {
 	Metrics() []Metric
-}
-
-// TraceProvider produces an opaque per-turn game state snapshot.
-// Optional — if Referee also implements this, match captures snapshots.
-type TraceProvider interface {
-	SnapshotTurn(turn int, players []Player) json.RawMessage
 }
 
 // TurnEventProvider produces structured game events per turn.

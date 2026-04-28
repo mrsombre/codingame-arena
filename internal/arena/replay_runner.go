@@ -101,9 +101,6 @@ func RunReplay(
 			P1Output:  playerOutputs[1],
 			Timing:    &TraceTurnTiming{Response: [2]float64{}},
 		}
-		if tp, ok := referee.(TraceProvider); ok {
-			tt.GameState = tp.SnapshotTurn(turn, players)
-		}
 
 		handlePlayerCommands(players, referee)
 

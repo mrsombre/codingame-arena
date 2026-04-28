@@ -38,7 +38,6 @@ type TraceMatch struct {
 	TraceID  int64         `json:"trace_id,omitempty"`
 	MatchID  int           `json:"match_id"`
 	Type     string        `json:"type,omitempty"`
-	File     string        `json:"file,omitempty"`
 	GameID   string        `json:"gameId,omitempty"`
 	PuzzleID int           `json:"puzzleId,omitempty"`
 	Seed     int64         `json:"seed,string"`
@@ -85,7 +84,6 @@ type TraceTurn struct {
 	P1Output  string           `json:"p1_output,omitempty"`
 	Timing    *TraceTurnTiming `json:"timing,omitempty"`
 	Events    []TurnEvent      `json:"events,omitempty"`
-	GameState json.RawMessage  `json:"game_state,omitempty"`
 }
 
 // TraceTurnTiming carries per-side response time for one turn in milliseconds.
@@ -141,8 +139,7 @@ func (w *TraceWriter) WriteMatch(match TraceMatch) error {
 	if match.Type == "" {
 		match.Type = TraceTypeTrace
 	}
-	match.File = TraceFileName(match.Type, w.traceID, match.MatchID)
-	path := filepath.Join(w.dir, match.File)
+	path := filepath.Join(w.dir, TraceFileName(match.Type, w.traceID, match.MatchID))
 	data, err := json.MarshalIndent(match, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal trace: %w", err)
