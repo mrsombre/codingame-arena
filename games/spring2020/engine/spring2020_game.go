@@ -414,6 +414,13 @@ movement steps for the turn (1 or 2) resolve before the next read. Mechanics
 are identical because Java never reads input between steps either —
 performGameSpeedUpdate only re-runs resolveMovement against the already
 sliced intendedPath.
+
+Java checks isGameOver() after every frame and sets gameOverFrame; once
+gameOverFrame is true the next gameTurn skips straight to the post-game
+branch, so a sub-turn queued after a game-ending main step never runs. We
+mirror that by guarding the inner loop with !IsGameOver — without it a
+SPEED pac can take a second step on the final turn and eat a pellet that
+Java's referee would have left on the grid.
 */
 
 // PerformGameUpdate runs one full main turn including any speed sub-steps.
@@ -422,7 +429,7 @@ func (g *Game) PerformGameUpdate() {
 	g.UpdateAbilityModifiers()
 	g.ProcessPacmenIntent()
 	g.ResolveMovement()
-	for g.IsSpeedTurn() {
+	for g.IsSpeedTurn() && !g.IsGameOver() {
 		g.PerformGameSpeedUpdate()
 	}
 }

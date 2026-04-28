@@ -248,8 +248,11 @@ func TestSpeedActivationSetsDurationAndCooldown(t *testing.T) {
 }
 
 func TestSpeedSubTurnDelivers2Steps(t *testing.T) {
-	g := newScenario(4, []string{"#######", "#     #", "#######"}, false)
+	g := newScenario(4, []string{"#######", "#.....#", "#######"}, false)
 	pac := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	// Spawn a P1 pac so IsGameOver stays false — PerformGameUpdate skips the
+	// speed sub-step once the game is over (mirrors Java's gameOverFrame).
+	spawn(g, 1, 0, TypeRock, Coord{X: 5, Y: 1})
 
 	// Turn 1: activate SPEED.
 	runTurn(g, func() {
@@ -260,7 +263,7 @@ func TestSpeedSubTurnDelivers2Steps(t *testing.T) {
 
 	// Turn 2: MOVE — both movement steps resolve in the same PerformGameUpdate.
 	runTurn(g, func() {
-		pac.Intent = NewMoveAction(Coord{X: 5, Y: 1})
+		pac.Intent = NewMoveAction(Coord{X: 4, Y: 1})
 	})
 	assert.Equal(t, Coord{X: 3, Y: 1}, pac.Position, "two steps in one turn")
 	assert.False(t, g.IsSpeedTurn(), "no follow-up sub-turn pending")
