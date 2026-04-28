@@ -156,8 +156,11 @@ func TestReplayTraceTurnCount(t *testing.T) {
 		},
 	}
 
-	if got := ReplayTraceTurnCount(replay); got != 4 {
-		t.Fatalf("ReplayTraceTurnCount() = %d, want 4", got)
+	// 2 main decision turns (SPEED, MOVE) + 1 trailing game-over frame.
+	// The mid-replay speed sub-turn frame is folded into the SPEED main turn
+	// by the engine and does not count.
+	if got := ReplayTraceTurnCount(replay); got != 3 {
+		t.Fatalf("ReplayTraceTurnCount() = %d, want 3", got)
 	}
 }
 

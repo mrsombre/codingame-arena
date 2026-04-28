@@ -116,8 +116,11 @@ func ReplayTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 }
 
 // ReplayTraceTurnCount returns the number of engine frames represented by the
-// replay. CodinGame stores simultaneous player outputs as one frame per player,
-// while engine-only frames such as Spring 2020 speed sub-turns have no stdout.
+// replay. CodinGame stores simultaneous player outputs as one frame per player.
+// Mid-replay empty-stdout frames are Spring 2020 speed sub-turns, which the
+// engine folds into the preceding main turn and emits no trace turn for. The
+// trailing empty-stdout frame is the game-over marker; the engine emits one
+// extra trace turn for it (mirroring Java's post-game-over gameTurn frame).
 func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	turns := 0
 	seenOutput := map[int]bool{}
@@ -137,7 +140,6 @@ func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 
 		if strings.TrimSpace(frame.Stdout) == "" {
 			flushOutputTurn()
-			turns++
 			continue
 		}
 
@@ -151,7 +153,26 @@ func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	}
 	flushOutputTurn()
 
+	if hasTrailingEngineFrame(replay) {
+		turns++
+	}
+
 	return turns
+}
+
+// hasTrailingEngineFrame reports whether the last agent frame in the replay is
+// an engine-only frame with no player stdout. CodinGame appends one such frame
+// per match (the game-over marker).
+func hasTrailingEngineFrame(replay CodinGameReplay[CodinGameReplayFrame]) bool {
+	frames := replay.GameResult.Frames
+	for i := len(frames) - 1; i >= 0; i-- {
+		f := frames[i]
+		if f.AgentID < 0 {
+			continue
+		}
+		return strings.TrimSpace(f.Stdout) == ""
+	}
+	return false
 }
 
 // ReplayPlayerNames extracts player display names from replay agent metadata.
