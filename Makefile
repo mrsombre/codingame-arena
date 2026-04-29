@@ -23,8 +23,11 @@ build-arena:
 	go build -ldflags="-w -s" -o $(BIN_DIR)/arena ./cmd/arena
 
 # frontend
-.PHONY: lint-viewer build-viewer
+.PHONY: type-check-viewer lint-viewer build-viewer
 VIEWER_DIR := viewer
+
+type-check-viewer:
+	cd $(VIEWER_DIR) && pnpm run type-check
 
 lint-viewer:
 	cd $(VIEWER_DIR) && pnpm run bundle
