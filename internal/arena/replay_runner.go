@@ -72,25 +72,35 @@ func RunReplay(
 	for ; !referee.Ended() && turn < maxTurns; turn++ {
 		referee.ResetGameTurnData()
 
+		// When fewer than two players are active, the engine is running its
+		// game-over frame: don't poll players for outputs and don't re-parse
+		// their commands (the surviving side has likely exhausted its replay
+		// move list, and parsing an empty line would deactivate it and skip
+		// PerformGameOver's remaining-pellets transfer). Mirror Java's
+		// gameTurn else-branch, which only drives the game forward.
+		liveTurn := referee.ActivePlayers(players) >= 2
+
 		playerOutputs := [2]string{}
 		var turnInput traceTurnInput
 
-		for _, player := range players {
-			if player.IsDeactivated() || referee.ShouldSkipPlayerTurn(player) {
-				continue
-			}
-			lines := referee.FrameInfoFor(player)
-			for _, line := range lines {
-				player.SendInputLine(line)
-			}
-			if player.GetIndex() == 0 {
-				turnInput.P0 = append([]string(nil), lines...)
-			} else {
-				turnInput.P1 = append([]string(nil), lines...)
-			}
-			_ = player.Execute()
-			if outs := player.GetOutputs(); len(outs) > 0 {
-				playerOutputs[player.GetIndex()] = strings.Join(outs, "\n")
+		if liveTurn {
+			for _, player := range players {
+				if player.IsDeactivated() || referee.ShouldSkipPlayerTurn(player) {
+					continue
+				}
+				lines := referee.FrameInfoFor(player)
+				for _, line := range lines {
+					player.SendInputLine(line)
+				}
+				if player.GetIndex() == 0 {
+					turnInput.P0 = append([]string(nil), lines...)
+				} else {
+					turnInput.P1 = append([]string(nil), lines...)
+				}
+				_ = player.Execute()
+				if outs := player.GetOutputs(); len(outs) > 0 {
+					playerOutputs[player.GetIndex()] = strings.Join(outs, "\n")
+				}
 			}
 		}
 
@@ -102,12 +112,8 @@ func RunReplay(
 			Timing:    &TraceTurnTiming{Response: [2]float64{}},
 		}
 
-		handlePlayerCommands(players, referee)
-
-		if referee.ActivePlayers(players) < 2 {
-			referee.EndGame()
-			traceTurns = append(traceTurns, tt)
-			break
+		if liveTurn {
+			handlePlayerCommands(players, referee)
 		}
 
 		referee.PerformGameUpdate(turn)

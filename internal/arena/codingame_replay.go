@@ -160,19 +160,17 @@ func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	return turns
 }
 
-// hasTrailingEngineFrame reports whether the last agent frame in the replay is
-// an engine-only frame with no player stdout. CodinGame appends one such frame
-// per match (the game-over marker).
+// hasTrailingEngineFrame reports whether the replay ends with the game-over
+// engine marker frame CodinGame appends after every match. The marker has no
+// stdout; its agentId is either -1 (engine-attributed, e.g. when the first
+// player to be polled has been deactivated) or the agentId of the player
+// whose slot would have been polled next.
 func hasTrailingEngineFrame(replay CodinGameReplay[CodinGameReplayFrame]) bool {
 	frames := replay.GameResult.Frames
-	for i := len(frames) - 1; i >= 0; i-- {
-		f := frames[i]
-		if f.AgentID < 0 {
-			continue
-		}
-		return strings.TrimSpace(f.Stdout) == ""
+	if len(frames) == 0 {
+		return false
 	}
-	return false
+	return strings.TrimSpace(frames[len(frames)-1].Stdout) == ""
 }
 
 // ReplayPlayerNames extracts player display names from replay agent metadata.
