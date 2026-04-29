@@ -11,7 +11,7 @@ import (
 func AddServeFlags(fs *pflag.FlagSet) {
 	fs.Int("port", 5757, "HTTP port")
 	fs.String("host", "localhost", "Bind host")
-	fs.String("trace-dir", "./matches", "Directory with match trace JSON files (powers /api/matches)")
+	fs.String("trace-dir", "./traces", "Directory with match trace JSON files (powers /api/matches)")
 	fs.String("replay-dir", "./replays", "Directory with CodinGame replay JSON files (powers /api/replays)")
 	fs.String("bin-dir", "./bin", "Directory to scan for bot binaries (powers /api/bots)")
 }
