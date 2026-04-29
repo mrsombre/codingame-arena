@@ -9,9 +9,20 @@ Local game engine runner for [CodinGame](https://www.codingame.com/) bot program
 - **Offline match runner** — execute thousands of matches locally with parallel workers
 - **Match tracing** — save per-match JSON traces for replay and analysis
 - **Built-in web viewer** — React + PixiJS viewer served from the binary, no extra setup
-- **Replay downloader** — fetch replays from codingame.com for local viewing
+- **Replay downloader** — fetch replays from codingame.com
+- **Replay conversion** — convert downloaded replay JSON into arena trace format
+- **Trace analysis** — aggregate stats across batches of traces
 
-![CLI View](docs/img/cli-view.png)
+```shell
+$ bin/arena --game=winter2026 \
+    --p0=bin/bot-winter2026-cpp \
+    --p1=bin/bot-winter2026-py \
+    --seed=100030005000 --simulations 100
+
+Summary: 100 matches played (3.15s)
+Stats: wins=29% losses=32% draws=39% avg_score=16.4x17.0 avg_turns=155
+Timing: avg_first_response=29msx198ms avg_turn_response=0msx0ms
+```
 
 ![Batch View](docs/img/batch-view.png)
 
@@ -19,24 +30,30 @@ Local game engine runner for [CodinGame](https://www.codingame.com/) bot program
 
 | Game                  | Flag                | Source              |
 |-----------------------|---------------------|---------------------|
-| Spring Challenge 2020 | `--game spring2020` | `games/spring2020/` |
 | Winter Challenge 2026 | `--game winter2026` | `games/winter2026/` |
+| Spring Challenge 2020 | `--game spring2020` | `games/spring2020/` |
+
+## Commands
+
+| Command     | Purpose                                                 |
+|-------------|---------------------------------------------------------|
+| `run`       | Run one or more match simulations against a player      |
+| `serialize` | Print initial game input for first turn for a seed      |
+| `serve`     | Serve the embedded web viewer                           |
+| `replay`    | Download replay JSON (`get`, `leaderboard` subcommands) |
+| `analyze`   | Analyze winner-side strengths from trace files          |
+| `convert`   | Convert replay JSON files into arena trace files        |
+
+Run `arena help <command>` for full flag listings.
 
 ## Quick Start
 
-### CLI Simulator
+### Build
 
 ```shell
 make build-arena
 make build-winter2026-agents
-
-bin/arena --game=winter2026 \
-  --p0=bin/bot-winter2026-cpp \
-  --p1=bin/bot-winter2026-py \
-  --seed=100030005000 --simulations 100
-
-# wins=26% losses=31% draws=43% avg_score=12.8v12.8 avg_turns=154
-# p0: avg_first_response=2ms avg_turn_response=0ms p1: avg_first_response=37ms avg_turn_response=0ms
+make match-winter2026
 ```
 
 ### Web Viewer
@@ -45,7 +62,11 @@ bin/arena --game=winter2026 \
 bin/arena serve
 ```
 
-Open a web UI at `http://localhost:5757` where you can select bots, run matches, and watch replays.
+Opens a web UI at `http://localhost:5757` where you can select bots, run matches, and watch replays.
+
+## Configuration
+
+Flags can be supplied via CLI, environment variables (`ARENA_<FLAG>`, hyphens become underscores — e.g. `ARENA_GAME`, `ARENA_SEED`), or an `arena.yml` config file in the current directory. See `arena.example.yml`.
 
 ## License
 
