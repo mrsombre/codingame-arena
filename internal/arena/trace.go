@@ -35,18 +35,18 @@ func (s TraceScore) MarshalJSON() ([]byte, error) {
 // intentionally not recorded — the bot→side mapping here is ground truth for
 // downstream trace consumers (e.g. training).
 type TraceMatch struct {
-	TraceID  int64         `json:"trace_id,omitempty"`
-	MatchID  int           `json:"match_id"`
-	Type     string        `json:"type,omitempty"`
-	File     string        `json:"file,omitempty"`
-	GameID   string        `json:"gameId,omitempty"`
-	PuzzleID int           `json:"puzzleId,omitempty"`
-	Seed     int64         `json:"seed,string"`
-	Scores   [2]TraceScore `json:"scores"`
-	Ranks    [2]int        `json:"ranks"`
-	Players  [2]string     `json:"players"`
-	Timing   *TraceTiming  `json:"timing,omitempty"`
-	Turns    []TraceTurn   `json:"turns"`
+	TraceID      int64         `json:"trace_id,omitempty"`
+	MatchID      int           `json:"match_id"`
+	Type         string        `json:"type,omitempty"`
+	GameID       string        `json:"gameId,omitempty"`
+	PuzzleID     int           `json:"puzzleId,omitempty"`
+	Seed         int64         `json:"seed,string"`
+	Scores       [2]TraceScore `json:"scores"`
+	Ranks        [2]int        `json:"ranks"`
+	Players      [2]string     `json:"players"`
+	Timing       *TraceTiming  `json:"timing,omitempty"`
+	TraceSummary *TraceSummary `json:"trace_summary,omitempty"`
+	Turns        []TraceTurn   `json:"turns"`
 }
 
 // RanksFromWinner returns the CodinGame-style ranks array for a 2-player match
@@ -84,8 +84,7 @@ type TraceTurn struct {
 	P0Output  string           `json:"p0_output,omitempty"`
 	P1Output  string           `json:"p1_output,omitempty"`
 	Timing    *TraceTurnTiming `json:"timing,omitempty"`
-	Events    []TurnEvent      `json:"events,omitempty"`
-	GameState json.RawMessage  `json:"game_state,omitempty"`
+	Traces    []TurnTrace      `json:"traces,omitempty"`
 }
 
 // TraceTurnTiming carries per-side response time for one turn in milliseconds.
@@ -141,8 +140,7 @@ func (w *TraceWriter) WriteMatch(match TraceMatch) error {
 	if match.Type == "" {
 		match.Type = TraceTypeTrace
 	}
-	match.File = TraceFileName(match.Type, w.traceID, match.MatchID)
-	path := filepath.Join(w.dir, match.File)
+	path := filepath.Join(w.dir, TraceFileName(match.Type, w.traceID, match.MatchID))
 	data, err := json.MarshalIndent(match, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal trace: %w", err)

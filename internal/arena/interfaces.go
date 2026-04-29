@@ -1,8 +1,6 @@
 package arena
 
 import (
-	"encoding/json"
-
 	"github.com/spf13/viper"
 )
 
@@ -57,16 +55,17 @@ type MetricsProvider interface {
 	Metrics() []Metric
 }
 
-// TraceProvider produces an opaque per-turn game state snapshot.
-// Optional — if Referee also implements this, match captures snapshots.
-type TraceProvider interface {
-	SnapshotTurn(turn int, players []Player) json.RawMessage
+// TurnTraceProvider produces structured game traces per turn.
+// Optional — if Referee also implements this, match captures traces.
+type TurnTraceProvider interface {
+	TurnTraces(turn int, players []Player) []TurnTrace
 }
 
-// TurnEventProvider produces structured game events per turn.
-// Optional — if Referee also implements this, match captures events.
-type TurnEventProvider interface {
-	TurnEvents(turn int, players []Player) []TurnEvent
+// TraceSummaryProvider returns the per-match aggregate of trace events.
+// Optional — if Referee also implements this, match writes the summary into
+// the trace JSON root under "trace_summary".
+type TraceSummaryProvider interface {
+	TraceSummary() TraceSummary
 }
 
 // RawScoresProvider returns per-player raw scores before any end-of-game

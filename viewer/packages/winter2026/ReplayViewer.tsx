@@ -6,10 +6,10 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { type FrameData, lerpFrame, type MapData, parseFrameLines, type TraceMatch, type TraceTurn } from "./parser.ts"
 import { destroyRenderer, initRenderer, updateFrame } from "./renderer.ts"
 
-type EventKind = "EAT" | "HIT_WALL" | "HIT_ITSELF" | "HIT_ENEMY" | "DEAD" | "FALL"
+type TraceKind = "EAT" | "HIT_WALL" | "HIT_ITSELF" | "HIT_ENEMY" | "DEAD" | "FALL"
 
-interface MoveEvent {
-  kind: EventKind
+interface MoveTrace {
+  kind: TraceKind
   coord?: string
 }
 
@@ -19,10 +19,10 @@ interface MoveRow {
   direction: string
   /** Alive segments at the end of this turn; undefined when the bird is no longer present. */
   size?: number
-  events: MoveEvent[]
+  traces: MoveTrace[]
 }
 
-const EVENT_ORDER: Record<EventKind, number> = {
+const TRACE_ORDER: Record<TraceKind, number> = {
   EAT: 0,
   HIT_WALL: 1,
   HIT_ENEMY: 2,
@@ -31,10 +31,10 @@ const EVENT_ORDER: Record<EventKind, number> = {
   DEAD: 5,
 }
 
-function EventBadge({ event }: { event: MoveEvent }) {
+function TraceBadge({ trace }: { trace: MoveTrace }) {
   const iconClass = "size-3.5"
   const icon = (() => {
-    switch (event.kind) {
+    switch (trace.kind) {
       case "EAT":
         return <AppleIcon className={`${iconClass} text-red-500`} />
       case "HIT_WALL":
@@ -50,9 +50,9 @@ function EventBadge({ event }: { event: MoveEvent }) {
     }
   })()
   return (
-    <span className="inline-flex items-center gap-0.5" title={event.kind}>
+    <span className="inline-flex items-center gap-0.5" title={trace.kind}>
       {icon}
-      {event.coord && <span>{event.coord}</span>}
+      {trace.coord && <span>{trace.coord}</span>}
     </span>
   )
 }
@@ -72,20 +72,20 @@ function parseMoves(turn: TraceTurn, myIds: Set<number>, frame: FrameData | unde
     }
   }
 
-  const eventsByBird = new Map<number, MoveEvent[]>()
-  for (const ev of turn.events ?? []) {
-    const parts = ev.payload.split(" ")
+  const tracesByBird = new Map<number, MoveTrace[]>()
+  for (const tr of turn.traces ?? []) {
+    const parts = tr.payload.split(" ")
     const bid = Number(parts[0])
     if (Number.isNaN(bid)) continue
     const coord = parts[1]?.includes(",") ? parts[1] : undefined
-    const kind = ev.label as EventKind
-    if (!(kind in EVENT_ORDER)) continue
-    const list = eventsByBird.get(bid) ?? []
+    const kind = tr.label as TraceKind
+    if (!(kind in TRACE_ORDER)) continue
+    const list = tracesByBird.get(bid) ?? []
     list.push({ kind, coord })
-    eventsByBird.set(bid, list)
+    tracesByBird.set(bid, list)
   }
-  for (const list of eventsByBird.values()) {
-    list.sort((a, b) => EVENT_ORDER[a.kind] - EVENT_ORDER[b.kind])
+  for (const list of tracesByBird.values()) {
+    list.sort((a, b) => TRACE_ORDER[a.kind] - TRACE_ORDER[b.kind])
   }
 
   const sizes = new Map<number, number>()
@@ -93,7 +93,7 @@ function parseMoves(turn: TraceTurn, myIds: Set<number>, frame: FrameData | unde
     for (const bird of frame.birds) sizes.set(bird.id, bird.body.length)
   }
 
-  const birdIds = new Set<number>([...directions.keys(), ...eventsByBird.keys()])
+  const birdIds = new Set<number>([...directions.keys(), ...tracesByBird.keys()])
   return [...birdIds]
     .sort((a, b) => a - b)
     .map((birdId) => ({
@@ -101,7 +101,7 @@ function parseMoves(turn: TraceTurn, myIds: Set<number>, frame: FrameData | unde
       mine: myIds.has(birdId),
       direction: directions.get(birdId) ?? "",
       size: sizes.get(birdId),
-      events: eventsByBird.get(birdId) ?? [],
+      traces: tracesByBird.get(birdId) ?? [],
     }))
 }
 
@@ -245,8 +245,8 @@ export function ReplayViewer({ mapData, trace, status, leftSlot }: ReplayViewerP
   // Initialise renderer when mapData/trace change.
   //
   // Slider layout (N = trace.turns.length):
-  //   - slider 0: initial state (what players saw at turn 0), no moves/events
-  //   - slider i (1..N): state AFTER turn (i-1)'s update, with moves/events
+  //   - slider 0: initial state (what players saw at turn 0), no moves/traces
+  //   - slider i (1..N): state AFTER turn (i-1)'s update, with moves/traces
   //     from turn (i-1). State is taken from turns[i].game_input.p0 when it
   //     exists, else falls back to turns[i-1].game_input.p0 for the final turn.
   useEffect(() => {
@@ -349,8 +349,8 @@ export function ReplayViewer({ mapData, trace, status, leftSlot }: ReplayViewerP
                       <span className="w-7 shrink-0 tabular-nums text-foreground/80">{row.size !== undefined ? `[${row.size}]` : ""}</span>
                       <span className="w-3 shrink-0">{row.mine ? "\u2192" : "\u2190"}</span>
                       <span className="w-14 shrink-0">{row.direction}</span>
-                      {row.events.map((e, i) => (
-                        <EventBadge key={`${e.kind}-${i}`} event={e} />
+                      {row.traces.map((e, i) => (
+                        <TraceBadge key={`${e.kind}-${i}`} trace={e} />
                       ))}
                     </div>
                   ))}

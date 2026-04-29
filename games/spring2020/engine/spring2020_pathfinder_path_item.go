@@ -18,5 +18,4 @@ type PathItem struct {
 	CumulativeLength       int
 	TotalPrevisionalLength int
 	Precedent              *PathItem
-	Seq                    int // insertion order tie-breaker for stable priority
 }

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@shared/components/ui/
 import { Slider } from "@shared/components/ui/slider.tsx"
 import { ChevronLeftIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon, EyeIcon, EyeOffIcon, PauseIcon, PlayIcon, ZapIcon } from "lucide-react"
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
-import { type FrameData, lerpFrame, type MapData, mergeFrames, parseFrameLines, type TraceGameState, type TraceMatch, type TraceTurn } from "./parser.ts"
+import { type FrameData, lerpFrame, type MapData, mergeFrames, parseFrameLines, type TraceMatch, type TraceTurn } from "./parser.ts"
 import { destroyRenderer, initRenderer, updateFrame } from "./renderer.ts"
 
 interface MoveRow {
@@ -48,25 +48,6 @@ function perspectiveFrame(lines: string[], side: ReplaySide): FrameData {
   return side === 0 ? frame : invertFrame(frame)
 }
 
-function gameStateFrame(state: TraceGameState, perspectiveSide: ReplaySide): FrameData {
-  const myScore = state.scores[perspectiveSide] ?? 0
-  const oppScore = state.scores[perspectiveSide === 0 ? 1 : 0] ?? 0
-  return {
-    myScore,
-    oppScore,
-    pacs: state.pacs.map((pac) => ({
-      id: pac.id,
-      mine: pac.owner === perspectiveSide,
-      x: pac.x,
-      y: pac.y,
-      type: pac.type,
-      abilityDuration: pac.abilityDuration,
-      abilityCooldown: pac.abilityCooldown,
-    })),
-    pellets: state.pellets,
-  }
-}
-
 function visibleFrameFromTurn(turn: TraceTurn, fallback: FrameData | undefined, side: ReplaySide): FrameData {
   const p0Lines = turn.game_input.p0
   const p1Lines = turn.game_input.p1
@@ -86,10 +67,6 @@ function visibleFrameFromTurn(turn: TraceTurn, fallback: FrameData | undefined, 
 }
 
 function fullFrameFromTurn(turn: TraceTurn, fallback: FrameData | undefined, perspectiveSide: ReplaySide): FrameData {
-  if (turn.game_state) {
-    return gameStateFrame(turn.game_state, perspectiveSide)
-  }
-
   const p0Lines = turn.game_input.p0
   const p1Lines = turn.game_input.p1
   if (p0Lines && p1Lines) {

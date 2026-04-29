@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -37,13 +36,12 @@ func spawn(g *Game, idx, number int, t PacmanType, pos Coord) *Pacman {
 }
 
 // runTurn ticks cooldowns/durations, applies the provided setup to set fresh
-// intents, then runs one main turn. Returns whether the engine flagged a
-// follow-up speed sub-turn.
-func runTurn(g *Game, setup func()) bool {
+// intents, then runs one main turn. PerformGameUpdate folds any speed
+// sub-step into the same call.
+func runTurn(g *Game, setup func()) {
 	g.ResetGameTurnData()
 	setup()
 	g.PerformGameUpdate()
-	return g.IsSpeedTurn()
 }
 
 // ——— movement / pellets ————————————————————————————————————————————————————
@@ -250,8 +248,11 @@ func TestSpeedActivationSetsDurationAndCooldown(t *testing.T) {
 }
 
 func TestSpeedSubTurnDelivers2Steps(t *testing.T) {
-	g := newScenario(4, []string{"#######", "#     #", "#######"}, false)
+	g := newScenario(4, []string{"#######", "#.....#", "#######"}, false)
 	pac := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	// Spawn a P1 pac so IsGameOver stays false — PerformGameUpdate skips the
+	// speed sub-step once the game is over (mirrors Java's gameOverFrame).
+	spawn(g, 1, 0, TypeRock, Coord{X: 5, Y: 1})
 
 	// Turn 1: activate SPEED.
 	runTurn(g, func() {
@@ -260,16 +261,12 @@ func TestSpeedSubTurnDelivers2Steps(t *testing.T) {
 		pac.HasAbilityToUse = true
 	})
 
-	// Turn 2: MOVE — pac should move 2 steps (one main, one sub-turn).
-	speedTurn := runTurn(g, func() {
-		pac.Intent = NewMoveAction(Coord{X: 5, Y: 1})
+	// Turn 2: MOVE — both movement steps resolve in the same PerformGameUpdate.
+	runTurn(g, func() {
+		pac.Intent = NewMoveAction(Coord{X: 4, Y: 1})
 	})
-	assert.Equal(t, Coord{X: 2, Y: 1}, pac.Position, "first of two steps")
-	assert.True(t, speedTurn, "engine flags speed sub-turn")
-
-	g.PerformGameSpeedUpdate()
-	assert.Equal(t, Coord{X: 3, Y: 1}, pac.Position, "sub-turn second step")
-	assert.False(t, g.IsSpeedTurn(), "no further sub-turn after 2 steps")
+	assert.Equal(t, Coord{X: 3, Y: 1}, pac.Position, "two steps in one turn")
+	assert.False(t, g.IsSpeedTurn(), "no follow-up sub-turn pending")
 }
 
 func TestSpeedExpiresAfterDurationTicks(t *testing.T) {
@@ -432,29 +429,6 @@ func TestFogOfWarEnemyPacInvisibleBehindWall(t *testing.T) {
 	// Line count: "0 0", "<visible pac count>", then that many pac lines.
 	// Only own pac is visible.
 	assert.Equal(t, "1", lines[1], "only one pac visible")
-}
-
-func TestSnapshotTurnIncludesEnginePerspectivePellets(t *testing.T) {
-	g := newScenario(4, []string{
-		"#####",
-		"# # #",
-		"#####",
-	}, false)
-	g.Grid.Get(Coord{X: 1, Y: 1}).HasPellet = true
-	g.Grid.Get(Coord{X: 3, Y: 1}).HasCherry = true
-	spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
-	spawn(g, 1, 0, TypePaper, Coord{X: 3, Y: 1})
-	g.Players[0].Pellets = 7
-	g.Players[1].Pellets = 5
-
-	var snapshot TraceSnapshot
-	err := json.Unmarshal(NewReferee(g).SnapshotTurn(0, nil), &snapshot)
-
-	assert.NoError(t, err)
-	assert.Equal(t, [2]int{7, 5}, snapshot.Scores)
-	assert.Len(t, snapshot.Pacs, 2)
-	assert.Contains(t, snapshot.Pellets, TracePellet{X: 1, Y: 1, Value: 1})
-	assert.Contains(t, snapshot.Pellets, TracePellet{X: 3, Y: 1, Value: CHERRY_SCORE})
 }
 
 // ——— serialization / referee smoke test ————————————————————————————————————

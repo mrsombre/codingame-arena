@@ -3,8 +3,6 @@
 package engine
 
 import (
-	"encoding/json"
-
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
@@ -14,23 +12,25 @@ Java: SpringChallenge2020/src/main/java/com/codingame/game/Referee.java:21-22
 private static final int MAX_TURNS = 200;
 */
 
-// MaxMainTurns mirrors Java Referee.MAX_TURNS — the cap on main turns
-// (speed sub-turns are extra and do not count toward this limit).
+// MaxMainTurns mirrors Java Referee.MAX_TURNS — the cap on main turns. We
+// fold speed sub-steps into the same PerformGameUpdate call, so a "turn"
+// here corresponds 1:1 to a Java main turn.
 const MaxMainTurns = 200
 
-// Referee drives the Game through the arena runner lifecycle. It tracks the
-// Spring 2020 "speed sub-turn" mechanic locally so the arena can treat every
-// iteration of its main loop uniformly.
+// Referee drives the Game through the arena runner lifecycle.
 type Referee struct {
 	Game           *Game
 	CommandManager *CommandManager
-	SpeedTurn      bool
 	GameOverFrame  bool
 	MainTurns      int
+	summaryByPac   [2]map[string][][]int
 }
 
 func NewReferee(game *Game) *Referee {
-	r := &Referee{Game: game}
+	r := &Referee{
+		Game:         game,
+		summaryByPac: [2]map[string][][]int{{}, {}},
+	}
 	r.CommandManager = NewCommandManager(&game.Summary, game)
 	return r
 }
@@ -82,9 +82,6 @@ private void handlePlayerCommands() {
 */
 
 func (r *Referee) ParsePlayerOutputs(players []arena.Player) {
-	if r.SpeedTurn {
-		return
-	}
 	for _, player := range players {
 		p := player.(*Player)
 		if p.IsDeactivated() {
@@ -119,34 +116,69 @@ public void gameTurn(int turn) {
         gameManager.endGame();
     }
 }
+
+We deviate from the Java frame split: PerformGameUpdate folds the speed
+sub-turn into a single call (see Game.PerformGameUpdate). Each arena turn
+maps 1:1 to a Java main turn, no skip-input bookkeeping needed.
 */
 
 func (r *Referee) PerformGameUpdate(turn int) {
 	if r.GameOverFrame {
 		r.Game.ResetGameTurnData()
 		r.Game.PerformGameUpdate()
+		r.recordTraceSummary(turn)
 		r.Game.PerformGameOver()
 		r.Game.EndGame()
 		return
 	}
 
-	if r.SpeedTurn {
-		r.Game.PerformGameSpeedUpdate()
-	} else {
-		r.MainTurns++
-		r.Game.PerformGameUpdate()
-	}
+	r.MainTurns++
+	r.Game.PerformGameUpdate()
+	r.recordTraceSummary(turn)
 
 	if r.Game.IsGameOver() || r.MainTurns >= MaxMainTurns {
 		r.GameOverFrame = true
 	}
-	r.SpeedTurn = r.Game.IsSpeedTurn()
+}
+
+// recordTraceSummary appends each trace fired this turn into the per-pac
+// summary, keyed by the pac listed first in the payload (the event subject).
+func (r *Referee) recordTraceSummary(turn int) {
+	for _, tr := range r.Game.traces {
+		pacID, ok := parseLeadingPacID(tr.Payload)
+		if !ok {
+			continue
+		}
+		pac := r.findPacByID(pacID)
+		if pac == nil {
+			continue
+		}
+		idx := pac.Owner.GetIndex()
+		if idx < 0 || idx >= 2 {
+			continue
+		}
+		m := r.summaryByPac[idx]
+		list := m[tr.Label]
+		for len(list) <= pac.Number {
+			list = append(list, nil)
+		}
+		list[pac.Number] = append(list[pac.Number], turn)
+		m[tr.Label] = list
+	}
+}
+
+func (r *Referee) findPacByID(id int) *Pacman {
+	for _, p := range r.Game.Players {
+		for _, pac := range p.Pacmen {
+			if pac.ID == id {
+				return pac
+			}
+		}
+	}
+	return nil
 }
 
 func (r *Referee) ResetGameTurnData() {
-	if r.SpeedTurn {
-		return
-	}
 	r.Game.ResetGameTurnData()
 }
 
@@ -176,7 +208,7 @@ func (r *Referee) OnEnd() {
 }
 
 func (r *Referee) ShouldSkipPlayerTurn(player arena.Player) bool {
-	return r.SpeedTurn
+	return false
 }
 
 func (r *Referee) ActivePlayers(players []arena.Player) int {
@@ -189,71 +221,29 @@ func (r *Referee) ActivePlayers(players []arena.Player) int {
 	return active
 }
 
-// TraceSnapshot, TracePac, TracePellet, SnapshotTurn, RawScores and Metrics
-// have no Java counterpart — they wire optional arena interfaces for replay
-// trace, pre-adjustment scores, and per-match metrics.
+// TurnTraces, TraceSummary, RawScores, and Metrics have no Java counterpart —
+// they wire optional arena interfaces for per-turn structured traces,
+// per-match aggregate trace counts, pre-adjustment scores, and per-match
+// metrics.
 
-type TraceSnapshot struct {
-	Scores  [2]int        `json:"scores"`
-	Pacs    []TracePac    `json:"pacs"`
-	Pellets []TracePellet `json:"pellets"`
-}
-
-type TracePac struct {
-	ID              int    `json:"id"`
-	Owner           int    `json:"owner"`
-	X               int    `json:"x"`
-	Y               int    `json:"y"`
-	Type            string `json:"type"`
-	AbilityDuration int    `json:"abilityDuration"`
-	AbilityCooldown int    `json:"abilityCooldown"`
-}
-
-type TracePellet struct {
-	X     int `json:"x"`
-	Y     int `json:"y"`
-	Value int `json:"value"`
-}
-
-// SnapshotTurn emits the full engine perspective for trace replay god mode.
-func (r *Referee) SnapshotTurn(_ int, _ []arena.Player) json.RawMessage {
-	snapshot := TraceSnapshot{}
-	for _, p := range r.Game.Players {
-		idx := p.GetIndex()
-		if idx >= 0 && idx < len(snapshot.Scores) {
-			snapshot.Scores[idx] = p.Pellets
-		}
-	}
-	for _, pac := range r.Game.Pacmen {
-		typeName := pac.Type.Name()
-		if pac.Dead {
-			typeName = "DEAD"
-		}
-		owner := 0
-		if pac.Owner != nil {
-			owner = pac.Owner.GetIndex()
-		}
-		snapshot.Pacs = append(snapshot.Pacs, TracePac{
-			ID:              pac.Number,
-			Owner:           owner,
-			X:               pac.Position.X,
-			Y:               pac.Position.Y,
-			Type:            typeName,
-			AbilityDuration: pac.AbilityDuration,
-			AbilityCooldown: pac.AbilityCooldown,
-		})
-	}
-	for _, p := range r.Game.Grid.AllPellets() {
-		snapshot.Pellets = append(snapshot.Pellets, TracePellet{X: p.X, Y: p.Y, Value: 1})
-	}
-	for _, p := range r.Game.Grid.AllCherries() {
-		snapshot.Pellets = append(snapshot.Pellets, TracePellet{X: p.X, Y: p.Y, Value: CHERRY_SCORE})
-	}
-	data, err := json.Marshal(snapshot)
-	if err != nil {
+// TurnTraces returns a copy of this turn's accumulated game traces.
+func (r *Referee) TurnTraces(_ int, _ []arena.Player) []arena.TurnTrace {
+	if len(r.Game.traces) == 0 {
 		return nil
 	}
-	return data
+	out := make([]arena.TurnTrace, len(r.Game.traces))
+	copy(out, r.Game.traces)
+	return out
+}
+
+// TraceSummary returns the per-side aggregate of trace events seen so far,
+// keyed by label and pac number within each player.
+func (r *Referee) TraceSummary() arena.TraceSummary {
+	var out arena.TraceSummary
+	for i := 0; i < 2; i++ {
+		out[i] = r.summaryByPac[i]
+	}
+	return out
 }
 
 // RawScores returns per-player pellet counts — the raw in-match score.

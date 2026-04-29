@@ -72,25 +72,35 @@ func RunReplay(
 	for ; !referee.Ended() && turn < maxTurns; turn++ {
 		referee.ResetGameTurnData()
 
+		// When fewer than two players are active, the engine is running its
+		// game-over frame: don't poll players for outputs and don't re-parse
+		// their commands (the surviving side has likely exhausted its replay
+		// move list, and parsing an empty line would deactivate it and skip
+		// PerformGameOver's remaining-pellets transfer). Mirror Java's
+		// gameTurn else-branch, which only drives the game forward.
+		liveTurn := referee.ActivePlayers(players) >= 2
+
 		playerOutputs := [2]string{}
 		var turnInput traceTurnInput
 
-		for _, player := range players {
-			if player.IsDeactivated() || referee.ShouldSkipPlayerTurn(player) {
-				continue
-			}
-			lines := referee.FrameInfoFor(player)
-			for _, line := range lines {
-				player.SendInputLine(line)
-			}
-			if player.GetIndex() == 0 {
-				turnInput.P0 = append([]string(nil), lines...)
-			} else {
-				turnInput.P1 = append([]string(nil), lines...)
-			}
-			_ = player.Execute()
-			if outs := player.GetOutputs(); len(outs) > 0 {
-				playerOutputs[player.GetIndex()] = strings.Join(outs, "\n")
+		if liveTurn {
+			for _, player := range players {
+				if player.IsDeactivated() || referee.ShouldSkipPlayerTurn(player) {
+					continue
+				}
+				lines := referee.FrameInfoFor(player)
+				for _, line := range lines {
+					player.SendInputLine(line)
+				}
+				if player.GetIndex() == 0 {
+					turnInput.P0 = append([]string(nil), lines...)
+				} else {
+					turnInput.P1 = append([]string(nil), lines...)
+				}
+				_ = player.Execute()
+				if outs := player.GetOutputs(); len(outs) > 0 {
+					playerOutputs[player.GetIndex()] = strings.Join(outs, "\n")
+				}
 			}
 		}
 
@@ -101,22 +111,15 @@ func RunReplay(
 			P1Output:  playerOutputs[1],
 			Timing:    &TraceTurnTiming{Response: [2]float64{}},
 		}
-		if tp, ok := referee.(TraceProvider); ok {
-			tt.GameState = tp.SnapshotTurn(turn, players)
-		}
 
-		handlePlayerCommands(players, referee)
-
-		if referee.ActivePlayers(players) < 2 {
-			referee.EndGame()
-			traceTurns = append(traceTurns, tt)
-			break
+		if liveTurn {
+			handlePlayerCommands(players, referee)
 		}
 
 		referee.PerformGameUpdate(turn)
 
-		if tep, ok := referee.(TurnEventProvider); ok {
-			tt.Events = tep.TurnEvents(turn, players)
+		if ttp, ok := referee.(TurnTraceProvider); ok {
+			tt.Traces = ttp.TurnTraces(turn, players)
 		}
 		traceTurns = append(traceTurns, tt)
 	}
@@ -146,15 +149,24 @@ func RunReplay(
 		winner = 1
 	}
 
+	var traceSummary *TraceSummary
+	if tsp, ok := referee.(TraceSummaryProvider); ok {
+		s := tsp.TraceSummary()
+		if !s.IsEmpty() {
+			traceSummary = &s
+		}
+	}
+
 	return TraceMatch{
-		MatchID:  0,
-		GameID:   factory.Name(),
-		PuzzleID: factory.PuzzleID(),
-		Seed:     seed,
-		Scores:   [2]TraceScore{TraceScore(scores[0]), TraceScore(scores[1])},
-		Ranks:    RanksFromWinner(winner),
-		Players:  [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
-		Timing:   &TraceTiming{},
-		Turns:    traceTurns,
+		MatchID:      0,
+		GameID:       factory.Name(),
+		PuzzleID:     factory.PuzzleID(),
+		Seed:         seed,
+		Scores:       [2]TraceScore{TraceScore(scores[0]), TraceScore(scores[1])},
+		Ranks:        RanksFromWinner(winner),
+		Players:      [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
+		Timing:       &TraceTiming{},
+		TraceSummary: traceSummary,
+		Turns:        traceTurns,
 	}
 }

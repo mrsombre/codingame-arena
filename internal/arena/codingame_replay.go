@@ -10,17 +10,23 @@ import (
 
 // CodinGameReplay is the shape of a CodinGame match replay JSON as returned by
 // /services/gameResult/findInformationById, and as stored on disk after the
-// `arena replay` downloader strips the no-op top-level "viewer" payload (see
-// StripReplayViewer).
+// `arena replay` downloader normalizes it (see PrepareReplay).
 //
 // Top-level fields are shared across every CodinGame game. The F parameter is
 // the per-game frame shape: games that don't need custom per-turn fields can
 // use the default CodinGameReplayFrame; games that do can declare their own
 // struct and pass it as F.
+//
+// Blue and League are arena-only annotations (not part of the upstream
+// CodinGame body): Blue is the username of the player we are playing for,
+// League is the league level the replay belongs to. Both are written by
+// `arena replay`.
 type CodinGameReplay[F any] struct {
 	PuzzleID      int                      `json:"puzzleId"`
 	PuzzleTitle   []string                 `json:"puzzleTitle"`
 	QuestionTitle string                   `json:"questionTitle"`
+	Blue          string                   `json:"blue,omitempty"`
+	League        int                      `json:"league,omitempty"`
 	GameResult    CodinGameReplayResult[F] `json:"gameResult"`
 }
 
@@ -116,8 +122,11 @@ func ReplayTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 }
 
 // ReplayTraceTurnCount returns the number of engine frames represented by the
-// replay. CodinGame stores simultaneous player outputs as one frame per player,
-// while engine-only frames such as Spring 2020 speed sub-turns have no stdout.
+// replay. CodinGame stores simultaneous player outputs as one frame per player.
+// Mid-replay empty-stdout frames are Spring 2020 speed sub-turns, which the
+// engine folds into the preceding main turn and emits no trace turn for. The
+// trailing empty-stdout frame is the game-over marker; the engine emits one
+// extra trace turn for it (mirroring Java's post-game-over gameTurn frame).
 func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	turns := 0
 	seenOutput := map[int]bool{}
@@ -137,7 +146,6 @@ func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 
 		if strings.TrimSpace(frame.Stdout) == "" {
 			flushOutputTurn()
-			turns++
 			continue
 		}
 
@@ -151,7 +159,24 @@ func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	}
 	flushOutputTurn()
 
+	if hasTrailingEngineFrame(replay) {
+		turns++
+	}
+
 	return turns
+}
+
+// hasTrailingEngineFrame reports whether the replay ends with the game-over
+// engine marker frame CodinGame appends after every match. The marker has no
+// stdout; its agentId is either -1 (engine-attributed, e.g. when the first
+// player to be polled has been deactivated) or the agentId of the player
+// whose slot would have been polled next.
+func hasTrailingEngineFrame(replay CodinGameReplay[CodinGameReplayFrame]) bool {
+	frames := replay.GameResult.Frames
+	if len(frames) == 0 {
+		return false
+	}
+	return strings.TrimSpace(frames[len(frames)-1].Stdout) == ""
 }
 
 // ReplayPlayerNames extracts player display names from replay agent metadata.
@@ -172,12 +197,17 @@ func ReplayPlayerNames(replay CodinGameReplay[CodinGameReplayFrame]) [2]string {
 	return names
 }
 
-// StripReplayViewer removes the top-level "viewer" field and the per-frame
-// "view" payloads from a raw CodinGame replay JSON body, then pretty-prints
-// the result. Those fields carry serialized viewer state that nothing in this
-// codebase reads, and they are typically the majority of the file size. If the
-// body is not a JSON object, the original bytes are returned unchanged.
-func StripReplayViewer(body []byte) ([]byte, error) {
+// PrepareReplay normalizes a raw CodinGame replay JSON body for local
+// storage. It removes the top-level "viewer" field and the per-frame "view"
+// payloads (serialized viewer state nothing in this codebase reads, and
+// usually the majority of the file size), adds the arena-only annotations,
+// and pretty-prints the result. If the body is not a JSON object, the
+// original bytes are returned unchanged.
+//
+// When blue is non-empty, a top-level "blue": "<username>" field is added to
+// record which player we are playing for. When league is non-zero, a
+// top-level "league": <num> field is added.
+func PrepareReplay(body []byte, blue string, league int) ([]byte, error) {
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal(body, &top); err != nil {
 		return body, nil
@@ -187,6 +217,21 @@ func StripReplayViewer(body []byte) ([]byte, error) {
 
 	if err := stripReplayFrameViews(top); err != nil {
 		return nil, err
+	}
+
+	if blue != "" {
+		raw, err := json.Marshal(blue)
+		if err != nil {
+			return nil, err
+		}
+		top["blue"] = raw
+	}
+	if league != 0 {
+		raw, err := json.Marshal(league)
+		if err != nil {
+			return nil, err
+		}
+		top["league"] = raw
 	}
 
 	var err error

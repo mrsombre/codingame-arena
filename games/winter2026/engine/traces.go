@@ -25,5 +25,5 @@ func traceBirdPayload(birdID int) string {
 }
 
 func (g *Game) trace(label, payload string) {
-	g.traces = append(g.traces, arena.TurnEvent{Label: label, Payload: payload})
+	g.traces = append(g.traces, arena.TurnTrace{Label: label, Payload: payload})
 }

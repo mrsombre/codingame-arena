@@ -36,7 +36,7 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 				P0Output: "UP 0 RIGHT 1",
 				P1Output: "DOWN 0 LEFT 1",
 				Timing:   &TraceTurnTiming{Response: [2]float64{820, 910}},
-				Events: []TurnEvent{
+				Traces: []TurnTrace{
 					{Label: "eat", Payload: "bot0:14.5"},
 				},
 			},
@@ -53,7 +53,6 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &got))
 	assert.Equal(t, traceID, got.TraceID)
 	assert.Equal(t, TraceTypeTrace, got.Type)
-	assert.Equal(t, fmt.Sprintf("trace-%d-3.json", traceID), got.File)
 	assert.Equal(t, int64(12345), got.Seed)
 	assert.Equal(t, [2]int{0, 1}, got.Ranks)
 	require.NotNil(t, got.Timing)
@@ -65,8 +64,8 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 	assert.Equal(t, "DOWN 0 LEFT 1", got.Turns[0].P1Output)
 	require.NotNil(t, got.Turns[0].Timing)
 	assert.Equal(t, [2]float64{820, 910}, got.Turns[0].Timing.Response)
-	require.Len(t, got.Turns[0].Events, 1)
-	assert.Equal(t, "eat", got.Turns[0].Events[0].Label)
+	require.Len(t, got.Turns[0].Traces, 1)
+	assert.Equal(t, "eat", got.Turns[0].Traces[0].Label)
 }
 
 func TestTraceWriterWritesReplayFile(t *testing.T) {
@@ -92,7 +91,6 @@ func TestTraceWriterWritesReplayFile(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &got))
 	assert.Equal(t, traceID, got.TraceID)
 	assert.Equal(t, TraceTypeReplay, got.Type)
-	assert.Equal(t, fmt.Sprintf("replay-%d.json", traceID), got.File)
 }
 
 func TestTraceWriterNilIsNoop(t *testing.T) {

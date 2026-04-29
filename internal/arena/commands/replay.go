@@ -35,8 +35,10 @@ Config: arena.yml in current directory (e.g. game: winter2026).`
 // ReplayGetUsage returns the help text shown for `arena help replay get`.
 func ReplayGetUsage(fs *pflag.FlagSet) string {
 	return arena.CommandUsage(
-		"replay get <url|id> [<url|id>...]",
-		"Download raw replay JSON for one or more CodinGame games.",
+		"replay get <username> <id|url>[,<id|url>...]",
+		"Download raw replay JSON for one or more CodinGame games. <username> is "+
+			"the player we are playing for; it is recorded as the top-level "+
+			"\"blue\" field in every saved replay.",
 		fs,
 		"",
 	)
@@ -46,8 +48,10 @@ func ReplayGetUsage(fs *pflag.FlagSet) string {
 // `arena help replay leaderboard`.
 func ReplayLeaderboardUsage(fs *pflag.FlagSet) string {
 	return arena.CommandUsage(
-		"replay leaderboard <leaderboard-url> <nickname>",
-		"Download every replay from a player's last battles list.",
+		"replay leaderboard <username> <puzzle-url|slug>",
+		"Download every replay from a player's last battles list. <username> is "+
+			"the player we are playing for; it is recorded as the top-level "+
+			"\"blue\" field in every saved replay.",
 		fs,
 		"",
 	)
@@ -63,7 +67,7 @@ func ReplayGet(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.F
 	}
 
 	client := codingame.New()
-	return downloadReplays(client, opts.IDs, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
+	return downloadReplays(client, opts.IDs, opts.Username, opts.League, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
 }
 
 // ReplayLeaderboard is the entry point for the "replay leaderboard"
@@ -89,11 +93,11 @@ func ReplayLeaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs 
 	}
 	_, _ = fmt.Fprintf(stdout, "puzzle: %s -> %s%s\n", opts.Slug, apiSlug, cacheTag(puzzleHit))
 
-	agentID, playerHit, err := resolveAgent(client, store, apiSlug, opts.Nickname)
+	agentID, playerHit, err := resolveAgent(client, store, apiSlug, opts.Username)
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(stdout, "player: %s -> agentId %d%s\n", opts.Nickname, agentID, cacheTag(playerHit))
+	_, _ = fmt.Fprintf(stdout, "player: %s -> agentId %d%s\n", opts.Username, agentID, cacheTag(playerHit))
 
 	gameIDs, err := client.FindLastBattles(agentID)
 	if err != nil {
@@ -101,12 +105,15 @@ func ReplayLeaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs 
 	}
 	_, _ = fmt.Fprintf(stdout, "battles: %d\n", len(gameIDs))
 
-	return downloadReplays(client, gameIDs, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
+	return downloadReplays(client, gameIDs, opts.Username, opts.League, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
 }
 
 // downloadReplays runs the shared per-ID download loop: skip-if-exists (unless
 // force is set), inter-request delay, soft failure, and a final summary line.
-func downloadReplays(client *codingame.Client, ids []int64, outDir string, limit int, delay time.Duration, force bool, stdout io.Writer) error {
+// blue is the username we are playing for; when non-empty it is written as
+// the top-level "blue" field of every saved replay JSON. league, when
+// non-zero, is written as the top-level "league" field.
+func downloadReplays(client *codingame.Client, ids []int64, blue string, league int, outDir string, limit int, delay time.Duration, force bool, stdout io.Writer) error {
 	if limit > 0 && len(ids) > limit {
 		ids = ids[:limit]
 	}
@@ -138,9 +145,9 @@ func downloadReplays(client *codingame.Client, ids []int64, outDir string, limit
 			_, _ = fmt.Fprintf(stdout, "[%d/%d] fail %d: %v\n", i+1, len(ids), id, err)
 			continue
 		}
-		body, err = arena.StripReplayViewer(body)
+		body, err = arena.PrepareReplay(body, blue, league)
 		if err != nil {
-			return fmt.Errorf("strip replay %d: %w", id, err)
+			return fmt.Errorf("prepare replay %d: %w", id, err)
 		}
 		if err := os.WriteFile(path, body, 0644); err != nil {
 			return fmt.Errorf("write %s: %w", path, err)

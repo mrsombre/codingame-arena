@@ -5,14 +5,14 @@ import (
 	"testing"
 )
 
-func TestStripReplayViewer_PrettyPrintsAndRemovesViewer(t *testing.T) {
+func TestPrepareReplay_PrettyPrintsAndRemovesViewer(t *testing.T) {
 	t.Parallel()
 
 	body := []byte(`{"puzzleId":1,"questionTitle":"Winter Challenge","puzzleTitle":["Winter"],"gameResult":{"gameId":42,"frames":[{"agentId":0,"view":"big-payload","stdout":"MOVE"}]},"viewer":{"frames":[]}}`)
 
-	got, err := StripReplayViewer(body)
+	got, err := PrepareReplay(body, "", 0)
 	if err != nil {
-		t.Fatalf("StripReplayViewer() error = %v", err)
+		t.Fatalf("PrepareReplay() error = %v", err)
 	}
 
 	want := "{\n" +
@@ -32,18 +32,18 @@ func TestStripReplayViewer_PrettyPrintsAndRemovesViewer(t *testing.T) {
 		"  \"questionTitle\": \"Winter Challenge\"\n" +
 		"}\n"
 	if string(got) != want {
-		t.Fatalf("StripReplayViewer() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
 	}
 }
 
-func TestStripReplayViewer_RemovesFrameViewOnly(t *testing.T) {
+func TestPrepareReplay_RemovesFrameViewOnly(t *testing.T) {
 	t.Parallel()
 
 	body := []byte(`{"gameResult":{"gameId":42,"frames":[{"agentId":0,"view":"big-payload","stdout":"MOVE"},{"agentId":1,"summary":"ok"},"raw"]}}`)
 
-	got, err := StripReplayViewer(body)
+	got, err := PrepareReplay(body, "", 0)
 	if err != nil {
-		t.Fatalf("StripReplayViewer() error = %v", err)
+		t.Fatalf("PrepareReplay() error = %v", err)
 	}
 
 	want := "{\n" +
@@ -63,18 +63,18 @@ func TestStripReplayViewer_RemovesFrameViewOnly(t *testing.T) {
 		"  }\n" +
 		"}\n"
 	if string(got) != want {
-		t.Fatalf("StripReplayViewer() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
 	}
 }
 
-func TestStripReplayViewer_PrettyPrintsWithoutViewer(t *testing.T) {
+func TestPrepareReplay_PrettyPrintsWithoutViewer(t *testing.T) {
 	t.Parallel()
 
 	body := []byte("{\"puzzleId\":1,\"gameResult\":{\"gameId\":42}}")
 
-	got, err := StripReplayViewer(body)
+	got, err := PrepareReplay(body, "", 0)
 	if err != nil {
-		t.Fatalf("StripReplayViewer() error = %v", err)
+		t.Fatalf("PrepareReplay() error = %v", err)
 	}
 
 	want := "{\n" +
@@ -84,7 +84,52 @@ func TestStripReplayViewer_PrettyPrintsWithoutViewer(t *testing.T) {
 		"  \"puzzleId\": 1\n" +
 		"}\n"
 	if string(got) != want {
-		t.Fatalf("StripReplayViewer() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
+func TestPrepareReplay_AddsBlueField(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"puzzleId":1,"gameResult":{"gameId":42}}`)
+
+	got, err := PrepareReplay(body, "mrsombre", 0)
+	if err != nil {
+		t.Fatalf("PrepareReplay() error = %v", err)
+	}
+
+	want := "{\n" +
+		"  \"blue\": \"mrsombre\",\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42\n" +
+		"  },\n" +
+		"  \"puzzleId\": 1\n" +
+		"}\n"
+	if string(got) != want {
+		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
+func TestPrepareReplay_AddsBlueAndLeagueFields(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"puzzleId":1,"gameResult":{"gameId":42}}`)
+
+	got, err := PrepareReplay(body, "mrsombre", 4)
+	if err != nil {
+		t.Fatalf("PrepareReplay() error = %v", err)
+	}
+
+	want := "{\n" +
+		"  \"blue\": \"mrsombre\",\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42\n" +
+		"  },\n" +
+		"  \"league\": 4,\n" +
+		"  \"puzzleId\": 1\n" +
+		"}\n"
+	if string(got) != want {
+		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
 	}
 }
 
@@ -156,8 +201,11 @@ func TestReplayTraceTurnCount(t *testing.T) {
 		},
 	}
 
-	if got := ReplayTraceTurnCount(replay); got != 4 {
-		t.Fatalf("ReplayTraceTurnCount() = %d, want 4", got)
+	// 2 main decision turns (SPEED, MOVE) + 1 trailing game-over frame.
+	// The mid-replay speed sub-turn frame is folded into the SPEED main turn
+	// by the engine and does not count.
+	if got := ReplayTraceTurnCount(replay); got != 3 {
+		t.Fatalf("ReplayTraceTurnCount() = %d, want 3", got)
 	}
 }
 

@@ -86,88 +86,94 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	for turn = 0; !referee.Ended() && turn < maxTurns; turn++ {
 		referee.ResetGameTurnData()
 
-		for _, controller := range controllers {
-			controller.BeginTurn()
-		}
+		// When fewer than two players are active, the engine is in its
+		// game-over frame: skip subprocess polling and command parsing and
+		// just drive the game forward. Mirrors Java's gameTurn else-branch,
+		// where the referee runs only resetGameTurnData / performGameUpdate /
+		// performGameOver / endGame on the trailing frame.
+		liveTurn := referee.ActivePlayers(players) >= 2
 
 		wasDeactivated := [2]bool{players[0].IsDeactivated(), players[1].IsDeactivated()}
 		playerOutputs := [2]string{}
 		var turnInput traceTurnInput
 
-		for _, player := range players {
-			if player.IsDeactivated() || referee.ShouldSkipPlayerTurn(player) {
-				continue
+		if liveTurn {
+			for _, controller := range controllers {
+				controller.BeginTurn()
 			}
-			lines := referee.FrameInfoFor(player)
-			for _, line := range lines {
-				player.SendInputLine(line)
-			}
-			if tracing {
-				if player.GetIndex() == 0 {
-					turnInput.P0 = append([]string(nil), lines...)
-				} else {
-					turnInput.P1 = append([]string(nil), lines...)
+
+			for _, player := range players {
+				if player.IsDeactivated() || referee.ShouldSkipPlayerTurn(player) {
+					continue
 				}
-			}
-			if runner.Options.Debug {
-				fmt.Fprintf(os.Stderr, "--- turn %d p%d input ---\n", turn, player.GetIndex())
+				lines := referee.FrameInfoFor(player)
 				for _, line := range lines {
-					fmt.Fprintln(os.Stderr, line)
+					player.SendInputLine(line)
 				}
-			}
-			_ = player.Execute()
-			if outs := player.GetOutputs(); len(outs) > 0 {
-				playerOutputs[player.GetIndex()] = strings.Join(outs, "\n")
-			}
-			if runner.Options.Debug {
-				fmt.Fprintf(os.Stderr, "turn %d p%d output: %s\n", turn, player.GetIndex(), strings.Join(player.GetOutputs(), " | "))
+				if tracing {
+					if player.GetIndex() == 0 {
+						turnInput.P0 = append([]string(nil), lines...)
+					} else {
+						turnInput.P1 = append([]string(nil), lines...)
+					}
+				}
+				if runner.Options.Debug {
+					fmt.Fprintf(os.Stderr, "--- turn %d p%d input ---\n", turn, player.GetIndex())
+					for _, line := range lines {
+						fmt.Fprintln(os.Stderr, line)
+					}
+				}
+				_ = player.Execute()
+				if outs := player.GetOutputs(); len(outs) > 0 {
+					playerOutputs[player.GetIndex()] = strings.Join(outs, "\n")
+				}
+				if runner.Options.Debug {
+					fmt.Fprintf(os.Stderr, "turn %d p%d output: %s\n", turn, player.GetIndex(), strings.Join(player.GetOutputs(), " | "))
+				}
 			}
 		}
 
-		// Trace snapshot (pre-parse). Events are attached after PerformGameUpdate,
+		// Trace snapshot (pre-parse). Traces are attached after PerformGameUpdate,
 		// since they describe outcomes of this turn's moves.
 		if tracing {
-			tt := TraceTurn{
+			turnTiming := &TraceTurnTiming{}
+			if liveTurn {
+				turnTiming.Response = [2]float64{
+					durationMillis(controllers[0].LastOutputDuration()),
+					durationMillis(controllers[1].LastOutputDuration()),
+				}
+			}
+			traceTurns = append(traceTurns, TraceTurn{
 				Turn:      turn,
 				GameInput: turnInput,
 				P0Output:  playerOutputs[0],
 				P1Output:  playerOutputs[1],
-				Timing: &TraceTurnTiming{Response: [2]float64{
-					durationMillis(controllers[0].LastOutputDuration()),
-					durationMillis(controllers[1].LastOutputDuration()),
-				}},
-			}
-			if tp, ok := referee.(TraceProvider); ok {
-				tt.GameState = tp.SnapshotTurn(turn, players)
-			}
-			traceTurns = append(traceTurns, tt)
+				Timing:    turnTiming,
+			})
 		}
 
-		handlePlayerCommands(players, referee)
+		if liveTurn {
+			handlePlayerCommands(players, referee)
 
-		// Detect newly deactivated players after output and command parsing.
-		for i, player := range players {
-			if !wasDeactivated[i] && player.IsDeactivated() {
-				badCommands = append(badCommands, BadCommandInfo{
-					Seed:    seed,
-					Player:  i,
-					Turn:    turn,
-					Command: playerOutputs[i],
-					Reason:  player.DeactivationReason(),
-				})
+			// Detect newly deactivated players after output and command parsing.
+			for i, player := range players {
+				if !wasDeactivated[i] && player.IsDeactivated() {
+					badCommands = append(badCommands, BadCommandInfo{
+						Seed:    seed,
+						Player:  i,
+						Turn:    turn,
+						Command: playerOutputs[i],
+						Reason:  player.DeactivationReason(),
+					})
+				}
 			}
-		}
-
-		if referee.ActivePlayers(players) < 2 {
-			referee.EndGame()
-			break
 		}
 
 		referee.PerformGameUpdate(turn)
 
 		if tracing {
-			if tep, ok := referee.(TurnEventProvider); ok {
-				traceTurns[len(traceTurns)-1].Events = tep.TurnEvents(turn, players)
+			if ttp, ok := referee.(TurnTraceProvider); ok {
+				traceTurns[len(traceTurns)-1].Traces = ttp.TurnTraces(turn, players)
 			}
 		}
 	}
@@ -248,16 +254,24 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				durationMillis(stats[1].MedianOutputTime),
 			},
 		}
+		var traceSummary *TraceSummary
+		if tsp, ok := referee.(TraceSummaryProvider); ok {
+			s := tsp.TraceSummary()
+			if !s.IsEmpty() {
+				traceSummary = &s
+			}
+		}
 		traceMatch := TraceMatch{
-			MatchID:  simulationID,
-			GameID:   runner.Factory.Name(),
-			PuzzleID: runner.Factory.PuzzleID(),
-			Seed:     seed,
-			Scores:   [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
-			Ranks:    RanksFromWinner(traceWinner),
-			Players:  [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
-			Timing:   traceTiming,
-			Turns:    traceTurns,
+			MatchID:      simulationID,
+			GameID:       runner.Factory.Name(),
+			PuzzleID:     runner.Factory.PuzzleID(),
+			Seed:         seed,
+			Scores:       [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
+			Ranks:        RanksFromWinner(traceWinner),
+			Players:      [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
+			Timing:       traceTiming,
+			TraceSummary: traceSummary,
+			Turns:        traceTurns,
 		}
 		if err := runner.Options.TraceWriter.WriteMatch(traceMatch); err != nil {
 			panic(err)
