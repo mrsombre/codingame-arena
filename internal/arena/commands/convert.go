@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,6 +17,11 @@ import (
 )
 
 var convertReplayFilePattern = regexp.MustCompile(`^\d+\.json$`)
+
+// errReplayMismatch flags a verification failure (engine output disagrees with
+// the replay) so the convert loop can skip writing the trace and move on
+// instead of aborting the whole batch.
+var errReplayMismatch = errors.New("replay mismatch")
 
 // ConvertUsage returns the help text shown for `arena help convert`.
 func ConvertUsage(fs *pflag.FlagSet) string {
@@ -35,7 +41,7 @@ func Convert(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfl
 		return err
 	}
 
-	var saved, skippedExisting, skippedPuzzle int
+	var saved, skippedExisting, skippedPuzzle, skippedMismatch int
 	for i, target := range targets {
 		tracePath := filepath.Join(opts.TraceDir, arena.TraceFileName(arena.TraceTypeReplay, target.ID, 0))
 		if !opts.Force {
@@ -65,6 +71,11 @@ func Convert(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfl
 
 		trace, league, err := convertReplayTrace(factory, replay, opts.League)
 		if err != nil {
+			if errors.Is(err, errReplayMismatch) {
+				skippedMismatch++
+				_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (%v)\n", i+1, len(targets), target.ID, err)
+				continue
+			}
 			return fmt.Errorf("convert replay %d: %w", target.ID, err)
 		}
 		trace.MatchID = 0
@@ -79,8 +90,8 @@ func Convert(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfl
 		saved++
 	}
 
-	_, _ = fmt.Fprintf(stdout, "done: %d saved, %d skipped-existing, %d skipped-puzzle (replays=%d out=%s)\n",
-		saved, skippedExisting, skippedPuzzle, len(targets), opts.TraceDir)
+	_, _ = fmt.Fprintf(stdout, "done: %d saved, %d skipped-existing, %d skipped-puzzle, %d skipped-mismatch (replays=%d out=%s)\n",
+		saved, skippedExisting, skippedPuzzle, skippedMismatch, len(targets), opts.TraceDir)
 	return nil
 }
 
@@ -172,13 +183,14 @@ func verifyReplayTrace(trace arena.TraceMatch, replay arena.CodinGameReplay[aren
 		return fmt.Errorf("replay scores must contain two entries")
 	}
 	if float64(trace.Scores[0]) != replay.GameResult.Scores[0] || float64(trace.Scores[1]) != replay.GameResult.Scores[1] {
-		return fmt.Errorf("score mismatch: replay=[%.1f %.1f] engine=[%.1f %.1f]",
+		return fmt.Errorf("%w: score mismatch: replay=[%.1f %.1f] engine=[%.1f %.1f]",
+			errReplayMismatch,
 			replay.GameResult.Scores[0], replay.GameResult.Scores[1], trace.Scores[0], trace.Scores[1])
 	}
 
 	expectedTurns := arena.ReplayTraceTurnCount(replay)
 	if len(trace.Turns) != expectedTurns {
-		return fmt.Errorf("turn mismatch: replay=%d engine=%d", expectedTurns, len(trace.Turns))
+		return fmt.Errorf("%w: turn mismatch: replay=%d engine=%d", errReplayMismatch, expectedTurns, len(trace.Turns))
 	}
 
 	return nil
