@@ -20,16 +20,22 @@ type ReplayMoves struct {
 // TraceMatch has the same shape as TraceWriter.WriteMatch produces, so viewers
 // that consume /api/matches can render replays without any format translation.
 //
-// botNames are copied into TraceMatch.Players (basename applied). maxTurns of
-// 0 defaults to factory.MaxTurns().
+// botNames are copied into TraceMatch.Players (basename applied). blueSide
+// (0 or 1) is the in-match side whose FrameInfoFor lines are recorded as
+// each turn's GameInput; values outside [0,1] fall back to side 0. maxTurns
+// of 0 defaults to factory.MaxTurns().
 func RunReplay(
 	factory GameFactory,
 	seed int64,
 	gameOptions *viper.Viper,
 	moves ReplayMoves,
 	botNames [2]string,
+	blueSide int,
 	maxTurns int,
 ) TraceMatch {
+	if blueSide != 0 && blueSide != 1 {
+		blueSide = 0
+	}
 	referee, players := factory.NewGame(seed, gameOptions)
 	referee.Init(players)
 
@@ -81,7 +87,7 @@ func RunReplay(
 		liveTurn := referee.ActivePlayers(players) >= 2
 
 		playerOutputs := [2]string{}
-		var turnInput traceTurnInput
+		var turnInput []string
 
 		if liveTurn {
 			for _, player := range players {
@@ -92,10 +98,8 @@ func RunReplay(
 				for _, line := range lines {
 					player.SendInputLine(line)
 				}
-				if player.GetIndex() == 0 {
-					turnInput.P0 = append([]string(nil), lines...)
-				} else {
-					turnInput.P1 = append([]string(nil), lines...)
+				if player.GetIndex() == blueSide {
+					turnInput = append([]string(nil), lines...)
 				}
 				_ = player.Execute()
 				if outs := player.GetOutputs(); len(outs) > 0 {

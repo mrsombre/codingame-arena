@@ -95,7 +95,14 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 
 		wasDeactivated := [2]bool{players[0].IsDeactivated(), players[1].IsDeactivated()}
 		playerOutputs := [2]string{}
-		var turnInput traceTurnInput
+		var turnInput []string
+		// Blue is the user's intended p0; after seed-driven swap, blue plays
+		// in-match side 1. Capturing only blue's view keeps traces compact;
+		// for symmetric-input games either side would yield the same lines.
+		blueSide := 0
+		if swapSides {
+			blueSide = 1
+		}
 
 		if liveTurn {
 			for _, controller := range controllers {
@@ -110,12 +117,8 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				for _, line := range lines {
 					player.SendInputLine(line)
 				}
-				if tracing {
-					if player.GetIndex() == 0 {
-						turnInput.P0 = append([]string(nil), lines...)
-					} else {
-						turnInput.P1 = append([]string(nil), lines...)
-					}
+				if tracing && player.GetIndex() == blueSide {
+					turnInput = append([]string(nil), lines...)
 				}
 				if runner.Options.Debug {
 					fmt.Fprintf(os.Stderr, "--- turn %d p%d input ---\n", turn, player.GetIndex())
@@ -261,11 +264,18 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				traceSummary = &s
 			}
 		}
+		league := 0
+		if lr, ok := runner.Factory.(LeagueResolver); ok {
+			league = lr.ResolveLeague(runner.Options.GameOptions)
+		}
 		traceMatch := TraceMatch{
 			MatchID:      simulationID,
 			GameID:       runner.Factory.Name(),
 			PuzzleID:     runner.Factory.PuzzleID(),
 			Seed:         seed,
+			Blue:         filepath.Base(runner.Options.P0Bin),
+			League:       league,
+			CreatedAt:    time.Now().UTC().Format(time.RFC3339),
 			Scores:       [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
 			Ranks:        RanksFromWinner(traceWinner),
 			Players:      [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},

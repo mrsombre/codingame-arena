@@ -80,6 +80,9 @@ func Convert(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfl
 		}
 		trace.MatchID = 0
 		trace.Type = arena.TraceTypeReplay
+		trace.Blue = replay.Blue
+		trace.League = replay.League
+		trace.CreatedAt = replay.FetchedAt
 
 		if err := arena.NewTraceWriter(opts.TraceDir, target.ID).WriteMatch(trace); err != nil {
 			return fmt.Errorf("write trace for replay %d: %w", target.ID, err)
@@ -100,15 +103,6 @@ type convertReplayTarget struct {
 	Path string
 }
 
-// resolveReplaySeed returns the replay's seed, preferring the top-level Seed
-// field (set by PrepareReplay since the seed-promotion change) and falling
-// back to parsing the legacy gameResult.refereeInput for older saved files.
-func resolveReplaySeed(replay arena.CodinGameReplay[arena.CodinGameReplayFrame]) (int64, bool) {
-	if replay.Seed != 0 {
-		return replay.Seed, true
-	}
-	return arena.ParseReplaySeed(replay.GameResult.RefereeInput)
-}
 
 func convertReplayTargets(replayDir string, ids []int64) ([]convertReplayTarget, error) {
 	if len(ids) > 0 {
@@ -153,7 +147,7 @@ func convertReplayTargets(replayDir string, ids []int64) ([]convertReplayTarget,
 }
 
 func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], leagueOverride string) (arena.TraceMatch, int, error) {
-	seed, ok := resolveReplaySeed(replay)
+	seed, ok := arena.ResolveReplaySeed(replay)
 	if !ok {
 		return arena.TraceMatch{}, 0, fmt.Errorf("replay missing seed")
 	}
@@ -172,12 +166,19 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		gameOptions.Set("league", strconv.Itoa(league))
 	}
 
+	botNames := arena.ReplayPlayerNames(replay)
+	blueSide := 0
+	if replay.Blue != "" && botNames[1] == replay.Blue {
+		blueSide = 1
+	}
+
 	trace := arena.RunReplay(
 		factory,
 		seed,
 		gameOptions,
 		arena.ReplayMovesFromFrames(replay),
-		arena.ReplayPlayerNames(replay),
+		botNames,
+		blueSide,
 		0,
 	)
 

@@ -247,8 +247,8 @@ export function ReplayViewer({ mapData, trace, status, leftSlot }: ReplayViewerP
   // Slider layout (N = trace.turns.length):
   //   - slider 0: initial state (what players saw at turn 0), no moves/traces
   //   - slider i (1..N): state AFTER turn (i-1)'s update, with moves/traces
-  //     from turn (i-1). State is taken from turns[i].game_input.p0 when it
-  //     exists, else falls back to turns[i-1].game_input.p0 for the final turn.
+  //     from turn (i-1). State is taken from turns[i].game_input when it
+  //     exists, else falls back to turns[i-1].game_input for the final turn.
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -264,12 +264,13 @@ export function ReplayViewer({ mapData, trace, status, leftSlot }: ReplayViewerP
     const turns: (TraceTurn | null)[] = []
 
     const initialTurn = trace.turns[0]
-    if (initialTurn) {
-      frames.push(parseFrameLines(initialTurn.game_input.p0))
+    const initialInput = initialTurn?.game_input
+    if (initialTurn && initialInput) {
+      frames.push(parseFrameLines(initialInput))
       turns.push(null)
       for (let i = 1; i <= N; i++) {
-        const source = trace.turns[i] ?? trace.turns[i - 1] ?? initialTurn
-        frames.push(parseFrameLines(source.game_input.p0))
+        const source = trace.turns[i]?.game_input ?? trace.turns[i - 1]?.game_input ?? initialInput
+        frames.push(parseFrameLines(source))
         turns.push(trace.turns[i - 1] ?? null)
       }
     }

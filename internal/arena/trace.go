@@ -34,19 +34,47 @@ func (s TraceScore) MarshalJSON() ([]byte, error) {
 // winner CodinGame-style (0 = first place, [0,0] = draw). Random side-swap is
 // intentionally not recorded — the bot→side mapping here is ground truth for
 // downstream trace consumers (e.g. training).
+//
+// Blue is the bot/agent name analyze treats as "us": for self-play traces
+// it's the basename of the user's --p0 binary; for converted replays it's
+// copied from the saved replay's blue field. Analyzers locate our side by
+// scanning Players[i] == Blue (so swap-on-run still resolves correctly).
 type TraceMatch struct {
-	TraceID      int64         `json:"trace_id,omitempty"`
-	MatchID      int           `json:"match_id"`
-	Type         string        `json:"type,omitempty"`
-	GameID       string        `json:"gameId,omitempty"`
-	PuzzleID     int           `json:"puzzleId,omitempty"`
-	Seed         int64         `json:"seed,string"`
+	TraceID   int64  `json:"trace_id,omitempty"`
+	MatchID   int    `json:"match_id"`
+	Type      string `json:"type,omitempty"`
+	GameID    string `json:"gameId,omitempty"`
+	PuzzleID  int    `json:"puzzleId,omitempty"`
+	Seed      int64  `json:"seed,string"`
+	Blue      string `json:"blue,omitempty"`
+	League    int    `json:"league,omitempty"`
+	// CreatedAt is the RFC 3339 timestamp the trace was produced. For
+	// self-play traces it's stamped at match completion; for replay traces
+	// it's copied from the source replay's fetched_at so analyze can sort
+	// converted replays chronologically without re-reading the JSON.
+	CreatedAt    string        `json:"created_at,omitempty"`
 	Scores       [2]TraceScore `json:"scores"`
 	Ranks        [2]int        `json:"ranks"`
 	Players      [2]string     `json:"players"`
 	Timing       *TraceTiming  `json:"timing,omitempty"`
 	TraceSummary *TraceSummary `json:"trace_summary,omitempty"`
 	Turns        []TraceTurn   `json:"turns"`
+}
+
+// BlueSide returns the index (0 or 1) of the side identified by Blue in
+// Players, or -1 if Blue is unset or doesn't match a player. When both
+// Players entries equal Blue (e.g. self-play of identical binary names),
+// the lower index wins.
+func (t TraceMatch) BlueSide() int {
+	if t.Blue == "" {
+		return -1
+	}
+	for i, p := range t.Players {
+		if p == t.Blue {
+			return i
+		}
+	}
+	return -1
 }
 
 // RanksFromWinner returns the CodinGame-style ranks array for a 2-player match
@@ -78,9 +106,15 @@ type TraceTiming struct {
 }
 
 // TraceTurn captures one turn of game state for replay/debug.
+//
+// GameInput is the stdin lines the engine fed the blue side this turn (the
+// user's bot — see TraceMatch.Blue). For symmetric-input games it equals
+// what either side received; for fog-of-war games it is blue's perspective
+// only. Absent on turns where blue did not execute (deactivated, skipped,
+// or game-over frame).
 type TraceTurn struct {
 	Turn      int              `json:"turn"`
-	GameInput traceTurnInput   `json:"game_input"`
+	GameInput []string         `json:"game_input,omitempty"`
 	P0Output  string           `json:"p0_output,omitempty"`
 	P1Output  string           `json:"p1_output,omitempty"`
 	Timing    *TraceTurnTiming `json:"timing,omitempty"`
@@ -91,11 +125,6 @@ type TraceTurn struct {
 // Zero entries mean the side did not execute (deactivated or skipped).
 type TraceTurnTiming struct {
 	Response [2]float64 `json:"response"`
-}
-
-type traceTurnInput struct {
-	P0 []string `json:"p0,omitempty"`
-	P1 []string `json:"p1,omitempty"`
 }
 
 // TraceWriter writes per-match JSON trace files to a directory. All matches in

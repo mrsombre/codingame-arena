@@ -17,7 +17,6 @@ export interface BatchMatchCacheEntry {
   match: BatchMatch
   mapData: MapData
   trace: TraceMatch
-  fogPerspectiveSide: 0 | 1
 }
 
 export const batchMatchCache = new Map<string, BatchMatchCacheEntry>()
@@ -143,11 +142,7 @@ export function MassView({ bots }: MassViewProps) {
       const serText = await serRes.text()
       const traceJson: TraceMatch = await traceRes.json()
       const mapData = parseSerializeResponse(serText)
-      // Batch summary swaps per-match p0/p1 bot names to the in-match side.
-      // When user's P0 bot played as in-match side 1 (swapped), fog follows
-      // the user's P0 so the viewer stays consistent with PlayView.
-      const fogPerspectiveSide: 0 | 1 = m.p0_bot === batch.p0_bot ? 0 : 1
-      batchMatchCache.set(String(m.id), { match: m, mapData, trace: traceJson, fogPerspectiveSide })
+      batchMatchCache.set(String(m.id), { match: m, mapData, trace: traceJson })
       setStatus("")
       navigate({ to: "/batch/$matchId", params: { matchId: String(m.id) } })
     } catch (err) {

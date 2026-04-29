@@ -97,6 +97,16 @@ type CodinGameReplayFrame struct {
 	Summary string `json:"summary"`
 }
 
+// ResolveReplaySeed returns the replay's seed, preferring the top-level Seed
+// field (set by PrepareReplay since the seed-promotion change) and falling
+// back to parsing the legacy gameResult.refereeInput for older saved files.
+func ResolveReplaySeed[F any](replay CodinGameReplay[F]) (int64, bool) {
+	if replay.Seed != 0 {
+		return replay.Seed, true
+	}
+	return ParseReplaySeed(replay.GameResult.RefereeInput)
+}
+
 // ParseReplaySeed extracts the referee seed from the replay's refereeInput.
 func ParseReplaySeed(refereeInput string) (int64, bool) {
 	for _, tok := range strings.Fields(refereeInput) {

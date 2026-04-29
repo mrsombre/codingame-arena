@@ -105,7 +105,10 @@ export interface TraceTiming {
 
 export interface TraceTurn {
   turn: number
-  game_input: { p0?: string[]; p1?: string[] }
+  /** Stdin lines fed to the blue side this turn (the user's bot — see
+   * TraceMatch.blue). Absent on speed sub-turns and turns where blue did
+   * not execute. */
+  game_input?: string[]
   p0_output: string
   p1_output: string
   timing?: TraceTurnTiming
@@ -180,42 +183,6 @@ export function parseFrameLines(lines: string[]): FrameData {
   }
 
   return { myScore, oppScore, pacs, pellets }
-}
-
-/**
- * Merge frames from p0 and p1 views. Each player sees their own pacs plus any
- * opponent pacs within line-of-sight; union gives the most complete picture.
- * Pellets are unioned by coord. Scores: p0 view's "my/opp" = p0/p1.
- */
-export function mergeFrames(p0: FrameData, p1: FrameData): FrameData {
-  const byId = new Map<string, Pac>()
-  for (const pac of p0.pacs) {
-    // p0 view: mine=true -> belongs to p0 (side 0)
-    const mergedPac = { ...pac, mine: pac.mine }
-    byId.set(pacKey(mergedPac), mergedPac)
-  }
-  for (const pac of p1.pacs) {
-    // p1 view: mine=true -> belongs to p1 (side 1); invert to keep "mine==side 0"
-    const mergedPac = { ...pac, mine: !pac.mine }
-    if (!byId.has(pacKey(mergedPac))) {
-      byId.set(pacKey(mergedPac), mergedPac)
-    }
-  }
-
-  const pelletKey = (x: number, y: number) => `${x},${y}`
-  const pelletMap = new Map<string, Pellet>()
-  for (const p of p0.pellets) pelletMap.set(pelletKey(p.x, p.y), p)
-  for (const p of p1.pellets) {
-    const k = pelletKey(p.x, p.y)
-    if (!pelletMap.has(k)) pelletMap.set(k, p)
-  }
-
-  return {
-    myScore: p0.myScore,
-    oppScore: p0.oppScore,
-    pacs: [...byId.values()].sort((a, b) => Number(b.mine) - Number(a.mine) || a.id - b.id),
-    pellets: [...pelletMap.values()],
-  }
 }
 
 /**

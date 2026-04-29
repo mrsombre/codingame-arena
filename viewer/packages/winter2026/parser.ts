@@ -102,7 +102,9 @@ export interface TraceTiming {
 
 export interface TraceTurn {
   turn: number
-  game_input: { p0: string[]; p1: string[] }
+  /** Stdin lines fed to the blue side this turn (the user's bot — see
+   * TraceMatch.blue). Absent on turns where blue did not execute. */
+  game_input?: string[]
   p0_output: string
   p1_output: string
   timing?: TraceTurnTiming

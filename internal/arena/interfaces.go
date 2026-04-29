@@ -76,3 +76,11 @@ type TraceSummaryProvider interface {
 type RawScoresProvider interface {
 	RawScores() [2]int
 }
+
+// LeagueResolver returns the league level a factory will run with for the
+// given options (applying its game-specific default when "league" is unset).
+// Optional — if a GameFactory implements this, match stamps the resolved
+// value onto each trace as "league".
+type LeagueResolver interface {
+	ResolveLeague(options *viper.Viper) int
+}
