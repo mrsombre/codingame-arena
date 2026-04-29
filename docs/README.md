@@ -9,10 +9,10 @@ For a project overview, see the [top-level README](../README.md).
 | Command                     | Purpose                                                  |
 |-----------------------------|----------------------------------------------------------|
 | [`run`](run.md)             | Run one or more match simulations against a player       |
+| [`replay`](replay.md)       | Download replay JSON (`get`, `leaderboard` subcommands)  |
+| [`convert`](convert.md)     | Re-simulate downloaded replays into arena trace files    |
 | [`analyze`](analyze.md)     | Aggregate trace files into a winner-vs-loser report      |
 | [`serialize`](serialize.md) | Print initial game input for the first turn of a seed    |
-| [`convert`](convert.md)     | Re-simulate downloaded replays into arena trace files    |
-| [`replay`](replay.md)       | Download replay JSON (`get`, `leaderboard` subcommands)  |
 | [`serve`](serve.md)         | Serve the embedded web viewer                            |
 
 ## Typical flow

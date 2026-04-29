@@ -38,11 +38,11 @@ Timing: avg_first_response=29msx198ms avg_turn_response=0msx0ms
 | Command     | Purpose                                                 |
 |-------------|---------------------------------------------------------|
 | `run`       | Run one or more match simulations against a player      |
+| `replay`    | Download replay JSON (`get`, `leaderboard` subcommands) |
+| `convert`   | Convert replay JSON files into arena trace files        |
+| `analyze`   | Analyze winner-side strengths from trace files          |
 | `serialize` | Print initial game input for first turn for a seed      |
 | `serve`     | Serve the embedded web viewer                           |
-| `replay`    | Download replay JSON (`get`, `leaderboard` subcommands) |
-| `analyze`   | Analyze winner-side strengths from trace files          |
-| `convert`   | Convert replay JSON files into arena trace files        |
 
 Run `arena help <command>` for full flag listings.
 
