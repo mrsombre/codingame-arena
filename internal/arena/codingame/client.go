@@ -61,9 +61,19 @@ func (c *Client) ResolvePuzzle(prettyID string) (string, error) {
 	return resp.PuzzleLeaderboardID, nil
 }
 
-// FindAgent searches the leaderboard for a nickname and returns the player's
-// agentId for the given puzzle leaderboard slug. Matches case-insensitively.
-func (c *Client) FindAgent(apiSlug, nickname string) (int64, error) {
+// AgentInfo bundles the leaderboard fields the arena reads for a player.
+// Rank is the player's overall position; Division mirrors the API's
+// `league.divisionIndex`. Score is the elo-like value the API returns.
+type AgentInfo struct {
+	AgentID  int64
+	Rank     int
+	Division int
+	Score    float64
+}
+
+// FindAgent searches the leaderboard for a nickname and returns the matching
+// AgentInfo for the given puzzle leaderboard slug. Matches case-insensitively.
+func (c *Client) FindAgent(apiSlug, nickname string) (AgentInfo, error) {
 	payload, err := json.Marshal([]any{
 		apiSlug,
 		nil,
@@ -71,30 +81,46 @@ func (c *Client) FindAgent(apiSlug, nickname string) (int64, error) {
 		map[string]any{"active": true, "column": "KEYWORD", "filter": nickname},
 	})
 	if err != nil {
-		return 0, err
+		return AgentInfo{}, err
 	}
 	body, err := c.post(LeaderboardAPI, string(payload))
 	if err != nil {
-		return 0, fmt.Errorf("search leaderboard: %w", err)
+		return AgentInfo{}, fmt.Errorf("search leaderboard: %w", err)
 	}
 	var resp struct {
-		Users []struct {
-			Pseudo  string `json:"pseudo"`
-			AgentID int64  `json:"agentId"`
-		} `json:"users"`
+		Users []leaderboardUser `json:"users"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return 0, fmt.Errorf("parse leaderboard response: %w", err)
+		return AgentInfo{}, fmt.Errorf("parse leaderboard response: %w", err)
 	}
 	for _, u := range resp.Users {
 		if strings.EqualFold(u.Pseudo, nickname) && u.AgentID != 0 {
-			return u.AgentID, nil
+			return u.toAgentInfo(), nil
 		}
 	}
 	if len(resp.Users) > 0 && resp.Users[0].AgentID != 0 {
-		return resp.Users[0].AgentID, nil
+		return resp.Users[0].toAgentInfo(), nil
 	}
-	return 0, fmt.Errorf("no agentId found for nickname %q in puzzle %q", nickname, apiSlug)
+	return AgentInfo{}, fmt.Errorf("no agentId found for nickname %q in puzzle %q", nickname, apiSlug)
+}
+
+type leaderboardUser struct {
+	Pseudo  string  `json:"pseudo"`
+	AgentID int64   `json:"agentId"`
+	Rank    int     `json:"rank"`
+	Score   float64 `json:"score"`
+	League  struct {
+		DivisionIndex int `json:"divisionIndex"`
+	} `json:"league"`
+}
+
+func (u leaderboardUser) toAgentInfo() AgentInfo {
+	return AgentInfo{
+		AgentID:  u.AgentID,
+		Rank:     u.Rank,
+		Division: u.League.DivisionIndex,
+		Score:    u.Score,
+	}
 }
 
 // FindLastBattles returns the gameIds for the most recent battles played by

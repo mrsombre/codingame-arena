@@ -100,6 +100,16 @@ type convertReplayTarget struct {
 	Path string
 }
 
+// resolveReplaySeed returns the replay's seed, preferring the top-level Seed
+// field (set by PrepareReplay since the seed-promotion change) and falling
+// back to parsing the legacy gameResult.refereeInput for older saved files.
+func resolveReplaySeed(replay arena.CodinGameReplay[arena.CodinGameReplayFrame]) (int64, bool) {
+	if replay.Seed != 0 {
+		return replay.Seed, true
+	}
+	return arena.ParseReplaySeed(replay.GameResult.RefereeInput)
+}
+
 func convertReplayTargets(replayDir string, ids []int64) ([]convertReplayTarget, error) {
 	if len(ids) > 0 {
 		targets := make([]convertReplayTarget, 0, len(ids))
@@ -143,9 +153,9 @@ func convertReplayTargets(replayDir string, ids []int64) ([]convertReplayTarget,
 }
 
 func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], leagueOverride string) (arena.TraceMatch, int, error) {
-	seed, ok := arena.ParseReplaySeed(replay.GameResult.RefereeInput)
+	seed, ok := resolveReplaySeed(replay)
 	if !ok {
-		return arena.TraceMatch{}, 0, fmt.Errorf("replay missing seed in refereeInput")
+		return arena.TraceMatch{}, 0, fmt.Errorf("replay missing seed")
 	}
 
 	league := arena.ParseReplayLeague(replay.QuestionTitle)

@@ -73,8 +73,25 @@ done: 1 saved, 1 skipped, 1 failed (out=./replays)
 
 ```
 puzzle: winter-challenge-2026 -> winter-challenge-2026 (cached)
-player: mrsombre -> agentId 12345 (cached)
+player: mrsombre -> agentId 12345 (rank 210, division 3)
 battles: 50
 ```
 
 Saved replays are pretty-printed JSON ready for `arena convert` to turn into trace files.
+
+## Saved file shape
+
+Each saved replay is the upstream CodinGame `gameResult` body with viewer-only payloads stripped (top-level `viewer`, `shareable`; `gameResult.metadata`, `tooltips`; per-frame `view`, `gameInformation`, `keyframe`), the seed lifted to the top level, and arena-only annotations layered on:
+
+| Field         | Source                                           | Description                                                            |
+|---------------|--------------------------------------------------|------------------------------------------------------------------------|
+| `seed`        | extracted from `gameResult.refereeInput`         | Match RNG seed; JSON-string-encoded int64. Replaces `refereeInput`.    |
+| `blue`        | `<username>` argument                            | Player we are playing for (the analyze "us" side)                      |
+| `league`      | parsed from `questionTitle` (e.g. `level3` → 3)  | League level the match was played at                                   |
+| `source`      | `get` or `leaderboard`                           | Which subcommand produced this file                                    |
+| `fetched_at`  | RFC 3339 timestamp at download time              | Lets `analyze` filter cohorts chronologically                          |
+| `leaderboard` | `replay leaderboard` only                        | `{rank, division, score}` of the player at fetch time                  |
+
+`league` and `leaderboard.division` are deliberately separate: the former is the level a given match was played at, the latter is where the player currently sits on the ladder (Wood / Bronze / Silver / Gold / Legend, indexed from 0).
+
+For replays saved before the seed-promotion change, `refereeInput` is still preserved on read; `arena convert` falls back to parsing it when the top-level `seed` is absent.

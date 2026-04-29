@@ -6,6 +6,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+)
+
+// Replay source tags written into the saved replay's top-level "source" field.
+const (
+	ReplaySourceGet         = "get"
+	ReplaySourceLeaderboard = "leaderboard"
 )
 
 // CodinGameReplay is the shape of a CodinGame match replay JSON as returned by
@@ -17,24 +24,47 @@ import (
 // use the default CodinGameReplayFrame; games that do can declare their own
 // struct and pass it as F.
 //
-// Blue and League are arena-only annotations (not part of the upstream
-// CodinGame body): Blue is the username of the player we are playing for,
-// League is the league level the replay belongs to. Both are written by
-// `arena replay`.
+// Blue, League, Source, FetchedAt, and Leaderboard are arena-only annotations
+// (not part of the upstream CodinGame body): Blue is the username of the
+// player we are playing for, League is the league level the replay belongs
+// to, Source records which `arena replay` subcommand produced the file
+// ("get" or "leaderboard"), FetchedAt is the RFC 3339 download timestamp,
+// and Leaderboard carries the player's rank/division at fetch time
+// (populated only when downloaded via `replay leaderboard`).
 type CodinGameReplay[F any] struct {
 	PuzzleID      int                      `json:"puzzleId"`
 	PuzzleTitle   []string                 `json:"puzzleTitle"`
 	QuestionTitle string                   `json:"questionTitle"`
 	Blue          string                   `json:"blue,omitempty"`
 	League        int                      `json:"league,omitempty"`
-	GameResult    CodinGameReplayResult[F] `json:"gameResult"`
+	Source        string                   `json:"source,omitempty"`
+	FetchedAt     string                   `json:"fetched_at,omitempty"`
+	// Seed is the referee seed promoted to the top level by PrepareReplay so
+	// callers don't need to re-parse refereeInput. Encoded as a JSON string
+	// because seeds routinely exceed JS Number precision.
+	Seed        int64                    `json:"seed,string,omitempty"`
+	Leaderboard *ReplayLeaderboardInfo   `json:"leaderboard,omitempty"`
+	GameResult  CodinGameReplayResult[F] `json:"gameResult"`
+}
+
+// ReplayLeaderboardInfo captures the player's leaderboard standing at the
+// moment the replay was downloaded. Division mirrors the API's
+// `league.divisionIndex`. Score is the elo-like value the API returns; 0 if
+// unknown.
+type ReplayLeaderboardInfo struct {
+	Rank     int     `json:"rank"`
+	Division int     `json:"division"`
+	Score    float64 `json:"score,omitempty"`
 }
 
 // CodinGameReplayResult is the gameResult sub-object. Frames is the only
-// game-parameterized field.
+// game-parameterized field. RefereeInput is preserved on parsing so older
+// saved replays (written before the top-level Seed field existed) can still
+// be re-read; PrepareReplay strips it from new files once the seed is
+// promoted to the top level.
 type CodinGameReplayResult[F any] struct {
 	GameID       int64                  `json:"gameId"`
-	RefereeInput string                 `json:"refereeInput"`
+	RefereeInput string                 `json:"refereeInput,omitempty"`
 	Scores       []float64              `json:"scores"`
 	Ranks        []int                  `json:"ranks"`
 	Agents       []CodinGameReplayAgent `json:"agents"`
@@ -197,58 +227,137 @@ func ReplayPlayerNames(replay CodinGameReplay[CodinGameReplayFrame]) [2]string {
 	return names
 }
 
+// ReplayAnnotations carries the arena-only metadata written into a saved
+// replay JSON by `arena replay`. Zero values are omitted from the output.
+type ReplayAnnotations struct {
+	// Blue is the username of the player we are playing for.
+	Blue string
+	// League is the league level the match was played at (parsed from the
+	// CodinGame question title).
+	League int
+	// Source identifies which subcommand produced the file (ReplaySourceGet
+	// or ReplaySourceLeaderboard).
+	Source string
+	// FetchedAt is the time the replay was downloaded; serialized as RFC 3339.
+	FetchedAt time.Time
+	// Leaderboard captures the player's rank/division at fetch time. Set only
+	// when the replay was discovered via `replay leaderboard`.
+	Leaderboard *ReplayLeaderboardInfo
+}
+
+// Top-level keys that exist only to drive the CodinGame web viewer. Stripped
+// from saved replays so the on-disk shape mirrors what convert/analyze read.
+var replayStripTopLevel = []string{"viewer", "shareable"}
+
+// gameResult sub-keys with the same "viewer-only" property.
+var replayStripGameResult = []string{"metadata", "tooltips"}
+
+// Per-frame keys we drop. "view" is the serialized viewer state and is
+// usually the majority of the file size; "gameInformation" / "keyframe" are
+// viewer hints unused by convert/analyze.
+var replayStripFrame = []string{"view", "gameInformation", "keyframe"}
+
 // PrepareReplay normalizes a raw CodinGame replay JSON body for local
-// storage. It removes the top-level "viewer" field and the per-frame "view"
-// payloads (serialized viewer state nothing in this codebase reads, and
-// usually the majority of the file size), adds the arena-only annotations,
+// storage: removes viewer-only payloads, layers in the arena annotations,
 // and pretty-prints the result. If the body is not a JSON object, the
 // original bytes are returned unchanged.
-//
-// When blue is non-empty, a top-level "blue": "<username>" field is added to
-// record which player we are playing for. When league is non-zero, a
-// top-level "league": <num> field is added.
-func PrepareReplay(body []byte, blue string, league int) ([]byte, error) {
+func PrepareReplay(body []byte, ann ReplayAnnotations) ([]byte, error) {
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal(body, &top); err != nil {
 		return body, nil
 	}
 
-	delete(top, "viewer")
+	for _, key := range replayStripTopLevel {
+		delete(top, key)
+	}
 
-	if err := stripReplayFrameViews(top); err != nil {
+	if err := promoteReplaySeed(top); err != nil {
 		return nil, err
 	}
 
-	if blue != "" {
-		raw, err := json.Marshal(blue)
-		if err != nil {
-			return nil, err
-		}
-		top["blue"] = raw
-	}
-	if league != 0 {
-		raw, err := json.Marshal(league)
-		if err != nil {
-			return nil, err
-		}
-		top["league"] = raw
+	if err := stripReplayInner(top); err != nil {
+		return nil, err
 	}
 
-	var err error
-	body, err = json.Marshal(top)
+	if err := setIfNotEmpty(top, "blue", ann.Blue); err != nil {
+		return nil, err
+	}
+	if err := setIfNotZero(top, "league", ann.League); err != nil {
+		return nil, err
+	}
+	if err := setIfNotEmpty(top, "source", ann.Source); err != nil {
+		return nil, err
+	}
+	if !ann.FetchedAt.IsZero() {
+		if err := setRaw(top, "fetched_at", ann.FetchedAt.UTC().Format(time.RFC3339)); err != nil {
+			return nil, err
+		}
+	}
+	if ann.Leaderboard != nil {
+		if err := setRaw(top, "leaderboard", ann.Leaderboard); err != nil {
+			return nil, err
+		}
+	}
+
+	body, err := json.Marshal(top)
 	if err != nil {
 		return nil, err
 	}
-
 	return prettyJSON(body)
 }
 
-func stripReplayFrameViews(top map[string]json.RawMessage) error {
+// promoteReplaySeed reads gameResult.refereeInput, lifts the seed to the
+// top-level "seed" field as a JSON string, then drops refereeInput. Silent
+// no-op if gameResult is absent or no seed token is found.
+func promoteReplaySeed(top map[string]json.RawMessage) error {
 	var gameResult map[string]json.RawMessage
 	if err := json.Unmarshal(top["gameResult"], &gameResult); err != nil {
 		return nil
 	}
+	raw, ok := gameResult["refereeInput"]
+	if !ok {
+		return nil
+	}
+	var refereeInput string
+	if err := json.Unmarshal(raw, &refereeInput); err != nil {
+		return nil
+	}
+	seed, ok := ParseReplaySeed(refereeInput)
+	if !ok {
+		return nil
+	}
 
+	if err := setRaw(top, "seed", strconv.FormatInt(seed, 10)); err != nil {
+		return err
+	}
+	delete(gameResult, "refereeInput")
+
+	var err error
+	top["gameResult"], err = json.Marshal(gameResult)
+	return err
+}
+
+// stripReplayInner removes viewer-only fields nested under gameResult and
+// inside each frame. Silent no-op if gameResult or frames are absent.
+func stripReplayInner(top map[string]json.RawMessage) error {
+	var gameResult map[string]json.RawMessage
+	if err := json.Unmarshal(top["gameResult"], &gameResult); err != nil {
+		return nil
+	}
+	for _, key := range replayStripGameResult {
+		delete(gameResult, key)
+	}
+
+	if err := stripReplayFrames(gameResult); err != nil {
+		return err
+	}
+
+	var err error
+	top["gameResult"], err = json.Marshal(gameResult)
+	return err
+}
+
+func stripReplayFrames(gameResult map[string]json.RawMessage) error {
 	var frames []json.RawMessage
 	if err := json.Unmarshal(gameResult["frames"], &frames); err != nil {
 		return nil
@@ -260,11 +369,16 @@ func stripReplayFrameViews(top map[string]json.RawMessage) error {
 		if err := json.Unmarshal(frameBody, &frame); err != nil {
 			continue
 		}
-		if _, ok := frame["view"]; !ok {
+		dropped := false
+		for _, key := range replayStripFrame {
+			if _, ok := frame[key]; ok {
+				delete(frame, key)
+				dropped = true
+			}
+		}
+		if !dropped {
 			continue
 		}
-		delete(frame, "view")
-
 		var err error
 		frames[i], err = json.Marshal(frame)
 		if err != nil {
@@ -278,11 +392,30 @@ func stripReplayFrameViews(top map[string]json.RawMessage) error {
 
 	var err error
 	gameResult["frames"], err = json.Marshal(frames)
+	return err
+}
+
+func setIfNotEmpty(top map[string]json.RawMessage, key, value string) error {
+	if value == "" {
+		return nil
+	}
+	return setRaw(top, key, value)
+}
+
+func setIfNotZero(top map[string]json.RawMessage, key string, value int) error {
+	if value == 0 {
+		return nil
+	}
+	return setRaw(top, key, value)
+}
+
+func setRaw(top map[string]json.RawMessage, key string, value any) error {
+	raw, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
-	top["gameResult"], err = json.Marshal(gameResult)
-	return err
+	top[key] = raw
+	return nil
 }
 
 func prettyJSON(body []byte) ([]byte, error) {
