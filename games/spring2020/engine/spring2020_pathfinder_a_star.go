@@ -37,7 +37,6 @@ type AStar struct {
 	Weight  func(Coord) int
 	Closed  map[Coord]*PathItem
 	Open    *ItemHeap
-	Seq     int
 }
 
 func NewAStar(g *Grid, from, target Coord, weight func(Coord) int) *AStar {
@@ -84,9 +83,9 @@ PathItem getPathItemLinkedList() {
 
 func (a *AStar) Find() []*PathItem {
 	root := &PathItem{Coord: a.From}
-	a.Push(root)
+	heap.Push(a.Open, root)
 	for a.Open.Len() > 0 {
-		visiting := a.Pop()
+		visiting := heap.Pop(a.Open).(*PathItem)
 		if visiting.Coord == a.Target {
 			return ReversePath(visiting)
 		}
@@ -135,17 +134,7 @@ func (a *AStar) AddOpen(visiting *PathItem, from, to Coord) {
 	}
 	manh := a.Grid.CalculateDistance(from, to)
 	pi.TotalPrevisionalLength = pi.CumulativeLength + manh
-	a.Push(pi)
-}
-
-func (a *AStar) Push(pi *PathItem) {
-	pi.Seq = a.Seq
-	a.Seq++
 	heap.Push(a.Open, pi)
-}
-
-func (a *AStar) Pop() *PathItem {
-	return heap.Pop(a.Open).(*PathItem)
 }
 
 /*
@@ -172,17 +161,16 @@ func ReversePath(end *PathItem) []*PathItem {
 	return out
 }
 
-// ItemHeap orders by TotalPrevisionalLength, with Seq as a stable tie-breaker
-// so equal-priority items keep insertion order (Java's PriorityQueue does not
-// guarantee this, but the engine relies on observed Java behavior here).
+// ItemHeap orders by TotalPrevisionalLength only, mirroring Java's
+// PriorityQueue with Comparator.comparingInt(...). Equal-priority items
+// resolve in heap-internal order (which Go's container/heap matches because
+// both implementations are array-backed binary heaps with the same sift
+// rules — adding an explicit FIFO tiebreaker would diverge from Java).
 type ItemHeap []*PathItem
 
 func (h ItemHeap) Len() int { return len(h) }
 func (h ItemHeap) Less(i, j int) bool {
-	if h[i].TotalPrevisionalLength != h[j].TotalPrevisionalLength {
-		return h[i].TotalPrevisionalLength < h[j].TotalPrevisionalLength
-	}
-	return h[i].Seq < h[j].Seq
+	return h[i].TotalPrevisionalLength < h[j].TotalPrevisionalLength
 }
 func (h ItemHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
 func (h *ItemHeap) Push(x any)   { *h = append(*h, x.(*PathItem)) }
