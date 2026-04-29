@@ -5,6 +5,7 @@ package engine
 import (
 	"fmt"
 
+	"github.com/mrsombre/codingame-arena/internal/arena"
 	"github.com/mrsombre/codingame-arena/internal/util/javarand"
 )
 
@@ -40,6 +41,7 @@ type Game struct {
 	EndedFlag         bool
 	GameOverProcessed bool
 	Summary           []string
+	traces            []arena.TurnTrace
 }
 
 // NewGame sets up a fresh simulation with the given seed and league level.
@@ -425,6 +427,7 @@ Java's referee would have left on the grid.
 
 // PerformGameUpdate runs one full main turn including any speed sub-steps.
 func (g *Game) PerformGameUpdate() {
+	g.traces = g.traces[:0]
 	g.ExecutePacmenAbilities()
 	g.UpdateAbilityModifiers()
 	g.ProcessPacmenIntent()
@@ -502,9 +505,11 @@ func (g *Game) ExecutePacmenAbilities() {
 		switch ability {
 		case AbilitySetRock, AbilitySetPaper, AbilitySetScissors:
 			pac.Type = PacTypeFromAbility(ability)
+			g.trace(TraceSwitch, traceSwitchPayload(pac.ID, pac.Type))
 		case AbilitySpeed:
 			pac.Speed = g.Config.SPEED_BOOST
 			pac.AbilityDuration = g.Config.ABILITY_DURATION
+			g.trace(TraceSpeed, tracePacPayload(pac.ID))
 		}
 		pac.AbilityCooldown = g.Config.ABILITY_COOLDOWN
 	}
@@ -634,7 +639,11 @@ private void resolveMovement() {
 */
 
 func (g *Game) ResolveMovement() {
-	pacmenToKill := make([]*Pacman, 0)
+	type pendingKill struct {
+		victim *Pacman
+		killer *Pacman
+	}
+	var kills []pendingKill
 	seen := make(map[*Pacman]struct{})
 
 	resolution := g.ResolvePacmenMovement()
@@ -647,10 +656,16 @@ func (g *Game) ResolveMovement() {
 			if g.CanEat(pac, other) && g.PacmenHaveCollided(pac, other) {
 				if _, ok := seen[other]; !ok {
 					seen[other] = struct{}{}
-					pacmenToKill = append(pacmenToKill, other)
+					kills = append(kills, pendingKill{victim: other, killer: pac})
 				}
 			}
 		}
+	}
+
+	pacmenToKill := make([]*Pacman, len(kills))
+	for i, k := range kills {
+		pacmenToKill[i] = k.victim
+		g.trace(TraceKilled, traceKilledPayload(k.victim.ID, k.victim.Position, k.killer.ID))
 	}
 
 	g.KillPacmen(pacmenToKill)
@@ -1035,6 +1050,7 @@ func (g *Game) EatItem(hasItem func(*Cell) bool, pelletValue int) {
 			}
 			credited[pac.Owner] = struct{}{}
 			pac.Owner.Pellets += pelletValue
+			g.trace(TraceEat, traceEatPayload(pac.ID, coord, pelletValue))
 		}
 		cell := g.Grid.Get(coord)
 		cell.HasPellet = false

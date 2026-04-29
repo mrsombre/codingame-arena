@@ -143,15 +143,24 @@ func RunReplay(
 		winner = 1
 	}
 
+	var traceSummary *TraceSummary
+	if tsp, ok := referee.(TraceSummaryProvider); ok {
+		s := tsp.TraceSummary()
+		if !s.IsEmpty() {
+			traceSummary = &s
+		}
+	}
+
 	return TraceMatch{
-		MatchID:  0,
-		GameID:   factory.Name(),
-		PuzzleID: factory.PuzzleID(),
-		Seed:     seed,
-		Scores:   [2]TraceScore{TraceScore(scores[0]), TraceScore(scores[1])},
-		Ranks:    RanksFromWinner(winner),
-		Players:  [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
-		Timing:   &TraceTiming{},
-		Turns:    traceTurns,
+		MatchID:      0,
+		GameID:       factory.Name(),
+		PuzzleID:     factory.PuzzleID(),
+		Seed:         seed,
+		Scores:       [2]TraceScore{TraceScore(scores[0]), TraceScore(scores[1])},
+		Ranks:        RanksFromWinner(winner),
+		Players:      [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
+		Timing:       &TraceTiming{},
+		TraceSummary: traceSummary,
+		Turns:        traceTurns,
 	}
 }

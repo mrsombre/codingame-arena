@@ -244,16 +244,24 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				durationMillis(stats[1].MedianOutputTime),
 			},
 		}
+		var traceSummary *TraceSummary
+		if tsp, ok := referee.(TraceSummaryProvider); ok {
+			s := tsp.TraceSummary()
+			if !s.IsEmpty() {
+				traceSummary = &s
+			}
+		}
 		traceMatch := TraceMatch{
-			MatchID:  simulationID,
-			GameID:   runner.Factory.Name(),
-			PuzzleID: runner.Factory.PuzzleID(),
-			Seed:     seed,
-			Scores:   [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
-			Ranks:    RanksFromWinner(traceWinner),
-			Players:  [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
-			Timing:   traceTiming,
-			Turns:    traceTurns,
+			MatchID:      simulationID,
+			GameID:       runner.Factory.Name(),
+			PuzzleID:     runner.Factory.PuzzleID(),
+			Seed:         seed,
+			Scores:       [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
+			Ranks:        RanksFromWinner(traceWinner),
+			Players:      [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
+			Timing:       traceTiming,
+			TraceSummary: traceSummary,
+			Turns:        traceTurns,
 		}
 		if err := runner.Options.TraceWriter.WriteMatch(traceMatch); err != nil {
 			panic(err)

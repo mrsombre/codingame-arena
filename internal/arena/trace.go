@@ -35,17 +35,18 @@ func (s TraceScore) MarshalJSON() ([]byte, error) {
 // intentionally not recorded — the bot→side mapping here is ground truth for
 // downstream trace consumers (e.g. training).
 type TraceMatch struct {
-	TraceID  int64         `json:"trace_id,omitempty"`
-	MatchID  int           `json:"match_id"`
-	Type     string        `json:"type,omitempty"`
-	GameID   string        `json:"gameId,omitempty"`
-	PuzzleID int           `json:"puzzleId,omitempty"`
-	Seed     int64         `json:"seed,string"`
-	Scores   [2]TraceScore `json:"scores"`
-	Ranks    [2]int        `json:"ranks"`
-	Players  [2]string     `json:"players"`
-	Timing   *TraceTiming  `json:"timing,omitempty"`
-	Turns    []TraceTurn   `json:"turns"`
+	TraceID      int64         `json:"trace_id,omitempty"`
+	MatchID      int           `json:"match_id"`
+	Type         string        `json:"type,omitempty"`
+	GameID       string        `json:"gameId,omitempty"`
+	PuzzleID     int           `json:"puzzleId,omitempty"`
+	Seed         int64         `json:"seed,string"`
+	Scores       [2]TraceScore `json:"scores"`
+	Ranks        [2]int        `json:"ranks"`
+	Players      [2]string     `json:"players"`
+	Timing       *TraceTiming  `json:"timing,omitempty"`
+	TraceSummary *TraceSummary `json:"trace_summary,omitempty"`
+	Turns        []TraceTurn   `json:"turns"`
 }
 
 // RanksFromWinner returns the CodinGame-style ranks array for a 2-player match

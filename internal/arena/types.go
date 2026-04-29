@@ -14,6 +14,20 @@ type TurnTrace struct {
 	Payload string `json:"payload"`
 }
 
+// TraceSummary is the per-match aggregate of trace events. The outer index is
+// the in-match player side (0 = left). Each entry maps a trace label to a
+// per-pac (or per-unit) list of turn IDs at which that label fired with that
+// unit as its subject.
+//
+// Example: TraceSummary[0]["EAT"][2] = [3, 7, 12] means side-0 unit number 2
+// triggered EAT events on turns 3, 7, and 12.
+type TraceSummary [2]map[string][][]int
+
+// IsEmpty reports whether neither side has any recorded events.
+func (s TraceSummary) IsEmpty() bool {
+	return len(s[0]) == 0 && len(s[1]) == 0
+}
+
 // LossReason describes why a player lost a match.
 type LossReason string
 
