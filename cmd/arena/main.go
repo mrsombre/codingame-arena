@@ -58,6 +58,9 @@ func main() {
 		commands.AddRunFlags(fs)
 		handler = commands.Run
 		needsFactory = true
+	case "analyze":
+		commands.AddAnalyzeFlags(fs)
+		handler = commands.Analyze
 	case "convert":
 		commands.AddConvertFlags(fs)
 		handler = commands.Convert
@@ -136,6 +139,9 @@ func printHelp(args []string, games []string) error {
 	case "run":
 		commands.AddRunFlags(fs)
 		fmt.Println(commands.RunUsage(fs))
+	case "analyze":
+		commands.AddAnalyzeFlags(fs)
+		fmt.Println(commands.AnalyzeUsage(fs))
 	case "convert":
 		commands.AddConvertFlags(fs)
 		fmt.Println(commands.ConvertUsage(fs))
