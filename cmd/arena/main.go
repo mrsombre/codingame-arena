@@ -84,9 +84,11 @@ func main() {
 		case "get":
 			commands.AddReplayGetFlags(fs)
 			handler = commands.ReplayGet
+			needsFactory = true
 		case "leaderboard":
 			commands.AddReplayLeaderboardFlags(fs)
 			handler = commands.ReplayLeaderboard
+			needsFactory = true
 		default:
 			fmt.Fprintf(os.Stderr, "unknown replay subcommand %q; run `arena help replay` for usage\n", sub)
 			os.Exit(1)

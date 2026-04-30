@@ -46,8 +46,8 @@ func TestAnalyzeTracesComparesWinnersAgainstLosers(t *testing.T) {
 					Ranks:        [2]int{0, 1},
 					TraceSummary: &traceSummaryA,
 					Turns: []arena.TraceTurn{
-						{Turn: 0, P0Output: "SPEED 0 | MOVE 1 1 1", P1Output: "MOVE 0 2 2"},
-						{Turn: 1, P0Output: "MOVE 0 1 1", P1Output: "SPEED 0"},
+						{Turn: 0, Output: [2]string{"SPEED 0 | MOVE 1 1 1", "MOVE 0 2 2"}},
+						{Turn: 1, Output: [2]string{"MOVE 0 1 1", "SPEED 0"}},
 					},
 				},
 			},
@@ -59,7 +59,7 @@ func TestAnalyzeTracesComparesWinnersAgainstLosers(t *testing.T) {
 					Ranks:        [2]int{1, 0},
 					TraceSummary: &traceSummaryB,
 					Turns: []arena.TraceTurn{
-						{Turn: 0, P0Output: "MOVE 0 1 1", P1Output: "MOVE 0 2 2 | SPEED 1"},
+						{Turn: 0, Output: [2]string{"MOVE 0 1 1", "MOVE 0 2 2 | SPEED 1"}},
 					},
 				},
 			},

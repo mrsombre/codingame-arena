@@ -55,10 +55,10 @@ Usage: arena <command> [OPTIONS]
 
 Commands:
   run          Run one or more match simulations against a player binary
+  replay       Download replay JSON (sub: get <url|id>..., leaderboard <url> <nick>)
+  convert      Convert replay JSON files into arena trace files
   analyze      Analyze winner-side strengths from trace files
   serialize    Print initial game input for first turn for a given seed
-  convert      Convert replay JSON files into arena trace files
-  replay       Download replay JSON (sub: get <url|id>..., leaderboard <url> <nick>)
   serve        Serve the embedded web viewer
 
 Use "arena help <command>" for more information about a command.

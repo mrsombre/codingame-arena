@@ -130,9 +130,9 @@ func handleReplayGet(replayDir string, factory arena.GameFactory) http.HandlerFu
 			return
 		}
 
-		seed, ok := arena.ParseReplaySeed(replay.GameResult.RefereeInput)
+		seed, ok := arena.ResolveReplaySeed(replay)
 		if !ok {
-			writeError(w, http.StatusBadRequest, "replay missing seed in refereeInput")
+			writeError(w, http.StatusBadRequest, "replay missing seed")
 			return
 		}
 
@@ -144,8 +144,12 @@ func handleReplayGet(replayDir string, factory arena.GameFactory) http.HandlerFu
 
 		moves := arena.ReplayMovesFromFrames(replay)
 		names := arena.ReplayPlayerNames(replay)
+		blueSide := 0
+		if replay.Blue != "" && names[1] == replay.Blue {
+			blueSide = 1
+		}
 
-		trace := arena.RunReplay(factory, seed, gameOptions, moves, names, 0)
+		trace, _ := arena.RunReplay(factory, seed, gameOptions, moves, names, blueSide, 0)
 		// Keep the original replay id so the client can use it as a stable key.
 		if n, err := strconv.Atoi(id); err == nil {
 			trace.MatchID = n

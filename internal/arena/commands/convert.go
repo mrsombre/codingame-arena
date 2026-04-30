@@ -80,6 +80,9 @@ func Convert(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfl
 		}
 		trace.MatchID = 0
 		trace.Type = arena.TraceTypeReplay
+		trace.Blue = replay.Blue
+		trace.League = replay.League
+		trace.CreatedAt = replay.FetchedAt
 
 		if err := arena.NewTraceWriter(opts.TraceDir, target.ID).WriteMatch(trace); err != nil {
 			return fmt.Errorf("write trace for replay %d: %w", target.ID, err)
@@ -143,9 +146,9 @@ func convertReplayTargets(replayDir string, ids []int64) ([]convertReplayTarget,
 }
 
 func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], leagueOverride string) (arena.TraceMatch, int, error) {
-	seed, ok := arena.ParseReplaySeed(replay.GameResult.RefereeInput)
+	seed, ok := arena.ResolveReplaySeed(replay)
 	if !ok {
-		return arena.TraceMatch{}, 0, fmt.Errorf("replay missing seed in refereeInput")
+		return arena.TraceMatch{}, 0, fmt.Errorf("replay missing seed")
 	}
 
 	league := arena.ParseReplayLeague(replay.QuestionTitle)
@@ -162,30 +165,43 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		gameOptions.Set("league", strconv.Itoa(league))
 	}
 
-	trace := arena.RunReplay(
+	botNames := arena.ReplayPlayerNames(replay)
+	blueSide := 0
+	if replay.Blue != "" && botNames[1] == replay.Blue {
+		blueSide = 1
+	}
+
+	trace, finalScores := arena.RunReplay(
 		factory,
 		seed,
 		gameOptions,
 		arena.ReplayMovesFromFrames(replay),
-		arena.ReplayPlayerNames(replay),
+		botNames,
+		blueSide,
 		0,
 	)
 
-	if err := verifyReplayTrace(trace, replay); err != nil {
+	if err := verifyReplayTrace(trace, finalScores, replay); err != nil {
 		return arena.TraceMatch{}, league, err
 	}
 
 	return trace, league, nil
 }
 
-func verifyReplayTrace(trace arena.TraceMatch, replay arena.CodinGameReplay[arena.CodinGameReplayFrame]) error {
+// verifyReplayTrace checks the engine reproduces the replay. finalScores are
+// the post-OnEnd values (Player.GetScore after tie-break and deactivation
+// adjustments) — the same shape the replay's gameResult.scores carries.
+// trace.Scores cannot be used for this comparison: it stores raw bird-segment
+// counts that diverge whenever OnEnd touched the value (ties in raw scores
+// trigger a losses subtraction, deactivated players become -1).
+func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame]) error {
 	if len(replay.GameResult.Scores) < 2 {
 		return fmt.Errorf("replay scores must contain two entries")
 	}
-	if float64(trace.Scores[0]) != replay.GameResult.Scores[0] || float64(trace.Scores[1]) != replay.GameResult.Scores[1] {
-		return fmt.Errorf("%w: score mismatch: replay=[%.1f %.1f] engine=[%.1f %.1f]",
+	if float64(finalScores[0]) != replay.GameResult.Scores[0] || float64(finalScores[1]) != replay.GameResult.Scores[1] {
+		return fmt.Errorf("%w: score mismatch: replay=[%.1f %.1f] engine=[%d %d]",
 			errReplayMismatch,
-			replay.GameResult.Scores[0], replay.GameResult.Scores[1], trace.Scores[0], trace.Scores[1])
+			replay.GameResult.Scores[0], replay.GameResult.Scores[1], finalScores[0], finalScores[1])
 	}
 
 	expectedTurns := arena.ReplayTraceTurnCount(replay)

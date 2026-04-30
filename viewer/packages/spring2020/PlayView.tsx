@@ -9,7 +9,7 @@ import { useState } from "react"
 import { type MapData, parseSerializeResponse, type TraceMatch } from "./parser.ts"
 import { ReplayViewer } from "./ReplayViewer.tsx"
 
-let lastSingleMatch: { mapData: MapData; trace: TraceMatch; status: string; fogPerspectiveSide: 0 | 1 } | null = null
+let lastSingleMatch: { mapData: MapData; trace: TraceMatch; status: string } | null = null
 
 interface PlayViewProps {
   bots: BotEntry[]
@@ -25,7 +25,6 @@ export function PlayView({ bots }: PlayViewProps) {
   const [running, setRunning] = useState(false)
   const [mapData, setMapData] = useState<MapData | null>(lastSingleMatch?.mapData ?? null)
   const [trace, setTrace] = useState<TraceMatch | null>(lastSingleMatch?.trace ?? null)
-  const [fogPerspectiveSide, setFogPerspectiveSide] = useState<0 | 1>(lastSingleMatch?.fogPerspectiveSide ?? 0)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -84,14 +83,12 @@ export function PlayView({ bots }: PlayViewProps) {
       }
 
       const winnerStr = runData.winner === -1 ? "draw" : `p${runData.winner}`
-      const mainTurns = traceJson.turns.filter((t) => t.game_input.p0 || t.game_input.p1).length
+      const mainTurns = traceJson.turns.filter((t) => t.game_input).length
       const ttfo = runData.ttfo_ms ?? [0, 0]
       const aot = runData.aot_ms ?? [0, 0]
       const statusLine = `seed=${actualSeed}  ${map.width}\u00d7${map.height}  winner=${winnerStr}  score=${runData.score_p0}:${runData.score_p1}  turns=${runData.turns} [${mainTurns}]  p0 ttfo=${ttfo[0].toFixed(0)}ms aot=${aot[0].toFixed(0)}ms  p1 ttfo=${ttfo[1].toFixed(0)}ms aot=${aot[1].toFixed(0)}ms`
       setStatus(statusLine)
-      const fog: 0 | 1 = runData.swapped ? 1 : 0
-      setFogPerspectiveSide(fog)
-      lastSingleMatch = { mapData: map, trace: traceJson, status: statusLine, fogPerspectiveSide: fog }
+      lastSingleMatch = { mapData: map, trace: traceJson, status: statusLine }
       setMapData(map)
       setTrace(traceJson)
     } catch (err) {
@@ -176,7 +173,7 @@ export function PlayView({ bots }: PlayViewProps) {
   )
 
   if (mapData && trace) {
-    return <ReplayViewer mapData={mapData} trace={trace} fogPerspectiveSide={fogPerspectiveSide} status={status} leftSlot={form} />
+    return <ReplayViewer mapData={mapData} trace={trace} status={status} leftSlot={form} />
   }
   return (
     <div className="flex gap-8">

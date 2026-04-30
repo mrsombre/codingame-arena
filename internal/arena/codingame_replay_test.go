@@ -3,14 +3,27 @@ package arena
 import (
 	"reflect"
 	"testing"
+	"time"
 )
 
-func TestPrepareReplay_PrettyPrintsAndRemovesViewer(t *testing.T) {
+func TestPrepareReplay_StripsViewerOnlyFields(t *testing.T) {
 	t.Parallel()
 
-	body := []byte(`{"puzzleId":1,"questionTitle":"Winter Challenge","puzzleTitle":["Winter"],"gameResult":{"gameId":42,"frames":[{"agentId":0,"view":"big-payload","stdout":"MOVE"}]},"viewer":{"frames":[]}}`)
+	body := []byte(`{
+		"puzzleId":1,
+		"questionTitle":"Winter Challenge",
+		"puzzleTitle":["Winter"],
+		"shareable":true,
+		"viewer":{"frames":[]},
+		"gameResult":{
+			"gameId":42,
+			"metadata":{"foo":"bar"},
+			"tooltips":["t1"],
+			"frames":[{"agentId":0,"view":"big-payload","gameInformation":"","keyframe":false,"stdout":"MOVE"}]
+		}
+	}`)
 
-	got, err := PrepareReplay(body, "", 0)
+	got, err := PrepareReplay(body, ReplayAnnotations{})
 	if err != nil {
 		t.Fatalf("PrepareReplay() error = %v", err)
 	}
@@ -36,12 +49,54 @@ func TestPrepareReplay_PrettyPrintsAndRemovesViewer(t *testing.T) {
 	}
 }
 
+func TestPrepareReplay_PromotesSeedAndDropsRefereeInput(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"gameResult":{"gameId":42,"refereeInput":"seed=6978185030065794000\n"}}`)
+
+	got, err := PrepareReplay(body, ReplayAnnotations{})
+	if err != nil {
+		t.Fatalf("PrepareReplay() error = %v", err)
+	}
+
+	want := "{\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42\n" +
+		"  },\n" +
+		"  \"seed\": \"6978185030065794000\"\n" +
+		"}\n"
+	if string(got) != want {
+		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
+func TestPrepareReplay_KeepsRefereeInputWhenSeedMissing(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"gameResult":{"gameId":42,"refereeInput":"max-turns=200"}}`)
+
+	got, err := PrepareReplay(body, ReplayAnnotations{})
+	if err != nil {
+		t.Fatalf("PrepareReplay() error = %v", err)
+	}
+
+	want := "{\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42,\n" +
+		"    \"refereeInput\": \"max-turns=200\"\n" +
+		"  }\n" +
+		"}\n"
+	if string(got) != want {
+		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
 func TestPrepareReplay_RemovesFrameViewOnly(t *testing.T) {
 	t.Parallel()
 
 	body := []byte(`{"gameResult":{"gameId":42,"frames":[{"agentId":0,"view":"big-payload","stdout":"MOVE"},{"agentId":1,"summary":"ok"},"raw"]}}`)
 
-	got, err := PrepareReplay(body, "", 0)
+	got, err := PrepareReplay(body, ReplayAnnotations{})
 	if err != nil {
 		t.Fatalf("PrepareReplay() error = %v", err)
 	}
@@ -72,34 +127,12 @@ func TestPrepareReplay_PrettyPrintsWithoutViewer(t *testing.T) {
 
 	body := []byte("{\"puzzleId\":1,\"gameResult\":{\"gameId\":42}}")
 
-	got, err := PrepareReplay(body, "", 0)
+	got, err := PrepareReplay(body, ReplayAnnotations{})
 	if err != nil {
 		t.Fatalf("PrepareReplay() error = %v", err)
 	}
 
 	want := "{\n" +
-		"  \"gameResult\": {\n" +
-		"    \"gameId\": 42\n" +
-		"  },\n" +
-		"  \"puzzleId\": 1\n" +
-		"}\n"
-	if string(got) != want {
-		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
-	}
-}
-
-func TestPrepareReplay_AddsBlueField(t *testing.T) {
-	t.Parallel()
-
-	body := []byte(`{"puzzleId":1,"gameResult":{"gameId":42}}`)
-
-	got, err := PrepareReplay(body, "mrsombre", 0)
-	if err != nil {
-		t.Fatalf("PrepareReplay() error = %v", err)
-	}
-
-	want := "{\n" +
-		"  \"blue\": \"mrsombre\",\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
 		"  },\n" +
@@ -115,7 +148,7 @@ func TestPrepareReplay_AddsBlueAndLeagueFields(t *testing.T) {
 
 	body := []byte(`{"puzzleId":1,"gameResult":{"gameId":42}}`)
 
-	got, err := PrepareReplay(body, "mrsombre", 4)
+	got, err := PrepareReplay(body, ReplayAnnotations{Blue: "mrsombre", League: 4})
 	if err != nil {
 		t.Fatalf("PrepareReplay() error = %v", err)
 	}
@@ -127,6 +160,97 @@ func TestPrepareReplay_AddsBlueAndLeagueFields(t *testing.T) {
 		"  },\n" +
 		"  \"league\": 4,\n" +
 		"  \"puzzleId\": 1\n" +
+		"}\n"
+	if string(got) != want {
+		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
+func TestPrepareReplay_AddsSourceAndFetchedAt(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"puzzleId":1,"gameResult":{"gameId":42}}`)
+	at := time.Date(2026, 4, 29, 11, 23, 45, 0, time.UTC)
+
+	got, err := PrepareReplay(body, ReplayAnnotations{
+		Source:    ReplaySourceGet,
+		FetchedAt: at,
+	})
+	if err != nil {
+		t.Fatalf("PrepareReplay() error = %v", err)
+	}
+
+	want := "{\n" +
+		"  \"fetched_at\": \"2026-04-29T11:23:45Z\",\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42\n" +
+		"  },\n" +
+		"  \"puzzleId\": 1,\n" +
+		"  \"source\": \"get\"\n" +
+		"}\n"
+	if string(got) != want {
+		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
+func TestPrepareReplay_OverridesPuzzleIDAndTitle(t *testing.T) {
+	t.Parallel()
+
+	// API returned puzzleId=0 with no puzzleTitle (the actual shape we see for
+	// games like 882653023). Annotations carry the canonical values from the
+	// factory; PrepareReplay must layer them on top, writing puzzleTitle as a
+	// plain string (CG's array form is unnecessary for our consumers).
+	body := []byte(`{"puzzleId":0,"questionTitle":"SnakeBot level4","gameResult":{"gameId":42}}`)
+
+	got, err := PrepareReplay(body, ReplayAnnotations{
+		PuzzleID:    13771,
+		PuzzleTitle: "SnakeByte - Winter Challenge 2026",
+	})
+	if err != nil {
+		t.Fatalf("PrepareReplay() error = %v", err)
+	}
+
+	want := "{\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42\n" +
+		"  },\n" +
+		"  \"puzzleId\": 13771,\n" +
+		"  \"puzzleTitle\": \"SnakeByte - Winter Challenge 2026\",\n" +
+		"  \"questionTitle\": \"SnakeBot level4\"\n" +
+		"}\n"
+	if string(got) != want {
+		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
+func TestPrepareReplay_AddsLeaderboardInfo(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"puzzleId":1,"gameResult":{"gameId":42}}`)
+
+	got, err := PrepareReplay(body, ReplayAnnotations{
+		Source: ReplaySourceLeaderboard,
+		Leaderboard: &ReplayLeaderboardInfo{
+			Rank:     210,
+			Division: 3,
+			Score:    18.95,
+		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareReplay() error = %v", err)
+	}
+
+	want := "{\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42\n" +
+		"  },\n" +
+		"  \"leaderboard\": {\n" +
+		"    \"rank\": 210,\n" +
+		"    \"division\": 3,\n" +
+		"    \"score\": 18.95\n" +
+		"  },\n" +
+		"  \"puzzleId\": 1,\n" +
+		"  \"source\": \"leaderboard\"\n" +
 		"}\n"
 	if string(got) != want {
 		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
@@ -206,6 +330,29 @@ func TestReplayTraceTurnCount(t *testing.T) {
 	// by the engine and does not count.
 	if got := ReplayTraceTurnCount(replay); got != 3 {
 		t.Fatalf("ReplayTraceTurnCount() = %d, want 3", got)
+	}
+}
+
+func TestReplayTraceTurnCount_DeactivationPairFrame(t *testing.T) {
+	t.Parallel()
+
+	// Last turn pairs P0's normal stdout with P1's empty stdout (timeout). The
+	// empty frame closes turn 2 — it is NOT a separate game-over marker, so
+	// the count must stay at 2 instead of being incremented to 3.
+	replay := CodinGameReplay[CodinGameReplayFrame]{
+		GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+			Frames: []CodinGameReplayFrame{
+				{AgentID: -1, Summary: "init"},
+				{AgentID: 0, Stdout: "0 UP"},
+				{AgentID: 1, Stdout: "4 UP"},
+				{AgentID: 0, Stdout: "0 LEFT"},
+				{AgentID: 1, Stdout: "", Summary: "$1 has not provided 1 lines in time\n"},
+			},
+		},
+	}
+
+	if got := ReplayTraceTurnCount(replay); got != 2 {
+		t.Fatalf("ReplayTraceTurnCount() = %d, want 2", got)
 	}
 }
 

@@ -60,20 +60,27 @@ func ReplayLeaderboardUsage(fs *pflag.FlagSet) string {
 // ReplayGet is the entry point for the "replay get" subcommand. It downloads
 // the raw replay JSON for one or more CodinGame games, strips the unused
 // top-level viewer payload, and writes each replay back as pretty-printed JSON.
-func ReplayGet(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
+func ReplayGet(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
 	opts, err := parseReplayGetOptions(args, fs, v)
 	if err != nil {
 		return err
 	}
 
 	client := codingame.New()
-	return downloadReplays(client, opts.IDs, opts.Username, opts.League, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
+	ann := arena.ReplayAnnotations{
+		Blue:        opts.Username,
+		League:      opts.League,
+		Source:      arena.ReplaySourceGet,
+		PuzzleID:    factory.PuzzleID(),
+		PuzzleTitle: factory.PuzzleTitle(),
+	}
+	return downloadReplays(client, opts.IDs, ann, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
 }
 
 // ReplayLeaderboard is the entry point for the "replay leaderboard"
 // subcommand. It resolves a CodinGame leaderboard URL plus nickname into the
 // player's last battles and downloads each replay as pretty-printed JSON.
-func ReplayLeaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
+func ReplayLeaderboard(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
 	opts, err := parseReplayLeaderboardOptions(args, fs, v)
 	if err != nil {
 		return err
@@ -93,27 +100,39 @@ func ReplayLeaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs 
 	}
 	_, _ = fmt.Fprintf(stdout, "puzzle: %s -> %s%s\n", opts.Slug, apiSlug, cacheTag(puzzleHit))
 
-	agentID, playerHit, err := resolveAgent(client, store, apiSlug, opts.Username)
+	info, err := resolveAgent(client, store, apiSlug, opts.Username)
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(stdout, "player: %s -> agentId %d%s\n", opts.Username, agentID, cacheTag(playerHit))
+	_, _ = fmt.Fprintf(stdout, "player: %s -> agentId %d (rank %d, division %d)\n",
+		opts.Username, info.AgentID, info.Rank, info.Division)
 
-	gameIDs, err := client.FindLastBattles(agentID)
+	gameIDs, err := client.FindLastBattles(info.AgentID)
 	if err != nil {
 		return err
 	}
 	_, _ = fmt.Fprintf(stdout, "battles: %d\n", len(gameIDs))
 
-	return downloadReplays(client, gameIDs, opts.Username, opts.League, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
+	ann := arena.ReplayAnnotations{
+		Blue:   opts.Username,
+		League: opts.League,
+		Source: arena.ReplaySourceLeaderboard,
+		Leaderboard: &arena.ReplayLeaderboardInfo{
+			Rank:     info.Rank,
+			Division: info.Division,
+			Score:    info.Score,
+		},
+		PuzzleID:    factory.PuzzleID(),
+		PuzzleTitle: factory.PuzzleTitle(),
+	}
+	return downloadReplays(client, gameIDs, ann, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
 }
 
 // downloadReplays runs the shared per-ID download loop: skip-if-exists (unless
 // force is set), inter-request delay, soft failure, and a final summary line.
-// blue is the username we are playing for; when non-empty it is written as
-// the top-level "blue" field of every saved replay JSON. league, when
-// non-zero, is written as the top-level "league" field.
-func downloadReplays(client *codingame.Client, ids []int64, blue string, league int, outDir string, limit int, delay time.Duration, force bool, stdout io.Writer) error {
+// ann is layered into every saved replay's top-level metadata; FetchedAt is
+// stamped per-replay at the moment FetchReplay returns successfully.
+func downloadReplays(client *codingame.Client, ids []int64, ann arena.ReplayAnnotations, outDir string, limit int, delay time.Duration, force bool, stdout io.Writer) error {
 	if limit > 0 && len(ids) > limit {
 		ids = ids[:limit]
 	}
@@ -145,7 +164,9 @@ func downloadReplays(client *codingame.Client, ids []int64, blue string, league 
 			_, _ = fmt.Fprintf(stdout, "[%d/%d] fail %d: %v\n", i+1, len(ids), id, err)
 			continue
 		}
-		body, err = arena.PrepareReplay(body, blue, league)
+		annPerReplay := ann
+		annPerReplay.FetchedAt = time.Now()
+		body, err = arena.PrepareReplay(body, annPerReplay)
 		if err != nil {
 			return fmt.Errorf("prepare replay %d: %w", id, err)
 		}
@@ -186,20 +207,16 @@ func resolvePuzzle(client *codingame.Client, store *db.DB, prettyID string) (str
 	return apiSlug, false, nil
 }
 
-// resolveAgent reads from cache, falling back to a CodinGame leaderboard
-// search and persisting the result.
-func resolveAgent(client *codingame.Client, store *db.DB, apiSlug, nickname string) (int64, bool, error) {
-	if cached, err := store.Players.Find(apiSlug, nickname); err != nil {
-		return 0, false, err
-	} else if cached != nil {
-		return cached.AgentID, true, nil
-	}
-	agentID, err := client.FindAgent(apiSlug, nickname)
+// resolveAgent fetches the player's current leaderboard standing and refreshes
+// the local cache. Always hits the API: rank/division change continuously, so
+// stale cache entries would silently mislabel saved replays.
+func resolveAgent(client *codingame.Client, store *db.DB, apiSlug, nickname string) (codingame.AgentInfo, error) {
+	info, err := client.FindAgent(apiSlug, nickname)
 	if err != nil {
-		return 0, false, err
+		return codingame.AgentInfo{}, err
 	}
-	if err := store.Players.Save(apiSlug, nickname, agentID); err != nil {
-		return 0, false, fmt.Errorf("cache player: %w", err)
+	if err := store.Players.Save(apiSlug, nickname, info.AgentID); err != nil {
+		return codingame.AgentInfo{}, fmt.Errorf("cache player: %w", err)
 	}
-	return agentID, false, nil
+	return info, nil
 }

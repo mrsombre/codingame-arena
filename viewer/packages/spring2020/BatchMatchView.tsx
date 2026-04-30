@@ -28,7 +28,7 @@ export function BatchMatchView({ matchId }: BatchMatchViewProps) {
     )
   }
 
-  const { match: m, mapData, trace, fogPerspectiveSide } = entry
+  const { match: m, mapData, trace } = entry
   const winnerLabel = m.winner === -1 ? "draw" : `p${m.winner}`
   const replayStatus = `match #${m.id}  seed=${m.seed}  ${m.p0_bot} vs ${m.p1_bot}  winner=${winnerLabel}  score=${m.score_p0}:${m.score_p1}  turns=${m.turns}  p0 ttfo=${m.ttfo_p0_ms.toFixed(0)}ms aot=${m.aot_p0_ms.toFixed(0)}ms  p1 ttfo=${m.ttfo_p1_ms.toFixed(0)}ms aot=${m.aot_p1_ms.toFixed(0)}ms`
 
@@ -40,5 +40,5 @@ export function BatchMatchView({ matchId }: BatchMatchViewProps) {
     </Button>
   )
 
-  return <ReplayViewer mapData={mapData} trace={trace} fogPerspectiveSide={fogPerspectiveSide} status={replayStatus} leftSlot={backCard} />
+  return <ReplayViewer mapData={mapData} trace={trace} status={replayStatus} leftSlot={backCard} />
 }

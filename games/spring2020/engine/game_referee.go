@@ -259,6 +259,42 @@ func (r *Referee) RawScores() [2]int {
 	return scores
 }
 
+// EndReason categorizes how the match terminated. Priority: deactivation
+// reason (if any side is deactivated) > IsGameOver via score lock-in > turn
+// cap. The "all pacmen dead" deactivation maps to ELIMINATED rather than a
+// disqualification — it's a normal in-game elimination, not a fault.
+//
+// "Timeout!" is the literal deactivation message used by both the arena
+// runner (on no output) and CommandManager.ParseCommands (on empty input).
+func (r *Referee) EndReason(turn int, players []arena.Player, deactivationTurns [2]int) string {
+	for i, p := range players {
+		if !p.IsDeactivated() {
+			continue
+		}
+		reason := p.DeactivationReason()
+		switch {
+		case reason == "Timeout!" && deactivationTurns[i] == 0:
+			return arena.EndReasonTimeoutStart
+		case reason == "Timeout!":
+			return arena.EndReasonTimeout
+		case reason == "all pacmen dead":
+			return arena.EndReasonEliminated
+		default:
+			return arena.EndReasonInvalid
+		}
+	}
+
+	// Both sides still active. IsGameOver here means canImproveRanking lock-in.
+	if r.Game.IsGameOver() {
+		if r.Game.RemainingPellets() == 0 {
+			return arena.EndReasonScore
+		}
+		return arena.EndReasonScoreEarly
+	}
+
+	return arena.EndReasonTurnsOut
+}
+
 // Metrics emits Spring 2020-specific per-match metrics.
 func (r *Referee) Metrics() []arena.Metric {
 	remainingPellets := 0

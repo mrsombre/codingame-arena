@@ -24,7 +24,7 @@ func TestLoadAnalyzeTraceFilesSkipsNonTraceJSON(t *testing.T) {
   "seed": "1",
   "scores": [1.0, 0.0],
   "ranks": [0, 1],
-  "turns": [{"turn": 0, "p0_output": "WAIT", "p1_output": "WAIT"}]
+  "turns": [{"turn": 0, "output": ["WAIT", "WAIT"]}]
 }`)
 
 	files, err := loadAnalyzeTraceFiles(traceDir)
@@ -114,6 +114,8 @@ type recordingAnalyzeFactory struct {
 func (f *recordingAnalyzeFactory) Name() string { return f.name }
 
 func (f *recordingAnalyzeFactory) PuzzleID() int { return 0 }
+
+func (f *recordingAnalyzeFactory) PuzzleTitle() string { return "" }
 
 func (f *recordingAnalyzeFactory) NewGame(_ int64, _ *viper.Viper) (arena.Referee, []arena.Player) {
 	panic("not used")

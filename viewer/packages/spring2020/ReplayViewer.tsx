@@ -1,9 +1,9 @@
 import { Button } from "@shared/components/ui/button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "@shared/components/ui/card.tsx"
 import { Slider } from "@shared/components/ui/slider.tsx"
-import { ChevronLeftIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon, EyeIcon, EyeOffIcon, PauseIcon, PlayIcon, ZapIcon } from "lucide-react"
+import { ChevronLeftIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon, PauseIcon, PlayIcon, ZapIcon } from "lucide-react"
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
-import { type FrameData, lerpFrame, type MapData, mergeFrames, parseFrameLines, type TraceMatch, type TraceTurn } from "./parser.ts"
+import { type FrameData, lerpFrame, type MapData, parseFrameLines, type TraceMatch, type TraceTurn } from "./parser.ts"
 import { destroyRenderer, initRenderer, updateFrame } from "./renderer.ts"
 
 interface MoveRow {
@@ -14,9 +14,10 @@ interface MoveRow {
 
 function parseMoves(turn: TraceTurn): MoveRow[] {
   const rows: MoveRow[] = []
+  const outputs = turn.output ?? ["", ""]
   for (const [output, mine] of [
-    [turn.p0_output, true],
-    [turn.p1_output, false],
+    [outputs[0], true],
+    [outputs[1], false],
   ] as const) {
     if (!output) continue
     for (const cmd of output.split("|")) {
@@ -32,52 +33,10 @@ function parseMoves(turn: TraceTurn): MoveRow[] {
   return rows.sort((a, b) => a.pacId - b.pacId)
 }
 
-function invertFrame(frame: FrameData): FrameData {
-  return {
-    myScore: frame.oppScore,
-    oppScore: frame.myScore,
-    pacs: frame.pacs.map((pac) => ({ ...pac, mine: !pac.mine })),
-    pellets: frame.pellets,
-  }
-}
-
-type ReplaySide = 0 | 1
-
-function perspectiveFrame(lines: string[], side: ReplaySide): FrameData {
-  const frame = parseFrameLines(lines)
-  return side === 0 ? frame : invertFrame(frame)
-}
-
-function visibleFrameFromTurn(turn: TraceTurn, fallback: FrameData | undefined, side: ReplaySide): FrameData {
-  const p0Lines = turn.game_input.p0
-  const p1Lines = turn.game_input.p1
-
-  const lines = side === 0 ? p0Lines : p1Lines
+function frameFromTurn(turn: TraceTurn, fallback: FrameData | undefined): FrameData {
+  const lines = turn.game_input
   if (lines) {
-    return perspectiveFrame(lines, side)
-  }
-  if (fallback) {
-    return fallback
-  }
-  const otherLines = side === 0 ? p1Lines : p0Lines
-  if (otherLines) {
-    return perspectiveFrame(otherLines, side === 0 ? 1 : 0)
-  }
-  throw new Error(`turn ${turn.turn} has no frame input`)
-}
-
-function fullFrameFromTurn(turn: TraceTurn, fallback: FrameData | undefined, perspectiveSide: ReplaySide): FrameData {
-  const p0Lines = turn.game_input.p0
-  const p1Lines = turn.game_input.p1
-  if (p0Lines && p1Lines) {
-    const merged = mergeFrames(parseFrameLines(p0Lines), parseFrameLines(p1Lines))
-    return perspectiveSide === 0 ? merged : invertFrame(merged)
-  }
-  if (p0Lines) {
-    return perspectiveFrame(p0Lines, 0)
-  }
-  if (p1Lines) {
-    return perspectiveFrame(p1Lines, 1)
+    return parseFrameLines(lines)
   }
   if (fallback) {
     return fallback
@@ -88,16 +47,13 @@ function fullFrameFromTurn(turn: TraceTurn, fallback: FrameData | undefined, per
 interface ReplayViewerProps {
   mapData: MapData
   trace: TraceMatch
-  fogPerspectiveSide?: ReplaySide
   status?: ReactNode
   leftSlot?: ReactNode
 }
 
-export function ReplayViewer({ mapData, trace, fogPerspectiveSide = 0, status, leftSlot }: ReplayViewerProps) {
+export function ReplayViewer({ mapData, trace, status, leftSlot }: ReplayViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const framesRef = useRef<FrameData[]>([])
-  const fullFramesRef = useRef<FrameData[]>([])
-  const fogFramesRef = useRef<FrameData[]>([])
   const turnsRef = useRef<(TraceTurn | null)[]>([])
   const mainTurnIndexRef = useRef<number[]>([])
   const totalMainTurnsRef = useRef(0)
@@ -113,15 +69,10 @@ export function ReplayViewer({ mapData, trace, fogPerspectiveSide = 0, status, l
   const [currentScores, setCurrentScores] = useState<[number, number]>([0, 0])
   const [playing, setPlaying] = useState(false)
   const [pauseRequested, setPauseRequested] = useState(false)
-  const [fogEnabled, setFogEnabled] = useState(false)
   const pauseRequestedRef = useRef(false)
-  const fogEnabledRef = useRef(false)
   useEffect(() => {
     pauseRequestedRef.current = pauseRequested
   }, [pauseRequested])
-  useEffect(() => {
-    fogEnabledRef.current = fogEnabled
-  }, [fogEnabled])
 
   const goToTurn = useCallback((t: number) => {
     const frames = framesRef.current
@@ -136,7 +87,7 @@ export function ReplayViewer({ mapData, trace, fogPerspectiveSide = 0, status, l
     setSliderValue(clamped)
 
     const turn = turnsRef.current[clamped]
-    const speed = !!turn && !turn.game_input.p0 && !turn.game_input.p1
+    const speed = !!turn && !turn.game_input
     const mainIdx = mainTurnIndexRef.current[clamped] ?? 0
     setTurnDisplay(`turn ${mainIdx} / ${totalMainTurnsRef.current}`)
     if (turn) {
@@ -159,16 +110,6 @@ export function ReplayViewer({ mapData, trace, fogPerspectiveSide = 0, status, l
     }
     setPlaying(true)
   }, [playing, goToTurn])
-
-  const toggleFog = useCallback(() => {
-    setFogEnabled((enabled) => {
-      const next = !enabled
-      fogEnabledRef.current = next
-      framesRef.current = next ? fogFramesRef.current : fullFramesRef.current
-      goToTurn(turnRef.current)
-      return next
-    })
-  }, [goToTurn])
 
   useEffect(() => {
     if (!playing) return
@@ -237,8 +178,7 @@ export function ReplayViewer({ mapData, trace, fogPerspectiveSide = 0, status, l
     setPauseRequested(false)
 
     const N = trace.turns.length
-    const fullFrames: FrameData[] = []
-    const fogFrames: FrameData[] = []
+    const frames: FrameData[] = []
     const turns: (TraceTurn | null)[] = []
     const mainTurnIdx: number[] = []
 
@@ -248,25 +188,19 @@ export function ReplayViewer({ mapData, trace, fogPerspectiveSide = 0, status, l
     const initialTurn = trace.turns[0]
     let mainCount = 0
     if (initialTurn) {
-      fullFrames.push(fullFrameFromTurn(initialTurn, undefined, fogPerspectiveSide))
-      fogFrames.push(visibleFrameFromTurn(initialTurn, undefined, fogPerspectiveSide))
+      frames.push(frameFromTurn(initialTurn, undefined))
       turns.push(null)
       mainTurnIdx.push(0)
       for (let i = 1; i <= N; i++) {
         const previous = trace.turns[i - 1]
         if (!previous) continue
         const source = trace.turns[i] ?? previous
-        fullFrames.push(fullFrameFromTurn(source, fullFrames[fullFrames.length - 1], fogPerspectiveSide))
-        fogFrames.push(visibleFrameFromTurn(source, fogFrames[fogFrames.length - 1], fogPerspectiveSide))
+        frames.push(frameFromTurn(source, frames[frames.length - 1]))
         turns.push(previous)
-        const isMain = !!(previous.game_input.p0 || previous.game_input.p1)
-        if (isMain) mainCount++
+        if (previous.game_input) mainCount++
         mainTurnIdx.push(mainCount)
       }
     }
-    fullFramesRef.current = fullFrames
-    fogFramesRef.current = fogFrames
-    const frames = fogEnabledRef.current ? fogFrames : fullFrames
     framesRef.current = frames
     turnsRef.current = turns
     mainTurnIndexRef.current = mainTurnIdx
@@ -297,7 +231,7 @@ export function ReplayViewer({ mapData, trace, fogPerspectiveSide = 0, status, l
       cancelled = true
       destroyRenderer()
     }
-  }, [mapData, trace, fogPerspectiveSide])
+  }, [mapData, trace])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -355,18 +289,6 @@ export function ReplayViewer({ mapData, trace, fogPerspectiveSide = 0, status, l
       <div className="min-w-0 flex-1 overflow-hidden">
         <div className="mb-3 flex min-h-9 items-center justify-between gap-3" style={canvasWidth ? { maxWidth: canvasWidth } : undefined}>
           {status && <p className="min-w-0 truncate font-mono text-xs text-muted-foreground">{status}</p>}
-          {ready && (
-            <Button
-              className="ml-auto"
-              variant={fogEnabled ? "default" : "outline"}
-              size="icon-sm"
-              onClick={toggleFog}
-              aria-label={fogEnabled ? "show all pellets" : "show selected bot perspective"}
-              title={fogEnabled ? "Show all pellets" : "Show selected bot perspective"}
-            >
-              {fogEnabled ? <EyeIcon /> : <EyeOffIcon />}
-            </Button>
-          )}
         </div>
         <div ref={containerRef} className="[&_canvas]:block [&_canvas]:rounded-sm" />
         {ready && (

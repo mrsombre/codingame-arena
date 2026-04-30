@@ -19,17 +19,28 @@ type ReplayMoves struct {
 // the engine instead of spawning external bot processes. The returned
 // TraceMatch has the same shape as TraceWriter.WriteMatch produces, so viewers
 // that consume /api/matches can render replays without any format translation.
+// The second return value is the post-OnEnd score reported by Player.GetScore
+// for each side; convert verification compares these against the replay's
+// recorded scores (which are already post-OnEnd, with -1 for deactivated
+// players and tie-break adjustments applied) since TraceMatch.Scores carries
+// raw bird-segment counts that diverge whenever OnEnd touched the value.
 //
-// botNames are copied into TraceMatch.Players (basename applied). maxTurns of
-// 0 defaults to factory.MaxTurns().
+// botNames are copied into TraceMatch.Players (basename applied). blueSide
+// (0 or 1) is the in-match side whose FrameInfoFor lines are recorded as
+// each turn's GameInput; values outside [0,1] fall back to side 0. maxTurns
+// of 0 defaults to factory.MaxTurns().
 func RunReplay(
 	factory GameFactory,
 	seed int64,
 	gameOptions *viper.Viper,
 	moves ReplayMoves,
 	botNames [2]string,
+	blueSide int,
 	maxTurns int,
-) TraceMatch {
+) (TraceMatch, [2]int) {
+	if blueSide != 0 && blueSide != 1 {
+		blueSide = 0
+	}
 	referee, players := factory.NewGame(seed, gameOptions)
 	referee.Init(players)
 
@@ -68,6 +79,7 @@ func RunReplay(
 	}
 
 	var traceTurns []TraceTurn
+	deactivationTurns := [2]int{-1, -1}
 	turn := 0
 	for ; !referee.Ended() && turn < maxTurns; turn++ {
 		referee.ResetGameTurnData()
@@ -81,7 +93,7 @@ func RunReplay(
 		liveTurn := referee.ActivePlayers(players) >= 2
 
 		playerOutputs := [2]string{}
-		var turnInput traceTurnInput
+		var turnInput []string
 
 		if liveTurn {
 			for _, player := range players {
@@ -92,10 +104,8 @@ func RunReplay(
 				for _, line := range lines {
 					player.SendInputLine(line)
 				}
-				if player.GetIndex() == 0 {
-					turnInput.P0 = append([]string(nil), lines...)
-				} else {
-					turnInput.P1 = append([]string(nil), lines...)
+				if player.GetIndex() == blueSide {
+					turnInput = append([]string(nil), lines...)
 				}
 				_ = player.Execute()
 				if outs := player.GetOutputs(); len(outs) > 0 {
@@ -107,8 +117,7 @@ func RunReplay(
 		tt := TraceTurn{
 			Turn:      turn,
 			GameInput: turnInput,
-			P0Output:  playerOutputs[0],
-			P1Output:  playerOutputs[1],
+			Output:    playerOutputs,
 			Timing:    &TraceTurnTiming{Response: [2]float64{}},
 		}
 
@@ -118,10 +127,24 @@ func RunReplay(
 
 		referee.PerformGameUpdate(turn)
 
+		for i, player := range players {
+			if deactivationTurns[i] == -1 && player.IsDeactivated() {
+				deactivationTurns[i] = turn
+			}
+		}
+
 		if ttp, ok := referee.(TurnTraceProvider); ok {
 			tt.Traces = ttp.TurnTraces(turn, players)
 		}
 		traceTurns = append(traceTurns, tt)
+
+		// CG's MultiplayerGameManager auto-ends the match when fewer than
+		// two players are active. Without this the surviving side keeps
+		// drifting on inertial Facing() moves until apples run out or a
+		// wall takes them, producing scores that don't match the replay.
+		if !referee.Ended() && referee.ActivePlayers(players) < 2 {
+			referee.EndGame()
+		}
 	}
 
 	if !referee.Ended() {
@@ -137,7 +160,8 @@ func RunReplay(
 
 	referee.OnEnd()
 
-	scores := [2]int{players[0].GetScore(), players[1].GetScore()}
+	finalScores := [2]int{players[0].GetScore(), players[1].GetScore()}
+	scores := finalScores
 	winner := -1
 	if haveRawScores {
 		scores = rawScores
@@ -157,16 +181,25 @@ func RunReplay(
 		}
 	}
 
+	var endReason string
+	if erp, ok := referee.(EndReasonProvider); ok {
+		endReason = erp.EndReason(turn, players, deactivationTurns)
+	}
+
+	deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
+
 	return TraceMatch{
 		MatchID:      0,
 		GameID:       factory.Name(),
 		PuzzleID:     factory.PuzzleID(),
 		Seed:         seed,
+		EndReason:    endReason,
+		Deactivated:  deactivated,
 		Scores:       [2]TraceScore{TraceScore(scores[0]), TraceScore(scores[1])},
 		Ranks:        RanksFromWinner(winner),
 		Players:      [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
 		Timing:       &TraceTiming{},
 		TraceSummary: traceSummary,
 		Turns:        traceTurns,
-	}
+	}, finalScores
 }

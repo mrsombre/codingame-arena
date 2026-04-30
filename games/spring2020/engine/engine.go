@@ -24,16 +24,26 @@ func (f *Factory) Name() string { return "spring2020" }
 
 func (f *Factory) PuzzleID() int { return 592 }
 
+func (f *Factory) PuzzleTitle() string { return "Spring Challenge 2020" }
+
 func (f *Factory) MaxTurns() int { return MaxTurns }
 
 func (f *Factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []arena.Player) {
-	leagueLevel := 4
-	if raw := options.GetString("league"); raw != "" {
-		if value, err := strconv.Atoi(raw); err == nil {
-			leagueLevel = value
-		}
-	}
-	game := NewGame(seed, leagueLevel)
+	game := NewGame(seed, f.ResolveLeague(options))
 	players := []arena.Player{NewPlayer(0), NewPlayer(1)}
 	return NewReferee(game), players
+}
+
+// ResolveLeague returns the league level the factory will run with for the
+// given options, falling back to the Spring 2020 default of 4 when the
+// "league" option is unset or unparseable.
+func (f *Factory) ResolveLeague(options *viper.Viper) int {
+	if options != nil {
+		if raw := options.GetString("league"); raw != "" {
+			if value, err := strconv.Atoi(raw); err == nil {
+				return value
+			}
+		}
+	}
+	return 4
 }

@@ -45,6 +45,11 @@ type Player interface {
 type GameFactory interface {
 	Name() string
 	PuzzleID() int
+	// PuzzleTitle returns the human-readable CodinGame puzzle title
+	// (e.g. "SnakeByte - Winter Challenge 2026"). convert uses it to
+	// recover replays where the API returned puzzleId=0 but did include
+	// a puzzleTitle entry.
+	PuzzleTitle() string
 	NewGame(seed int64, options *viper.Viper) (Referee, []Player)
 	MaxTurns() int
 }
@@ -75,4 +80,20 @@ type TraceSummaryProvider interface {
 // Optional — if Referee also implements this, match captures raw scores.
 type RawScoresProvider interface {
 	RawScores() [2]int
+}
+
+// LeagueResolver returns the league level a factory will run with for the
+// given options (applying its game-specific default when "league" is unset).
+// Optional — if a GameFactory implements this, match stamps the resolved
+// value onto each trace as "league".
+type LeagueResolver interface {
+	ResolveLeague(options *viper.Viper) int
+}
+
+// EndReasonProvider returns a categorized reason for why the match ended.
+// turn is the final loop turn; deactivationTurns[i] is the turn player i
+// was deactivated (or -1). Optional — if Referee implements this, match
+// stamps the value onto the trace as "end_reason".
+type EndReasonProvider interface {
+	EndReason(turn int, players []Player, deactivationTurns [2]int) string
 }

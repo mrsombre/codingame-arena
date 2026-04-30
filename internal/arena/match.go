@@ -80,6 +80,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	maxTurns := runner.Options.MaxTurns
 	turn := 0
 	var badCommands []BadCommandInfo
+	deactivationTurns := [2]int{-1, -1}
 	tracing := runner.Options.TraceWriter != nil
 	var traceTurns []TraceTurn
 
@@ -95,7 +96,14 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 
 		wasDeactivated := [2]bool{players[0].IsDeactivated(), players[1].IsDeactivated()}
 		playerOutputs := [2]string{}
-		var turnInput traceTurnInput
+		var turnInput []string
+		// Blue is the user's intended p0; after seed-driven swap, blue plays
+		// in-match side 1. Capturing only blue's view keeps traces compact;
+		// for symmetric-input games either side would yield the same lines.
+		blueSide := 0
+		if swapSides {
+			blueSide = 1
+		}
 
 		if liveTurn {
 			for _, controller := range controllers {
@@ -110,12 +118,8 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				for _, line := range lines {
 					player.SendInputLine(line)
 				}
-				if tracing {
-					if player.GetIndex() == 0 {
-						turnInput.P0 = append([]string(nil), lines...)
-					} else {
-						turnInput.P1 = append([]string(nil), lines...)
-					}
+				if tracing && player.GetIndex() == blueSide {
+					turnInput = append([]string(nil), lines...)
 				}
 				if runner.Options.Debug {
 					fmt.Fprintf(os.Stderr, "--- turn %d p%d input ---\n", turn, player.GetIndex())
@@ -146,8 +150,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			traceTurns = append(traceTurns, TraceTurn{
 				Turn:      turn,
 				GameInput: turnInput,
-				P0Output:  playerOutputs[0],
-				P1Output:  playerOutputs[1],
+				Output:    playerOutputs,
 				Timing:    turnTiming,
 			})
 		}
@@ -170,6 +173,16 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		}
 
 		referee.PerformGameUpdate(turn)
+
+		// Record turn-of-deactivation for any side that became deactivated
+		// this turn (covers both bad-command parses earlier in the iteration
+		// and engine-driven deactivations during PerformGameUpdate, e.g.
+		// "all pacmen dead").
+		for i, player := range players {
+			if deactivationTurns[i] == -1 && player.IsDeactivated() {
+				deactivationTurns[i] = turn
+			}
+		}
 
 		if tracing {
 			if ttp, ok := referee.(TurnTraceProvider); ok {
@@ -261,11 +274,25 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				traceSummary = &s
 			}
 		}
+		league := 0
+		if lr, ok := runner.Factory.(LeagueResolver); ok {
+			league = lr.ResolveLeague(runner.Options.GameOptions)
+		}
+		var endReason string
+		if erp, ok := referee.(EndReasonProvider); ok {
+			endReason = erp.EndReason(turn, players, deactivationTurns)
+		}
+		deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
 		traceMatch := TraceMatch{
 			MatchID:      simulationID,
 			GameID:       runner.Factory.Name(),
 			PuzzleID:     runner.Factory.PuzzleID(),
 			Seed:         seed,
+			Blue:         filepath.Base(runner.Options.P0Bin),
+			League:       league,
+			CreatedAt:    time.Now().UTC().Format(time.RFC3339),
+			EndReason:    endReason,
+			Deactivated:  deactivated,
 			Scores:       [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
 			Ranks:        RanksFromWinner(traceWinner),
 			Players:      [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
