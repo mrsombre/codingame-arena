@@ -80,6 +80,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	maxTurns := runner.Options.MaxTurns
 	turn := 0
 	var badCommands []BadCommandInfo
+	deactivationTurns := [2]int{-1, -1}
 	tracing := runner.Options.TraceWriter != nil
 	var traceTurns []TraceTurn
 
@@ -172,6 +173,16 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		}
 
 		referee.PerformGameUpdate(turn)
+
+		// Record turn-of-deactivation for any side that became deactivated
+		// this turn (covers both bad-command parses earlier in the iteration
+		// and engine-driven deactivations during PerformGameUpdate, e.g.
+		// "all pacmen dead").
+		for i, player := range players {
+			if deactivationTurns[i] == -1 && player.IsDeactivated() {
+				deactivationTurns[i] = turn
+			}
+		}
 
 		if tracing {
 			if ttp, ok := referee.(TurnTraceProvider); ok {
@@ -267,6 +278,10 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		if lr, ok := runner.Factory.(LeagueResolver); ok {
 			league = lr.ResolveLeague(runner.Options.GameOptions)
 		}
+		var endReason string
+		if erp, ok := referee.(EndReasonProvider); ok {
+			endReason = erp.EndReason(turn, players, deactivationTurns)
+		}
 		traceMatch := TraceMatch{
 			MatchID:      simulationID,
 			GameID:       runner.Factory.Name(),
@@ -275,6 +290,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			Blue:         filepath.Base(runner.Options.P0Bin),
 			League:       league,
 			CreatedAt:    time.Now().UTC().Format(time.RFC3339),
+			EndReason:    endReason,
 			Scores:       [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
 			Ranks:        RanksFromWinner(traceWinner),
 			Players:      [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},

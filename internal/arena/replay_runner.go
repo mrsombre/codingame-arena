@@ -74,6 +74,7 @@ func RunReplay(
 	}
 
 	var traceTurns []TraceTurn
+	deactivationTurns := [2]int{-1, -1}
 	turn := 0
 	for ; !referee.Ended() && turn < maxTurns; turn++ {
 		referee.ResetGameTurnData()
@@ -121,6 +122,12 @@ func RunReplay(
 
 		referee.PerformGameUpdate(turn)
 
+		for i, player := range players {
+			if deactivationTurns[i] == -1 && player.IsDeactivated() {
+				deactivationTurns[i] = turn
+			}
+		}
+
 		if ttp, ok := referee.(TurnTraceProvider); ok {
 			tt.Traces = ttp.TurnTraces(turn, players)
 		}
@@ -160,11 +167,17 @@ func RunReplay(
 		}
 	}
 
+	var endReason string
+	if erp, ok := referee.(EndReasonProvider); ok {
+		endReason = erp.EndReason(turn, players, deactivationTurns)
+	}
+
 	return TraceMatch{
 		MatchID:      0,
 		GameID:       factory.Name(),
 		PuzzleID:     factory.PuzzleID(),
 		Seed:         seed,
+		EndReason:    endReason,
 		Scores:       [2]TraceScore{TraceScore(scores[0]), TraceScore(scores[1])},
 		Ranks:        RanksFromWinner(winner),
 		Players:      [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},

@@ -84,3 +84,11 @@ type RawScoresProvider interface {
 type LeagueResolver interface {
 	ResolveLeague(options *viper.Viper) int
 }
+
+// EndReasonProvider returns a categorized reason for why the match ended.
+// turn is the final loop turn; deactivationTurns[i] is the turn player i
+// was deactivated (or -1). Optional — if Referee implements this, match
+// stamps the value onto the trace as "end_reason".
+type EndReasonProvider interface {
+	EndReason(turn int, players []Player, deactivationTurns [2]int) string
+}

@@ -52,7 +52,11 @@ type TraceMatch struct {
 	// self-play traces it's stamped at match completion; for replay traces
 	// it's copied from the source replay's fetched_at so analyze can sort
 	// converted replays chronologically without re-reading the JSON.
-	CreatedAt    string        `json:"created_at,omitempty"`
+	CreatedAt string `json:"created_at,omitempty"`
+	// EndReason categorizes how the match terminated. Game-specific; see the
+	// EndReason* constants for shared values. Empty when the referee doesn't
+	// implement EndReasonProvider.
+	EndReason    string        `json:"end_reason,omitempty"`
 	Scores       [2]TraceScore `json:"scores"`
 	Ranks        [2]int        `json:"ranks"`
 	Players      [2]string     `json:"players"`
@@ -60,6 +64,17 @@ type TraceMatch struct {
 	TraceSummary *TraceSummary `json:"trace_summary,omitempty"`
 	Turns        []TraceTurn   `json:"turns"`
 }
+
+// Shared EndReason values. Games may use these or add their own.
+const (
+	EndReasonTimeoutStart = "TIMEOUT_START"
+	EndReasonTimeout      = "TIMEOUT"
+	EndReasonInvalid      = "INVALID"
+	EndReasonEliminated   = "ELIMINATED"
+	EndReasonScore        = "SCORE"
+	EndReasonScoreEarly   = "SCORE_EARLY"
+	EndReasonTurnsOut     = "TURNS_OUT"
+)
 
 // BlueSide returns the index (0 or 1) of the side identified by Blue in
 // Players, or -1 if Blue is unset or doesn't match a player. When both
