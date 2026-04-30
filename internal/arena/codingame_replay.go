@@ -3,8 +3,6 @@ package arena
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -35,7 +33,6 @@ const (
 // (populated only when downloaded via `replay leaderboard`).
 type CodinGameReplay[F any] struct {
 	PuzzleID      int                      `json:"puzzleId"`
-	PuzzleTitle   []string                 `json:"puzzleTitle"`
 	QuestionTitle string                   `json:"questionTitle"`
 	Blue          string                   `json:"blue,omitempty"`
 	League        int                      `json:"league,omitempty"`
@@ -287,34 +284,6 @@ var replayStripGameResult = []string{"metadata", "tooltips"}
 // viewer hints unused by convert/analyze.
 var replayStripFrame = []string{"view", "gameInformation", "keyframe"}
 
-// RewriteReplayPuzzleID overwrites the saved replay's top-level puzzleId.
-// Used by convert to repair files where the CodinGame API returned puzzleId=0
-// but the puzzleTitle still identifies the right puzzle. The rest of the file
-// is preserved (re-pretty-printed through the same map-of-RawMessage path
-// PrepareReplay uses, so top-level keys end up in the same alphabetical order).
-func RewriteReplayPuzzleID(path string, puzzleID int) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	var top map[string]json.RawMessage
-	if err := json.Unmarshal(data, &top); err != nil {
-		return fmt.Errorf("parse %s: %w", path, err)
-	}
-	if err := setRaw(top, "puzzleId", puzzleID); err != nil {
-		return err
-	}
-	body, err := json.Marshal(top)
-	if err != nil {
-		return err
-	}
-	out, err := prettyJSON(body)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, out, 0644)
-}
-
 // PrepareReplay normalizes a raw CodinGame replay JSON body for local
 // storage: removes viewer-only payloads, layers in the arena annotations,
 // and pretty-prints the result. If the body is not a JSON object, the
@@ -366,7 +335,7 @@ func PrepareReplay(body []byte, ann ReplayAnnotations) ([]byte, error) {
 		}
 	}
 	if ann.PuzzleTitle != "" {
-		if err := setRaw(top, "puzzleTitle", []string{ann.PuzzleTitle, ann.PuzzleTitle}); err != nil {
+		if err := setRaw(top, "puzzleTitle", ann.PuzzleTitle); err != nil {
 			return nil, err
 		}
 	}

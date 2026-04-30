@@ -64,16 +64,9 @@ func Convert(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfl
 			return fmt.Errorf("parse %s: %w", target.Path, err)
 		}
 		if replay.PuzzleID != factory.PuzzleID() {
-			recovered, err := recoverReplayPuzzleID(target.Path, &replay, factory)
-			if err != nil {
-				return fmt.Errorf("recover puzzleId for %d: %w", target.ID, err)
-			}
-			if !recovered {
-				skippedPuzzle++
-				_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (puzzleId %d != %d)\n", i+1, len(targets), target.ID, replay.PuzzleID, factory.PuzzleID())
-				continue
-			}
-			_, _ = fmt.Fprintf(stdout, "[%d/%d] fix %d (puzzleId 0 → %d via puzzleTitle match)\n", i+1, len(targets), target.ID, factory.PuzzleID())
+			skippedPuzzle++
+			_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (puzzleId %d != %d)\n", i+1, len(targets), target.ID, replay.PuzzleID, factory.PuzzleID())
+			continue
 		}
 
 		trace, league, err := convertReplayTrace(factory, replay, opts.League)
@@ -109,38 +102,6 @@ type convertReplayTarget struct {
 	ID   int64
 	Path string
 }
-
-// recoverReplayPuzzleID rescues replays where the CodinGame API returned
-// puzzleId=0 but did include a puzzleTitle entry that matches the factory's
-// expected title. On match it rewrites the on-disk file's puzzleId so future
-// runs don't re-trigger the same recovery, and updates the in-memory replay
-// struct so the caller can proceed with conversion. Returns true when the
-// replay was recovered.
-func recoverReplayPuzzleID(path string, replay *arena.CodinGameReplay[arena.CodinGameReplayFrame], factory arena.GameFactory) (bool, error) {
-	if replay.PuzzleID != 0 {
-		return false, nil
-	}
-	expected := factory.PuzzleTitle()
-	if expected == "" {
-		return false, nil
-	}
-	matched := false
-	for _, title := range replay.PuzzleTitle {
-		if title == expected {
-			matched = true
-			break
-		}
-	}
-	if !matched {
-		return false, nil
-	}
-	if err := arena.RewriteReplayPuzzleID(path, factory.PuzzleID()); err != nil {
-		return false, err
-	}
-	replay.PuzzleID = factory.PuzzleID()
-	return true, nil
-}
-
 
 func convertReplayTargets(replayDir string, ids []int64) ([]convertReplayTarget, error) {
 	if len(ids) > 0 {
