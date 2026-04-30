@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@shared/components/ui/
 import { Slider } from "@shared/components/ui/slider.tsx"
 import { AppleIcon, ArrowDownIcon, BrickWallIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon, PauseIcon, PlayIcon, RotateCcwIcon, SkullIcon, SwordsIcon } from "lucide-react"
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
-import { type FrameData, lerpFrame, type MapData, parseFrameLines, type TraceMatch, type TraceTurn } from "./parser.ts"
+import { type BirdCoordMeta, type BirdMeta, type FrameData, lerpFrame, type MapData, parseFrameLines, type TraceMatch, type TraceTurn } from "./parser.ts"
 import { destroyRenderer, initRenderer, updateFrame } from "./renderer.ts"
 
 type TraceKind = "EAT" | "HIT_WALL" | "HIT_ITSELF" | "HIT_ENEMY" | "DEAD" | "FALL"
@@ -74,12 +74,13 @@ function parseMoves(turn: TraceTurn, myIds: Set<number>, frame: FrameData | unde
 
   const tracesByBird = new Map<number, MoveTrace[]>()
   for (const tr of turn.traces ?? []) {
-    const parts = tr.payload.split(" ")
-    const bid = Number(parts[0])
-    if (Number.isNaN(bid)) continue
-    const coord = parts[1]?.includes(",") ? parts[1] : undefined
-    const kind = tr.label as TraceKind
+    const kind = tr.type as TraceKind
     if (!(kind in TRACE_ORDER)) continue
+    const meta = tr.meta as BirdCoordMeta | BirdMeta | undefined
+    if (!meta) continue
+    const bid = meta.bird
+    if (typeof bid !== "number") continue
+    const coord = "coord" in meta && Array.isArray(meta.coord) ? `${meta.coord[0]},${meta.coord[1]}` : undefined
     const list = tracesByBird.get(bid) ?? []
     list.push({ kind, coord })
     tracesByBird.set(bid, list)

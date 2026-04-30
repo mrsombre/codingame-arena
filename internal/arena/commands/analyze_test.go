@@ -3,7 +3,6 @@ package commands
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,8 +72,8 @@ func TestAnalyzeUsesGameFlagToFilterTraceFiles(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
 	gameA := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_a"
 	gameB := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_b"
-	writeAnalyzeTestFile(t, traceDir, "trace-a.json", fmt.Sprintf(`{"gameId": %q, "turns": [{"turn": 0}]}`, gameA))
-	writeAnalyzeTestFile(t, traceDir, "trace-b.json", fmt.Sprintf(`{"gameId": %q, "turns": [{"turn": 0}]}`, gameB))
+	writeAnalyzeTestFile(t, traceDir, "trace-a.json", fmt.Sprintf(`{"type": "trace-a", "gameId": %q, "turns": [{"turn": 0}]}`, gameA))
+	writeAnalyzeTestFile(t, traceDir, "trace-b.json", fmt.Sprintf(`{"type": "trace-b", "gameId": %q, "turns": [{"turn": 0}]}`, gameB))
 
 	factory := &recordingAnalyzeFactory{name: gameA}
 	arena.Register(factory)
@@ -85,7 +84,7 @@ func TestAnalyzeUsesGameFlagToFilterTraceFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"trace-a.json"}, factory.files)
-	assert.Equal(t, "analyzed 1 files\n", out.String())
+	assert.Contains(t, out.String(), gameA+" analysis: 1 trace files analyzed")
 }
 
 func makeAnalyzeTestDir(t *testing.T) string {
@@ -123,23 +122,14 @@ func (f *recordingAnalyzeFactory) NewGame(_ int64, _ *viper.Viper) (arena.Refere
 
 func (f *recordingAnalyzeFactory) MaxTurns() int { return 1 }
 
-func (f *recordingAnalyzeFactory) AnalyzeTraces(input arena.TraceAnalysisInput) (arena.TraceAnalysis, error) {
-	f.files = f.files[:0]
-	for _, file := range input.Files {
-		f.files = append(f.files, file.Name)
-	}
-	return recordingAnalysis{files: len(input.Files)}, nil
+func (f *recordingAnalyzeFactory) TraceMetricSpecs() []arena.TraceMetricSpec {
+	return []arena.TraceMetricSpec{{Key: "seen", Kind: arena.TraceMetricPerMatchCount, ShowZero: true}}
 }
 
-type recordingAnalysis struct {
-	files int
-}
-
-func (r recordingAnalysis) Write(w io.Writer) error {
-	_, err := fmt.Fprintf(w, "analyzed %d files\n", r.files)
-	return err
+func (f *recordingAnalyzeFactory) AnalyzeTraceMetrics(trace arena.TraceMatch) (arena.TraceMetricStats, error) {
+	f.files = append(f.files, trace.Type+".json")
+	return arena.TraceMetricStats{"seen": [2]int{}}, nil
 }
 
 var _ arena.GameFactory = (*recordingAnalyzeFactory)(nil)
-var _ arena.TraceAnalyzer = (*recordingAnalyzeFactory)(nil)
-var _ arena.TraceAnalysis = recordingAnalysis{}
+var _ arena.TraceMetricAnalyzer = (*recordingAnalyzeFactory)(nil)

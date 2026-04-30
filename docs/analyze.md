@@ -1,17 +1,17 @@
 # Command analyze
 
-Aggregate trace files into a winner-vs-loser report — what does the winning side tend to do that the losing side doesn't?
+Aggregate trace files into a standard outcome report plus game-owned metrics.
 
-Reads every `*.json` trace in `--trace-dir` (both self-play `trace-*.json` files written by `arena run --trace` and `replay-*.json` files written by `arena convert`), groups them by outcome, and emits a per-game report.
+The command reads every `*.json` trace in `--trace-dir` (self-play `trace-*.json` files from `arena run --trace` and converted `replay-*.json` files from `arena convert`), filters them to one selected game, and emits an arena-owned report.
 
 ## Quick start
 
 ```shell
-# Analyze every trace in ./traces/
+# Analyze every Spring 2020 trace in ./traces/
 bin/arena analyze --game=spring2020
 
 # Read traces from a different directory
-bin/arena analyze --game=spring2020 --trace-dir=./traces/experiment-A
+bin/arena analyze --game=winter2026 --trace-dir=./traces/experiment-A
 ```
 
 ## Options
@@ -21,59 +21,51 @@ bin/arena analyze --game=spring2020 --trace-dir=./traces/experiment-A
 | `--trace-dir` | `./traces` | Directory to scan for trace JSON files                                         |
 | `--game`      | inferred   | Active game (or set in `arena.yml`); inferred when all traces share a `gameId` |
 
-If `--game` is omitted and the trace dir contains traces from multiple games, the command exits with an error listing the games it found — pass `--game` to disambiguate.
+If `--game` is omitted and the trace dir contains traces from multiple games, the command exits with an error listing the games it found. Pass `--game` to disambiguate.
 
 ## How it works
 
 1. Read every `*.json` file in `--trace-dir`; ignore non-trace JSON.
 2. Filter to traces whose `gameId` matches `--game` (or the inferred game).
-3. Hand the filtered list to the active game's analyzer (`TraceAnalyzer`).
-4. Per game, classify each trace as winner / loser / draw based on `ranks` (with `scores` as tie-breaker), then aggregate command and event statistics.
-5. Render the report to stdout.
+3. Render generic multiplayer facts: win/draw split, side wins, blue-side results, turns, scores, timing, and end reasons.
+4. If the game implements trace metrics, ask it to interpret opaque `turns[].traces` and return per-side metric counts.
+5. Arena aggregates those metrics as either average counts per match or average per-match turn rates.
 
-## Game support
+Games decide metric meaning and side attribution. Arena never interprets labels such as `EAT`, `DEAD`, or `COLLIDE_SELF`.
 
-| Game                  | Analyzer                |
-|-----------------------|-------------------------|
-| Spring Challenge 2020 | implemented             |
-| Winter Challenge 2026 | not yet — see `TODO.md` |
+## Output
 
-A game without an analyzer returns:
+```text
+winter2026 analysis: 100 trace files analyzed [./traces]
+Decided matches: 66.0% / Draws: 34.0%
+Side wins: p0 31.0% / p1 35.0%
+Blue: Wins: 32.0% Losses: 34.0% Draws: 34.0%
+Turns: avg 155.4 min 71 max 200
+Scores: avg p0 16.4 p1 17.0 margin 4.8
+Timing: first_response 29msx198ms avg_turn_response 0msx0ms
 
-```
-game "winter2026" does not implement trace analysis
-```
+End reasons:
+  TURNS_OUT       52.0%
+  SCORE           44.0%
+  ELIMINATED       4.0% (blue: 0.0%)
+  TIMEOUT_START    0.0%
+  TIMEOUT          0.0%
+  INVALID          0.0%
 
-## Output (Spring 2020)
+Winner vs loser metrics:
+  DEAD           winner  1.20/match  loser  2.10/match  (winner only 57% as often as loser; loser 1.8x winner)
+  NO_EAT         winner  22.0%  loser  31.0%  (winner only 71% as often as loser; loser 1.4x winner)
 
-```
-Spring 2020 trace analysis: 42 trace files from ./traces
-Decided matches: 40  draws: 2
-Side wins: p0=18 p1=22
-Winner score: avg 32.4 vs loser 18.7 (margin +13.7), avg turns 178.3
-
-Winner command rates (% of decisions per side):
-  MOVE         winner 78.10%  loser 71.20%  diff +6.90pp
-  SPEED        winner 14.50%  loser 12.30%  diff +2.20pp
-  SWITCH       winner  7.40%  loser 16.50%  diff -9.10pp
-
-Winner pac events (avg per decided match):
-  EAT          winner 28.40  loser 16.10  diff +12.30 (winner 1.8x loser; loser only 57% as often as winner)
-  KILLED       winner  0.30  loser  1.70  diff -1.40 (winner only 18% as often as loser; loser 5.7x winner)
-
-Command rates normalize for surviving pacs; events are absolute counts. Diff = winner - loser.
+Blue vs enemy metrics:
+  DEAD           blue  1.80/match  enemy  1.60/match  (blue 1.1x enemy; enemy only 89% as often as blue)
+  NO_EAT         blue  25.0%  enemy  20.0%  (blue 1.2x enemy; enemy only 80% as often as blue)
 ```
 
 Sections:
 
-- **Header** — file count, decided/draw split, per-side win counts, winner-vs-loser score margin.
-- **Command rates** — frequency of each command issued by the winning side vs the losing side, expressed as a percentage of that side's total commands. Normalizes for asymmetric unit counts (e.g. a side with fewer alive pacs naturally emits fewer commands).
-- **Events** — absolute counts of trace events (e.g. `EAT`, `KILLED` in Spring 2020) averaged per decided match, with a plain-language explanation of the gap.
+- **Header** — file count, trace directory, decided/draw split, side wins, and blue-side win/loss/draw rates when `blue` can be resolved from trace players.
+- **Generic stats** — turn count, score, and timing summaries from arena trace fields.
+- **End reasons** — match termination reasons as a percentage of trace files. Side-specific rows can include the percentage attributable to blue.
+- **Metric comparisons** — game-selected metrics rendered as counts per match or per-turn percentages.
 
-`Diff` is always **winner − loser**: positive means winners do it more, negative means losers do it more.
-
-## Caveats
-
-- The current report compares **winner vs loser** anonymously. It does not yet split by "us-when-winning vs us-when-losing" — that requires propagating the `blue` field from replays into traces (tracked in `TODO.md`).
-- All traces in `--trace-dir` are treated equally regardless of source (self-play vs converted replay), league, opponent, or bot version. For meaningful comparisons, keep cohorts in separate directories or trace dirs.
-- Draws (equal `ranks` and equal `scores`) are counted but excluded from winner/loser aggregation.
+Draws are counted in the header but excluded from winner-vs-loser metric aggregation.

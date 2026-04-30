@@ -11,7 +11,7 @@ For a project overview, see the [top-level README](../README.md).
 | [`run`](run.md)             | Run one or more match simulations against a player       |
 | [`replay`](replay.md)       | Download replay JSON (`get`, `leaderboard` subcommands)  |
 | [`convert`](convert.md)     | Re-simulate downloaded replays into arena trace files    |
-| [`analyze`](analyze.md)     | Aggregate trace files into a winner-vs-loser report      |
+| [`analyze`](analyze.md)     | Aggregate trace outcomes and game-owned metrics          |
 | [`serialize`](serialize.md) | Print initial game input for the first turn of a seed    |
 | [`serve`](serve.md)         | Serve the embedded web viewer                            |
 
@@ -21,7 +21,7 @@ For a project overview, see the [top-level README](../README.md).
 arena run --trace             ─▶ traces/trace-<id>-<n>.json    (self-play)
 arena replay get | leaderboard ─▶ replays/<id>.json            (real CG matches)
 arena convert                 ─▶ traces/replay-<id>.json       (verified)
-arena analyze                 ─▶ winner-vs-loser report
+arena analyze                 ─▶ outcome and game-metric report
 arena serve                   ─▶ web viewer over both dirs
 ```
 

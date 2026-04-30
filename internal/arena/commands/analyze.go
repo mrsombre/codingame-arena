@@ -16,7 +16,7 @@ import (
 
 // AnalyzeUsage returns the help text shown for `arena help analyze`.
 func AnalyzeUsage(fs *pflag.FlagSet) string {
-	return arena.CommandUsage("analyze", "Analyze winner-side strengths from trace files.", fs, "")
+	return arena.CommandUsage("analyze", "Analyze trace outcomes and game-owned metrics.", fs, "")
 }
 
 // Analyze is the entry point for the "analyze" subcommand.
@@ -48,15 +48,13 @@ func Analyze(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.Fla
 	if factory == nil {
 		return fmt.Errorf("unknown game %q", gameID)
 	}
-	analyzer, ok := factory.(arena.TraceAnalyzer)
-	if !ok {
-		return fmt.Errorf("game %q does not implement trace analysis", gameID)
-	}
+	metricAnalyzer, _ := factory.(arena.TraceMetricAnalyzer)
 
-	report, err := analyzer.AnalyzeTraces(arena.TraceAnalysisInput{
+	report, err := arena.AnalyzeTraceFiles(arena.TraceAnalysisInput{
 		TraceDir: opts.TraceDir,
 		Files:    gameFiles,
-	})
+		GameID:   gameID,
+	}, metricAnalyzer)
 	if err != nil {
 		return err
 	}

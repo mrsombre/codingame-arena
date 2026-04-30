@@ -120,9 +120,30 @@ export interface TraceTurnTiming {
   response: [number, number]
 }
 
-export interface TurnTrace {
-  label: string
-  payload: string
+export interface TurnTrace<M = unknown> {
+  type: string
+  meta?: M
+}
+
+export interface PacMeta {
+  pac: number
+}
+
+export interface EatMeta {
+  pac: number
+  coord: [number, number]
+  cost: number
+}
+
+export interface KilledMeta {
+  pac: number
+  coord: [number, number]
+  killer: number
+}
+
+export interface SwitchMeta {
+  pac: number
+  type: string
 }
 
 function pacKey(pac: Pac): string {

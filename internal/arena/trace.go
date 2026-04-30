@@ -40,14 +40,14 @@ func (s TraceScore) MarshalJSON() ([]byte, error) {
 // copied from the saved replay's blue field. Analyzers locate our side by
 // scanning Players[i] == Blue (so swap-on-run still resolves correctly).
 type TraceMatch struct {
-	TraceID   int64  `json:"trace_id,omitempty"`
-	MatchID   int    `json:"match_id"`
-	Type      string `json:"type,omitempty"`
-	GameID    string `json:"gameId,omitempty"`
-	PuzzleID  int    `json:"puzzleId,omitempty"`
-	Seed      int64  `json:"seed,string"`
-	Blue      string `json:"blue,omitempty"`
-	League    int    `json:"league,omitempty"`
+	TraceID  int64  `json:"trace_id,omitempty"`
+	MatchID  int    `json:"match_id"`
+	Type     string `json:"type,omitempty"`
+	GameID   string `json:"gameId,omitempty"`
+	PuzzleID int    `json:"puzzleId,omitempty"`
+	Seed     int64  `json:"seed,string"`
+	Blue     string `json:"blue,omitempty"`
+	League   int    `json:"league,omitempty"`
 	// CreatedAt is the RFC 3339 timestamp the trace was produced. For
 	// self-play traces it's stamped at match completion; for replay traces
 	// it's copied from the source replay's fetched_at so analyze can sort
@@ -60,13 +60,12 @@ type TraceMatch struct {
 	// Deactivated[i] is true when side i was deactivated (timeout / bad
 	// command) during the match. Used by analyzers to attribute fault end
 	// reasons to a specific side.
-	Deactivated  [2]bool       `json:"deactivated,omitzero"`
-	Scores       [2]TraceScore `json:"scores"`
-	Ranks        [2]int        `json:"ranks"`
-	Players      [2]string     `json:"players"`
-	Timing       *TraceTiming  `json:"timing,omitempty"`
-	TraceSummary *TraceSummary `json:"trace_summary,omitempty"`
-	Turns        []TraceTurn   `json:"turns"`
+	Deactivated [2]bool       `json:"deactivated,omitzero"`
+	Scores      [2]TraceScore `json:"scores"`
+	Ranks       [2]int        `json:"ranks"`
+	Players     [2]string     `json:"players"`
+	Timing      *TraceTiming  `json:"timing,omitempty"`
+	Turns       []TraceTurn   `json:"turns"`
 }
 
 // Shared EndReason values. Games may use these or add their own.

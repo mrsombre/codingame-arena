@@ -1,13 +1,12 @@
 package engine
 
 import (
-	"strconv"
-	"strings"
-
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-// Trace labels emitted per turn, attached to trace output for replay viewers.
+// Trace types emitted per turn, attached to trace output for replay viewers
+// and analyzers. Each type has a typed meta payload defined below; the wire
+// shape is `{"type": <const>, "meta": {...}}`.
 const (
 	TraceEat      = "EAT"
 	TraceHitWall  = "HIT_WALL"
@@ -17,27 +16,23 @@ const (
 	TraceFall     = "FALL"
 )
 
-func traceBirdCoordPayload(birdID int, c Coord) string {
-	return strconv.Itoa(birdID) + " " + strconv.Itoa(c.X) + "," + strconv.Itoa(c.Y)
+// BirdMeta is the meta for trace events whose only subject is one bird (DEAD,
+// FALL).
+type BirdMeta struct {
+	Bird int `json:"bird"`
 }
 
-func traceBirdPayload(birdID int) string {
-	return strconv.Itoa(birdID)
+// BirdCoordMeta is the meta for trace events that include the bird's head
+// position at the moment of the event (EAT, HIT_*).
+type BirdCoordMeta struct {
+	Bird  int    `json:"bird"`
+	Coord [2]int `json:"coord"`
 }
 
-func (g *Game) trace(label, payload string) {
-	g.traces = append(g.traces, arena.TurnTrace{Label: label, Payload: payload})
+func coordPair(c Coord) [2]int {
+	return [2]int{c.X, c.Y}
 }
 
-// parseLeadingBirdID extracts the first whitespace-delimited integer from a
-// trace payload. Every Winter 2026 trace payload starts with the subject
-// bird's global ID so the runner can bucket events per bird in the match
-// summary.
-func parseLeadingBirdID(payload string) (int, bool) {
-	head, _, _ := strings.Cut(payload, " ")
-	n, err := strconv.Atoi(head)
-	if err != nil {
-		return 0, false
-	}
-	return n, true
+func (g *Game) trace(t arena.TurnTrace) {
+	g.traces = append(g.traces, t)
 }

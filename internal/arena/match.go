@@ -267,13 +267,6 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				durationMillis(stats[1].MedianOutputTime),
 			},
 		}
-		var traceSummary *TraceSummary
-		if tsp, ok := referee.(TraceSummaryProvider); ok {
-			s := tsp.TraceSummary()
-			if !s.IsEmpty() {
-				traceSummary = &s
-			}
-		}
 		league := 0
 		if lr, ok := runner.Factory.(LeagueResolver); ok {
 			league = lr.ResolveLeague(runner.Options.GameOptions)
@@ -284,21 +277,20 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		}
 		deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
 		traceMatch := TraceMatch{
-			MatchID:      simulationID,
-			GameID:       runner.Factory.Name(),
-			PuzzleID:     runner.Factory.PuzzleID(),
-			Seed:         seed,
-			Blue:         filepath.Base(runner.Options.P0Bin),
-			League:       league,
-			CreatedAt:    time.Now().UTC().Format(time.RFC3339),
-			EndReason:    endReason,
-			Deactivated:  deactivated,
-			Scores:       [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
-			Ranks:        RanksFromWinner(traceWinner),
-			Players:      [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
-			Timing:       traceTiming,
-			TraceSummary: traceSummary,
-			Turns:        traceTurns,
+			MatchID:     simulationID,
+			GameID:      runner.Factory.Name(),
+			PuzzleID:    runner.Factory.PuzzleID(),
+			Seed:        seed,
+			Blue:        filepath.Base(runner.Options.P0Bin),
+			League:      league,
+			CreatedAt:   time.Now().UTC().Format(time.RFC3339),
+			EndReason:   endReason,
+			Deactivated: deactivated,
+			Scores:      [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
+			Ranks:       RanksFromWinner(traceWinner),
+			Players:     [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
+			Timing:      traceTiming,
+			Turns:       traceTurns,
 		}
 		if err := runner.Options.TraceWriter.WriteMatch(traceMatch); err != nil {
 			panic(err)

@@ -228,14 +228,15 @@ func (g *Game) DoBeheadings() {
 			}
 		}
 
+		head := bird.HeadPos()
 		if isInWall {
-			g.trace(TraceHitWall, traceBirdCoordPayload(bird.ID, bird.HeadPos()))
+			g.trace(arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
 		}
 		if isInEnemy {
-			g.trace(TraceHitEnemy, traceBirdCoordPayload(bird.ID, bird.HeadPos()))
+			g.trace(arena.MakeTurnTrace(TraceHitEnemy, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
 		}
 		if isInSelf {
-			g.trace(TraceHitSelf, traceBirdCoordPayload(bird.ID, bird.HeadPos()))
+			g.trace(arena.MakeTurnTrace(TraceHitSelf, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
 		}
 
 		if isInWall || isInEnemy || isInSelf {
@@ -247,7 +248,7 @@ func (g *Game) DoBeheadings() {
 		if len(b.Body) <= 3 {
 			b.Alive = false
 			g.Losses[b.Owner.GetIndex()] += len(b.Body)
-			g.trace(TraceDead, traceBirdPayload(b.ID))
+			g.trace(arena.MakeTurnTrace(TraceDead, BirdMeta{Bird: b.ID}))
 		} else {
 			b.Body = b.Body[1:]
 			g.Losses[b.Owner.GetIndex()]++
@@ -276,7 +277,7 @@ func (g *Game) DoEats() {
 	for _, p := range g.Players {
 		for _, bird := range p.Birds {
 			if bird.Alive && coordSliceContains(g.Grid.Apples, bird.HeadPos()) {
-				g.trace(TraceEat, traceBirdCoordPayload(bird.ID, bird.HeadPos()))
+				g.trace(arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(bird.HeadPos())}))
 				eaten[bird.HeadPos()] = struct{}{}
 			}
 		}
@@ -414,7 +415,7 @@ func (g *Game) DoFalls() {
 			if allOut {
 				bird.Alive = false
 				outOfBounds = append(outOfBounds, bird)
-				g.trace(TraceFall, traceBirdPayload(bird.ID))
+				g.trace(arena.MakeTurnTrace(TraceFall, BirdMeta{Bird: bird.ID}))
 			}
 		}
 		for _, bird := range outOfBounds {

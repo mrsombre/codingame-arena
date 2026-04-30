@@ -66,13 +66,6 @@ type TurnTraceProvider interface {
 	TurnTraces(turn int, players []Player) []TurnTrace
 }
 
-// TraceSummaryProvider returns the per-match aggregate of trace events.
-// Optional — if Referee also implements this, match writes the summary into
-// the trace JSON root under "trace_summary".
-type TraceSummaryProvider interface {
-	TraceSummary() TraceSummary
-}
-
 // RawScoresProvider returns per-player raw scores before any end-of-game
 // tiebreaker adjustments run. Used by the trace writer so match traces record
 // the intrinsic game state (e.g. sum of alive bird segments) rather than the

@@ -116,9 +116,18 @@ export interface TraceTurnTiming {
   response: [number, number]
 }
 
-export interface TurnTrace {
-  label: string
-  payload: string
+export interface TurnTrace<M = unknown> {
+  type: string
+  meta?: M
+}
+
+export interface BirdMeta {
+  bird: number
+}
+
+export interface BirdCoordMeta {
+  bird: number
+  coord: [number, number]
 }
 
 /**

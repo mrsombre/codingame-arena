@@ -1,6 +1,9 @@
 package arena
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // Metric is a labeled numeric value used for per-match and aggregate statistics.
 type Metric struct {
@@ -8,24 +11,34 @@ type Metric struct {
 	Value float64 `json:"value"`
 }
 
-// TurnTrace is a structured game event produced by the engine per turn.
+// TurnTrace is opaque game-owned data produced by the engine per turn.
+// Arena stores the type discriminator and an opaque JSON-encoded meta object
+// for game viewers and metric analyzers, but never interprets their meaning.
 type TurnTrace struct {
-	Label   string `json:"label"`
-	Payload string `json:"payload"`
+	Type string          `json:"type"`
+	Meta json.RawMessage `json:"meta,omitempty"`
 }
 
-// TraceSummary is the per-match aggregate of trace events. The outer index is
-// the in-match player side (0 = left). Each entry maps a trace label to a
-// per-pac (or per-unit) list of turn IDs at which that label fired with that
-// unit as its subject.
-//
-// Example: TraceSummary[0]["EAT"][2] = [3, 7, 12] means side-0 unit number 2
-// triggered EAT events on turns 3, 7, and 12.
-type TraceSummary [2]map[string][][]int
+// MakeTurnTrace marshals a typed game-owned meta into a TurnTrace. Games use
+// this to emit traces with structured payloads. The marshal must succeed:
+// trace metas are typed structs, so a panic indicates a programming error.
+func MakeTurnTrace[T any](typ string, meta T) TurnTrace {
+	raw, err := json.Marshal(meta)
+	if err != nil {
+		panic(err)
+	}
+	return TurnTrace{Type: typ, Meta: raw}
+}
 
-// IsEmpty reports whether neither side has any recorded events.
-func (s TraceSummary) IsEmpty() bool {
-	return len(s[0]) == 0 && len(s[1]) == 0
+// DecodeMeta unmarshals a TurnTrace's opaque meta into a typed game struct.
+// Returns the zero value plus an error on malformed input.
+func DecodeMeta[T any](t TurnTrace) (T, error) {
+	var v T
+	if len(t.Meta) == 0 {
+		return v, nil
+	}
+	err := json.Unmarshal(t.Meta, &v)
+	return v, err
 }
 
 // LossReason describes why a player lost a match.
