@@ -264,6 +264,15 @@ type ReplayAnnotations struct {
 	// Leaderboard captures the player's rank/division at fetch time. Set only
 	// when the replay was discovered via `replay leaderboard`.
 	Leaderboard *ReplayLeaderboardInfo
+	// PuzzleID is the canonical CodinGame puzzleId for the game we're
+	// downloading replays for. Layered into the saved replay even when the
+	// API returned 0, which CG occasionally does and which would otherwise
+	// make convert reject the file.
+	PuzzleID int
+	// PuzzleTitle is the canonical title for the puzzle (e.g.
+	// "SnakeByte - Winter Challenge 2026"). Written as the same two-element
+	// array CG's API uses so on-disk replays have a uniform shape.
+	PuzzleTitle string
 }
 
 // Top-level keys that exist only to drive the CodinGame web viewer. Stripped
@@ -344,6 +353,20 @@ func PrepareReplay(body []byte, ann ReplayAnnotations) ([]byte, error) {
 	}
 	if ann.Leaderboard != nil {
 		if err := setRaw(top, "leaderboard", ann.Leaderboard); err != nil {
+			return nil, err
+		}
+	}
+	// CG's API occasionally returns puzzleId=0 and omits puzzleTitle for some
+	// games (observed for game IDs 882653023, 882783026, 882785040 in the
+	// winter2026 leaderboard pull). Override with the canonical values from
+	// the factory so convert doesn't have to recover after the fact.
+	if ann.PuzzleID != 0 {
+		if err := setRaw(top, "puzzleId", ann.PuzzleID); err != nil {
+			return nil, err
+		}
+	}
+	if ann.PuzzleTitle != "" {
+		if err := setRaw(top, "puzzleTitle", []string{ann.PuzzleTitle, ann.PuzzleTitle}); err != nil {
 			return nil, err
 		}
 	}

@@ -60,7 +60,7 @@ func ReplayLeaderboardUsage(fs *pflag.FlagSet) string {
 // ReplayGet is the entry point for the "replay get" subcommand. It downloads
 // the raw replay JSON for one or more CodinGame games, strips the unused
 // top-level viewer payload, and writes each replay back as pretty-printed JSON.
-func ReplayGet(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
+func ReplayGet(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
 	opts, err := parseReplayGetOptions(args, fs, v)
 	if err != nil {
 		return err
@@ -68,9 +68,11 @@ func ReplayGet(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.F
 
 	client := codingame.New()
 	ann := arena.ReplayAnnotations{
-		Blue:   opts.Username,
-		League: opts.League,
-		Source: arena.ReplaySourceGet,
+		Blue:        opts.Username,
+		League:      opts.League,
+		Source:      arena.ReplaySourceGet,
+		PuzzleID:    factory.PuzzleID(),
+		PuzzleTitle: factory.PuzzleTitle(),
 	}
 	return downloadReplays(client, opts.IDs, ann, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
 }
@@ -78,7 +80,7 @@ func ReplayGet(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.F
 // ReplayLeaderboard is the entry point for the "replay leaderboard"
 // subcommand. It resolves a CodinGame leaderboard URL plus nickname into the
 // player's last battles and downloads each replay as pretty-printed JSON.
-func ReplayLeaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
+func ReplayLeaderboard(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
 	opts, err := parseReplayLeaderboardOptions(args, fs, v)
 	if err != nil {
 		return err
@@ -120,6 +122,8 @@ func ReplayLeaderboard(args []string, stdout io.Writer, _ arena.GameFactory, fs 
 			Division: info.Division,
 			Score:    info.Score,
 		},
+		PuzzleID:    factory.PuzzleID(),
+		PuzzleTitle: factory.PuzzleTitle(),
 	}
 	return downloadReplays(client, gameIDs, ann, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
 }

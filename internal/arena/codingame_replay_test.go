@@ -230,6 +230,38 @@ func TestRewriteReplayPuzzleID(t *testing.T) {
 	}
 }
 
+func TestPrepareReplay_OverridesPuzzleIDAndTitle(t *testing.T) {
+	t.Parallel()
+
+	// API returned puzzleId=0 with no puzzleTitle (the actual shape we see for
+	// games like 882653023). Annotations carry the canonical values from the
+	// factory; PrepareReplay must layer them on top.
+	body := []byte(`{"puzzleId":0,"questionTitle":"SnakeBot level4","gameResult":{"gameId":42}}`)
+
+	got, err := PrepareReplay(body, ReplayAnnotations{
+		PuzzleID:    13771,
+		PuzzleTitle: "SnakeByte - Winter Challenge 2026",
+	})
+	if err != nil {
+		t.Fatalf("PrepareReplay() error = %v", err)
+	}
+
+	want := "{\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42\n" +
+		"  },\n" +
+		"  \"puzzleId\": 13771,\n" +
+		"  \"puzzleTitle\": [\n" +
+		"    \"SnakeByte - Winter Challenge 2026\",\n" +
+		"    \"SnakeByte - Winter Challenge 2026\"\n" +
+		"  ],\n" +
+		"  \"questionTitle\": \"SnakeBot level4\"\n" +
+		"}\n"
+	if string(got) != want {
+		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
 func TestPrepareReplay_AddsLeaderboardInfo(t *testing.T) {
 	t.Parallel()
 
