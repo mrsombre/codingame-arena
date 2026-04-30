@@ -19,6 +19,11 @@ type ReplayMoves struct {
 // the engine instead of spawning external bot processes. The returned
 // TraceMatch has the same shape as TraceWriter.WriteMatch produces, so viewers
 // that consume /api/matches can render replays without any format translation.
+// The second return value is the post-OnEnd score reported by Player.GetScore
+// for each side; convert verification compares these against the replay's
+// recorded scores (which are already post-OnEnd, with -1 for deactivated
+// players and tie-break adjustments applied) since TraceMatch.Scores carries
+// raw bird-segment counts that diverge whenever OnEnd touched the value.
 //
 // botNames are copied into TraceMatch.Players (basename applied). blueSide
 // (0 or 1) is the in-match side whose FrameInfoFor lines are recorded as
@@ -32,7 +37,7 @@ func RunReplay(
 	botNames [2]string,
 	blueSide int,
 	maxTurns int,
-) TraceMatch {
+) (TraceMatch, [2]int) {
 	if blueSide != 0 && blueSide != 1 {
 		blueSide = 0
 	}
@@ -132,6 +137,14 @@ func RunReplay(
 			tt.Traces = ttp.TurnTraces(turn, players)
 		}
 		traceTurns = append(traceTurns, tt)
+
+		// CG's MultiplayerGameManager auto-ends the match when fewer than
+		// two players are active. Without this the surviving side keeps
+		// drifting on inertial Facing() moves until apples run out or a
+		// wall takes them, producing scores that don't match the replay.
+		if !referee.Ended() && referee.ActivePlayers(players) < 2 {
+			referee.EndGame()
+		}
 	}
 
 	if !referee.Ended() {
@@ -147,7 +160,8 @@ func RunReplay(
 
 	referee.OnEnd()
 
-	scores := [2]int{players[0].GetScore(), players[1].GetScore()}
+	finalScores := [2]int{players[0].GetScore(), players[1].GetScore()}
+	scores := finalScores
 	winner := -1
 	if haveRawScores {
 		scores = rawScores
@@ -184,5 +198,5 @@ func RunReplay(
 		Timing:       &TraceTiming{},
 		TraceSummary: traceSummary,
 		Turns:        traceTurns,
-	}
+	}, finalScores
 }

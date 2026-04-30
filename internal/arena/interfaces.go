@@ -45,6 +45,11 @@ type Player interface {
 type GameFactory interface {
 	Name() string
 	PuzzleID() int
+	// PuzzleTitle returns the human-readable CodinGame puzzle title
+	// (e.g. "SnakeByte - Winter Challenge 2026"). convert uses it to
+	// recover replays where the API returned puzzleId=0 but did include
+	// a puzzleTitle entry.
+	PuzzleTitle() string
 	NewGame(seed int64, options *viper.Viper) (Referee, []Player)
 	MaxTurns() int
 }

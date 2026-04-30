@@ -1,6 +1,8 @@
 package arena
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -193,6 +195,41 @@ func TestPrepareReplay_AddsSourceAndFetchedAt(t *testing.T) {
 	}
 }
 
+func TestRewriteReplayPuzzleID(t *testing.T) {
+	t.Parallel()
+
+	body := []byte("{\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42\n" +
+		"  },\n" +
+		"  \"puzzleId\": 0,\n" +
+		"  \"questionTitle\": \"SnakeBot level4\"\n" +
+		"}\n")
+	path := filepath.Join(t.TempDir(), "42.json")
+	if err := os.WriteFile(path, body, 0644); err != nil {
+		t.Fatalf("seed file: %v", err)
+	}
+
+	if err := RewriteReplayPuzzleID(path, 13771); err != nil {
+		t.Fatalf("RewriteReplayPuzzleID() error = %v", err)
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	want := "{\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42\n" +
+		"  },\n" +
+		"  \"puzzleId\": 13771,\n" +
+		"  \"questionTitle\": \"SnakeBot level4\"\n" +
+		"}\n"
+	if string(got) != want {
+		t.Fatalf("RewriteReplayPuzzleID() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
 func TestPrepareReplay_AddsLeaderboardInfo(t *testing.T) {
 	t.Parallel()
 
@@ -300,6 +337,29 @@ func TestReplayTraceTurnCount(t *testing.T) {
 	// by the engine and does not count.
 	if got := ReplayTraceTurnCount(replay); got != 3 {
 		t.Fatalf("ReplayTraceTurnCount() = %d, want 3", got)
+	}
+}
+
+func TestReplayTraceTurnCount_DeactivationPairFrame(t *testing.T) {
+	t.Parallel()
+
+	// Last turn pairs P0's normal stdout with P1's empty stdout (timeout). The
+	// empty frame closes turn 2 — it is NOT a separate game-over marker, so
+	// the count must stay at 2 instead of being incremented to 3.
+	replay := CodinGameReplay[CodinGameReplayFrame]{
+		GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+			Frames: []CodinGameReplayFrame{
+				{AgentID: -1, Summary: "init"},
+				{AgentID: 0, Stdout: "0 UP"},
+				{AgentID: 1, Stdout: "4 UP"},
+				{AgentID: 0, Stdout: "0 LEFT"},
+				{AgentID: 1, Stdout: "", Summary: "$1 has not provided 1 lines in time\n"},
+			},
+		},
+	}
+
+	if got := ReplayTraceTurnCount(replay); got != 2 {
+		t.Fatalf("ReplayTraceTurnCount() = %d, want 2", got)
 	}
 }
 

@@ -3,6 +3,8 @@ package arena
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -167,25 +169,34 @@ func ReplayTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 // engine folds into the preceding main turn and emits no trace turn for. The
 // trailing empty-stdout frame is the game-over marker; the engine emits one
 // extra trace turn for it (mirroring Java's post-game-over gameTurn frame).
+// Exception: a trailing empty stdout that pairs with the other side's stdout
+// to close an in-progress turn is a deactivation/timeout indicator for that
+// last turn — not a separate marker — so it must not be double-counted.
 func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	turns := 0
 	seenOutput := map[int]bool{}
 
-	flushOutputTurn := func() {
+	flushOutputTurn := func() bool {
 		if len(seenOutput) == 0 {
-			return
+			return false
 		}
 		turns++
 		clear(seenOutput)
+		return true
 	}
 
-	for _, frame := range replay.GameResult.Frames {
+	trailingEmptyClosedTurn := false
+	frames := replay.GameResult.Frames
+	for i, frame := range frames {
 		if frame.AgentID < 0 {
 			continue
 		}
 
 		if strings.TrimSpace(frame.Stdout) == "" {
-			flushOutputTurn()
+			flushed := flushOutputTurn()
+			if i == len(frames)-1 {
+				trailingEmptyClosedTurn = flushed
+			}
 			continue
 		}
 
@@ -199,7 +210,7 @@ func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	}
 	flushOutputTurn()
 
-	if hasTrailingEngineFrame(replay) {
+	if hasTrailingEngineFrame(replay) && !trailingEmptyClosedTurn {
 		turns++
 	}
 
@@ -266,6 +277,34 @@ var replayStripGameResult = []string{"metadata", "tooltips"}
 // usually the majority of the file size; "gameInformation" / "keyframe" are
 // viewer hints unused by convert/analyze.
 var replayStripFrame = []string{"view", "gameInformation", "keyframe"}
+
+// RewriteReplayPuzzleID overwrites the saved replay's top-level puzzleId.
+// Used by convert to repair files where the CodinGame API returned puzzleId=0
+// but the puzzleTitle still identifies the right puzzle. The rest of the file
+// is preserved (re-pretty-printed through the same map-of-RawMessage path
+// PrepareReplay uses, so top-level keys end up in the same alphabetical order).
+func RewriteReplayPuzzleID(path string, puzzleID int) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(data, &top); err != nil {
+		return fmt.Errorf("parse %s: %w", path, err)
+	}
+	if err := setRaw(top, "puzzleId", puzzleID); err != nil {
+		return err
+	}
+	body, err := json.Marshal(top)
+	if err != nil {
+		return err
+	}
+	out, err := prettyJSON(body)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, out, 0644)
+}
 
 // PrepareReplay normalizes a raw CodinGame replay JSON body for local
 // storage: removes viewer-only payloads, layers in the arena annotations,

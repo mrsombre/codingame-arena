@@ -64,9 +64,16 @@ func Convert(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfl
 			return fmt.Errorf("parse %s: %w", target.Path, err)
 		}
 		if replay.PuzzleID != factory.PuzzleID() {
-			skippedPuzzle++
-			_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (puzzleId %d != %d)\n", i+1, len(targets), target.ID, replay.PuzzleID, factory.PuzzleID())
-			continue
+			recovered, err := recoverReplayPuzzleID(target.Path, &replay, factory)
+			if err != nil {
+				return fmt.Errorf("recover puzzleId for %d: %w", target.ID, err)
+			}
+			if !recovered {
+				skippedPuzzle++
+				_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (puzzleId %d != %d)\n", i+1, len(targets), target.ID, replay.PuzzleID, factory.PuzzleID())
+				continue
+			}
+			_, _ = fmt.Fprintf(stdout, "[%d/%d] fix %d (puzzleId 0 → %d via puzzleTitle match)\n", i+1, len(targets), target.ID, factory.PuzzleID())
 		}
 
 		trace, league, err := convertReplayTrace(factory, replay, opts.League)
@@ -101,6 +108,37 @@ func Convert(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfl
 type convertReplayTarget struct {
 	ID   int64
 	Path string
+}
+
+// recoverReplayPuzzleID rescues replays where the CodinGame API returned
+// puzzleId=0 but did include a puzzleTitle entry that matches the factory's
+// expected title. On match it rewrites the on-disk file's puzzleId so future
+// runs don't re-trigger the same recovery, and updates the in-memory replay
+// struct so the caller can proceed with conversion. Returns true when the
+// replay was recovered.
+func recoverReplayPuzzleID(path string, replay *arena.CodinGameReplay[arena.CodinGameReplayFrame], factory arena.GameFactory) (bool, error) {
+	if replay.PuzzleID != 0 {
+		return false, nil
+	}
+	expected := factory.PuzzleTitle()
+	if expected == "" {
+		return false, nil
+	}
+	matched := false
+	for _, title := range replay.PuzzleTitle {
+		if title == expected {
+			matched = true
+			break
+		}
+	}
+	if !matched {
+		return false, nil
+	}
+	if err := arena.RewriteReplayPuzzleID(path, factory.PuzzleID()); err != nil {
+		return false, err
+	}
+	replay.PuzzleID = factory.PuzzleID()
+	return true, nil
 }
 
 
@@ -172,7 +210,7 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		blueSide = 1
 	}
 
-	trace := arena.RunReplay(
+	trace, finalScores := arena.RunReplay(
 		factory,
 		seed,
 		gameOptions,
@@ -182,21 +220,27 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		0,
 	)
 
-	if err := verifyReplayTrace(trace, replay); err != nil {
+	if err := verifyReplayTrace(trace, finalScores, replay); err != nil {
 		return arena.TraceMatch{}, league, err
 	}
 
 	return trace, league, nil
 }
 
-func verifyReplayTrace(trace arena.TraceMatch, replay arena.CodinGameReplay[arena.CodinGameReplayFrame]) error {
+// verifyReplayTrace checks the engine reproduces the replay. finalScores are
+// the post-OnEnd values (Player.GetScore after tie-break and deactivation
+// adjustments) — the same shape the replay's gameResult.scores carries.
+// trace.Scores cannot be used for this comparison: it stores raw bird-segment
+// counts that diverge whenever OnEnd touched the value (ties in raw scores
+// trigger a losses subtraction, deactivated players become -1).
+func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame]) error {
 	if len(replay.GameResult.Scores) < 2 {
 		return fmt.Errorf("replay scores must contain two entries")
 	}
-	if float64(trace.Scores[0]) != replay.GameResult.Scores[0] || float64(trace.Scores[1]) != replay.GameResult.Scores[1] {
-		return fmt.Errorf("%w: score mismatch: replay=[%.1f %.1f] engine=[%.1f %.1f]",
+	if float64(finalScores[0]) != replay.GameResult.Scores[0] || float64(finalScores[1]) != replay.GameResult.Scores[1] {
+		return fmt.Errorf("%w: score mismatch: replay=[%.1f %.1f] engine=[%d %d]",
 			errReplayMismatch,
-			replay.GameResult.Scores[0], replay.GameResult.Scores[1], trace.Scores[0], trace.Scores[1])
+			replay.GameResult.Scores[0], replay.GameResult.Scores[1], finalScores[0], finalScores[1])
 	}
 
 	expectedTurns := arena.ReplayTraceTurnCount(replay)

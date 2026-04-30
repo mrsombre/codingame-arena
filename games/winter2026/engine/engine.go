@@ -19,6 +19,8 @@ func (f *factory) Name() string { return "winter2026" }
 
 func (f *factory) PuzzleID() int { return 13771 }
 
+func (f *factory) PuzzleTitle() string { return "SnakeByte - Winter Challenge 2026" }
+
 func (f *factory) MaxTurns() int { return 200 }
 
 func (f *factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []arena.Player) {
