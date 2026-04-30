@@ -31,8 +31,7 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 			{
 				Turn:      0,
 				GameInput: []string{"5 3 2", "apple 1 2"},
-				P0Output:  "UP 0 RIGHT 1",
-				P1Output:  "DOWN 0 LEFT 1",
+				Output:    [2]string{"UP 0 RIGHT 1", "DOWN 0 LEFT 1"},
 				Timing:    &TraceTurnTiming{Response: [2]float64{820, 910}},
 				Traces: []TurnTrace{
 					{Label: "eat", Payload: "bot0:14.5"},
@@ -59,8 +58,7 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 	assert.Equal(t, [2]float64{12, 14}, got.Timing.ResponseAverage)
 	assert.Equal(t, [2]float64{10, 13}, got.Timing.ResponseMedian)
 	require.Len(t, got.Turns, 1)
-	assert.Equal(t, "UP 0 RIGHT 1", got.Turns[0].P0Output)
-	assert.Equal(t, "DOWN 0 LEFT 1", got.Turns[0].P1Output)
+	assert.Equal(t, [2]string{"UP 0 RIGHT 1", "DOWN 0 LEFT 1"}, got.Turns[0].Output)
 	require.NotNil(t, got.Turns[0].Timing)
 	assert.Equal(t, [2]float64{820, 910}, got.Turns[0].Timing.Response)
 	require.Len(t, got.Turns[0].Traces, 1)

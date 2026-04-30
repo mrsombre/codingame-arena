@@ -14,9 +14,10 @@ interface MoveRow {
 
 function parseMoves(turn: TraceTurn): MoveRow[] {
   const rows: MoveRow[] = []
+  const outputs = turn.output ?? ["", ""]
   for (const [output, mine] of [
-    [turn.p0_output, true],
-    [turn.p1_output, false],
+    [outputs[0], true],
+    [outputs[1], false],
   ] as const) {
     if (!output) continue
     for (const cmd of output.split("|")) {

@@ -149,8 +149,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			traceTurns = append(traceTurns, TraceTurn{
 				Turn:      turn,
 				GameInput: turnInput,
-				P0Output:  playerOutputs[0],
-				P1Output:  playerOutputs[1],
+				Output:    playerOutputs,
 				Timing:    turnTiming,
 			})
 		}

@@ -59,7 +59,7 @@ function TraceBadge({ trace }: { trace: MoveTrace }) {
 
 function parseMoves(turn: TraceTurn, myIds: Set<number>, frame: FrameData | undefined): MoveRow[] {
   const directions = new Map<number, string>()
-  for (const output of [turn.p0_output, turn.p1_output]) {
+  for (const output of turn.output ?? []) {
     if (!output) continue
     for (const cmd of output.split(";")) {
       const parts = cmd.trim().split(/\s+/)

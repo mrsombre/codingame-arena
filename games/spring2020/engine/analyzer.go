@@ -91,8 +91,8 @@ func analyzeSpringTraceSides(trace arena.TraceMatch) [2]springAnalyzeSideMatchSt
 	}
 
 	for _, turn := range trace.Turns {
-		stats[0].addOutput(turn.P0Output)
-		stats[1].addOutput(turn.P1Output)
+		stats[0].addOutput(turn.Output[0])
+		stats[1].addOutput(turn.Output[1])
 	}
 
 	if trace.TraceSummary != nil {

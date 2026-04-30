@@ -111,8 +111,7 @@ func RunReplay(
 		tt := TraceTurn{
 			Turn:      turn,
 			GameInput: turnInput,
-			P0Output:  playerOutputs[0],
-			P1Output:  playerOutputs[1],
+			Output:    playerOutputs,
 			Timing:    &TraceTurnTiming{Response: [2]float64{}},
 		}
 

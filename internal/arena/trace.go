@@ -112,11 +112,14 @@ type TraceTiming struct {
 // what either side received; for fog-of-war games it is blue's perspective
 // only. Absent on turns where blue did not execute (deactivated, skipped,
 // or game-over frame).
+//
+// Output[i] is the raw stdout the side-i bot emitted this turn (empty when
+// the side was deactivated or skipped). Indexed [left, right] in match-side
+// space; the bot→side mapping is in TraceMatch.Players.
 type TraceTurn struct {
 	Turn      int              `json:"turn"`
 	GameInput []string         `json:"game_input,omitempty"`
-	P0Output  string           `json:"p0_output,omitempty"`
-	P1Output  string           `json:"p1_output,omitempty"`
+	Output    [2]string        `json:"output,omitzero"`
 	Timing    *TraceTurnTiming `json:"timing,omitempty"`
 	Traces    []TurnTrace      `json:"traces,omitempty"`
 }
