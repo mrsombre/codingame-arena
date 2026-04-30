@@ -137,6 +137,65 @@ func TestAnalyzeTracesWithoutBlueOmitsBlueSummary(t *testing.T) {
 	assert.Contains(t, text, "Blue not identified in traces")
 }
 
+func TestAnalyzeTracesAggregatesPerSideEvents(t *testing.T) {
+	analyzer, ok := NewFactory().(arena.TraceAnalyzer)
+	require.True(t, ok)
+
+	// Per-turn output assigns birds 0,1 to side 0; bird 2,3 to side 1.
+	// Side 0 (winner) hits the wall once and eats once.
+	// Side 1 (loser) hits the wall twice and eats once.
+	turns := []arena.TraceTurn{
+		{
+			Turn:   0,
+			Output: [2]string{"0 UP;1 UP", "2 UP;3 UP"},
+			Traces: []arena.TurnTrace{
+				{Label: "EAT", Payload: "0 5,5"},
+				{Label: "HIT_WALL", Payload: "2 1,1"},
+			},
+		},
+		{
+			Turn:   1,
+			Output: [2]string{"0 UP;1 UP", "2 UP;3 UP"},
+			Traces: []arena.TurnTrace{
+				{Label: "HIT_WALL", Payload: "1 0,0"},
+				{Label: "HIT_WALL", Payload: "3 9,9"},
+				{Label: "EAT", Payload: "3 4,4"},
+			},
+		},
+	}
+
+	report, err := analyzer.AnalyzeTraces(arena.TraceAnalysisInput{
+		TraceDir: "traces",
+		Files: []arena.TraceFile{
+			{
+				Name: "trace-events.json",
+				Trace: arena.TraceMatch{
+					GameID:    "winter2026",
+					Blue:      "our_bot",
+					EndReason: arena.EndReasonScore,
+					Scores:    [2]arena.TraceScore{10, 4},
+					Ranks:     [2]int{0, 1},
+					Players:   [2]string{"our_bot", "rival"},
+					Turns:     turns,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	var out bytes.Buffer
+	require.NoError(t, report.Write(&out))
+	text := out.String()
+
+	assert.Contains(t, text, "Winner vs loser events")
+	// Winner (side 0): HIT_WALL=1; Loser (side 1): HIT_WALL=2. EAT is filtered.
+	assert.Contains(t, text, "HIT_WALL     winner 1.00  loser 2.00")
+	assert.NotContains(t, text, "EAT ")
+	// Blue side (side 0) is the winner, so blue rows mirror winner rows.
+	assert.Contains(t, text, "Blue vs opponent events")
+	assert.Contains(t, text, "HIT_WALL     blue 1.00  opp 2.00")
+}
+
 func TestAnalyzeTracesEmptyInput(t *testing.T) {
 	analyzer, ok := NewFactory().(arena.TraceAnalyzer)
 	require.True(t, ok)

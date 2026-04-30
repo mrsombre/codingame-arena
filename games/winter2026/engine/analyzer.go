@@ -3,14 +3,17 @@ package engine
 import (
 	"fmt"
 	"io"
+	"math"
 	"sort"
+	"strings"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
 // AnalyzeTraces implements arena.TraceAnalyzer for Winter 2026 traces. The
-// report focuses on end-reason distribution, with extra attention to whether
-// the blue (our) side caused fault terminations (timeouts / invalid commands).
+// report focuses on end-reason distribution (with attention to blue-side
+// faults) and aggregates per-side trace event counts (HIT_WALL, HIT_ENEMY,
+// HIT_ITSELF, EAT, FALL, DEAD) to compare winner vs loser play.
 func (f *factory) AnalyzeTraces(input arena.TraceAnalysisInput) (arena.TraceAnalysis, error) {
 	report := winterAnalyzeReport{
 		TraceDir:        input.TraceDir,
@@ -18,6 +21,10 @@ func (f *factory) AnalyzeTraces(input arena.TraceAnalysisInput) (arena.TraceAnal
 		EndReasonCounts: make(map[string]int),
 		BlueFaults:      make(map[string]int),
 		OpponentFaults:  make(map[string]int),
+		Winner:          newWinterAnalyzeSideAggregate(),
+		Loser:           newWinterAnalyzeSideAggregate(),
+		Blue:            newWinterAnalyzeSideAggregate(),
+		Opponent:        newWinterAnalyzeSideAggregate(),
 	}
 
 	for _, file := range input.Files {
@@ -61,9 +68,122 @@ func (f *factory) AnalyzeTraces(input arena.TraceAnalysisInput) (arena.TraceAnal
 				}
 			}
 		}
+
+		stats, ok := summarizeWinterTraceEvents(trace)
+		if !ok {
+			continue
+		}
+		if winner >= 0 {
+			loser := 1 - winner
+			report.EventMatches++
+			report.Winner.add(stats[winner])
+			report.Loser.add(stats[loser])
+		}
+		if blueSide >= 0 {
+			report.BlueEventMatches++
+			report.Blue.add(stats[blueSide])
+			report.Opponent.add(stats[1-blueSide])
+		}
 	}
 
 	return report, nil
+}
+
+// summarizeWinterTraceEvents derives a per-side event tally for one match by
+// scanning the per-turn traces. Each trace payload starts with the subject
+// bird ID; we map bird→side by reading the same turn's command outputs (each
+// side commands only its own birds), so this works on any winter2026 trace
+// without needing a precomputed TraceSummary. Returns ok=false when the trace
+// has no per-turn traces or no commands to derive ownership.
+func summarizeWinterTraceEvents(trace arena.TraceMatch) ([2]winterAnalyzeSideMatchStats, bool) {
+	stats := [2]winterAnalyzeSideMatchStats{
+		newWinterAnalyzeSideMatchStats(),
+		newWinterAnalyzeSideMatchStats(),
+	}
+
+	birdSide := winterBirdSideMap(trace)
+	if len(birdSide) == 0 {
+		return stats, false
+	}
+
+	hasEvents := false
+	for _, turn := range trace.Turns {
+		for _, ev := range turn.Traces {
+			birdID, ok := parseLeadingBirdID(ev.Payload)
+			if !ok {
+				continue
+			}
+			side, ok := birdSide[birdID]
+			if !ok {
+				continue
+			}
+			stats[side].EventCounts[ev.Label]++
+			hasEvents = true
+		}
+	}
+	return stats, hasEvents
+}
+
+// winterBirdSideMap reads the per-turn command outputs to learn which side
+// owns each bird ID. A move command starts with `<birdID> <DIR>`; only the
+// bird's owner can issue commands for it, so the leading int identifies
+// ownership unambiguously. MARK commands (which lead with `MARK`) are
+// skipped.
+func winterBirdSideMap(trace arena.TraceMatch) map[int]int {
+	birdSide := make(map[int]int)
+	for _, turn := range trace.Turns {
+		for side := 0; side < 2; side++ {
+			for _, cmd := range winterSplitCommands(turn.Output[side]) {
+				birdID, ok := parseLeadingBirdID(cmd)
+				if !ok {
+					continue
+				}
+				birdSide[birdID] = side
+			}
+		}
+	}
+	return birdSide
+}
+
+func winterSplitCommands(output string) []string {
+	if output == "" {
+		return nil
+	}
+	replacer := strings.NewReplacer(";", "\n", "\r", "\n")
+	lines := strings.Split(replacer.Replace(output), "\n")
+	commands := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		commands = append(commands, line)
+	}
+	return commands
+}
+
+type winterAnalyzeSideAggregate struct {
+	Matches     int
+	EventCounts map[string]int
+}
+
+type winterAnalyzeSideMatchStats struct {
+	EventCounts map[string]int
+}
+
+func newWinterAnalyzeSideAggregate() winterAnalyzeSideAggregate {
+	return winterAnalyzeSideAggregate{EventCounts: make(map[string]int)}
+}
+
+func newWinterAnalyzeSideMatchStats() winterAnalyzeSideMatchStats {
+	return winterAnalyzeSideMatchStats{EventCounts: make(map[string]int)}
+}
+
+func (a *winterAnalyzeSideAggregate) add(stats winterAnalyzeSideMatchStats) {
+	a.Matches++
+	for label, n := range stats.EventCounts {
+		a.EventCounts[label] += n
+	}
 }
 
 type winterAnalyzeReport struct {
@@ -83,6 +203,13 @@ type winterAnalyzeReport struct {
 	BlueFaultMatches    int
 	OpponentFaults      map[string]int
 	UnknownFaultMatches int
+
+	EventMatches     int
+	Winner           winterAnalyzeSideAggregate
+	Loser            winterAnalyzeSideAggregate
+	BlueEventMatches int
+	Blue             winterAnalyzeSideAggregate
+	Opponent         winterAnalyzeSideAggregate
 }
 
 // winterFaultSide picks which side caused a fault end_reason. Prefers the
@@ -155,7 +282,107 @@ func (r winterAnalyzeReport) Write(w io.Writer) error {
 		return err
 	}
 
-	return r.writeBlueFaultSummary(w)
+	if err := r.writeBlueFaultSummary(w); err != nil {
+		return err
+	}
+
+	if err := r.writeEventStats(w, "Winner vs loser events (avg per decided match)",
+		r.Winner, r.Loser, r.EventMatches, "winner", "loser"); err != nil {
+		return err
+	}
+
+	return r.writeEventStats(w, "Blue vs opponent events (avg per match with summary)",
+		r.Blue, r.Opponent, r.BlueEventMatches, "blue", "opp")
+}
+
+func (r winterAnalyzeReport) writeEventStats(w io.Writer, title string,
+	a, b winterAnalyzeSideAggregate, matches int, aLabel, bLabel string) error {
+	if _, err := fmt.Fprintf(w, "\n%s:\n", title); err != nil {
+		return err
+	}
+	if matches == 0 {
+		_, err := fmt.Fprintln(w, "  no traces with summary")
+		return err
+	}
+
+	rows := winterEventDiffRows(a.EventCounts, b.EventCounts, matches)
+	if len(rows) == 0 {
+		_, err := fmt.Fprintln(w, "  none")
+		return err
+	}
+	for _, row := range rows {
+		if _, err := fmt.Fprintf(w, "  %-12s %s %.2f  %s %.2f  diff %+0.2f (%s)\n",
+			row.Label, aLabel, row.A, bLabel, row.B, row.Diff,
+			winterEventExplanation(row, aLabel, bLabel)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type winterEventDiffRow struct {
+	Label string
+	A     float64
+	B     float64
+	Diff  float64
+}
+
+func winterEventDiffRows(a, b map[string]int, matches int) []winterEventDiffRow {
+	if matches == 0 {
+		return nil
+	}
+	labels := make(map[string]struct{}, len(a)+len(b))
+	for label := range a {
+		if label == TraceEat {
+			continue
+		}
+		labels[label] = struct{}{}
+	}
+	for label := range b {
+		if label == TraceEat {
+			continue
+		}
+		labels[label] = struct{}{}
+	}
+	rows := make([]winterEventDiffRow, 0, len(labels))
+	for label := range labels {
+		av := float64(a[label]) / float64(matches)
+		bv := float64(b[label]) / float64(matches)
+		rows = append(rows, winterEventDiffRow{
+			Label: label,
+			A:     av,
+			B:     bv,
+			Diff:  av - bv,
+		})
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		ai := math.Abs(rows[i].Diff)
+		aj := math.Abs(rows[j].Diff)
+		if ai == aj {
+			return rows[i].Label < rows[j].Label
+		}
+		return ai > aj
+	})
+	return rows
+}
+
+func winterEventExplanation(row winterEventDiffRow, aLabel, bLabel string) string {
+	switch {
+	case row.A == 0 && row.B == 0:
+		return "same rate"
+	case row.A == 0:
+		return fmt.Sprintf("%s never; %s did", aLabel, bLabel)
+	case row.B == 0:
+		return fmt.Sprintf("%s did; %s never", aLabel, bLabel)
+	case row.A < row.B:
+		return fmt.Sprintf("%s only %.0f%% as often as %s; %s %.1fx %s",
+			aLabel, row.A/row.B*100, bLabel, bLabel, row.B/row.A, aLabel)
+	case row.A > row.B:
+		return fmt.Sprintf("%s %.1fx %s; %s only %.0f%% as often as %s",
+			aLabel, row.A/row.B, bLabel, bLabel, row.B/row.A*100, aLabel)
+	default:
+		return "same rate"
+	}
 }
 
 func (r winterAnalyzeReport) writeEndReasons(w io.Writer) error {
