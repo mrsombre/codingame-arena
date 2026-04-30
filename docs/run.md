@@ -9,8 +9,7 @@ Run one or more match simulations between two player binaries.
 ```shell
 bin/arena --game=winter2026 \
   --p0=bin/bot-winter2026-cpp \
-  --p1=bin/bot-winter2026-py \
-  --seed=100030005000 --simulations 100
+  --p1=bin/bot-winter2026-py
 
 # Summary: 100 matches played (3.15s)
 # Stats: wins=29% losses=32% draws=39% avg_score=16.4x17.0 avg_turns=155
