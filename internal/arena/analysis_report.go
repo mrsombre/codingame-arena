@@ -160,9 +160,8 @@ type traceAnalysisReport struct {
 	gameID   string
 	files    int
 
-	decided  int
-	draws    int
-	sideWins [2]int
+	decided int
+	draws   int
 
 	blueMatches int
 	blueWins    int
@@ -173,11 +172,16 @@ type traceAnalysisReport struct {
 	turnMax  int
 	turnSeen bool
 
-	scoreSum       [2]float64
-	decidedMargin  float64
-	timingMatches  int
-	firstResponse  [2]float64
-	turnResponse   [2]float64
+	blueScoreSum  float64
+	redScoreSum   float64
+	decidedMargin float64
+
+	timingMatches    int
+	blueFirstResp    float64
+	redFirstResp     float64
+	blueTurnResp     float64
+	redTurnResp      float64
+
 	endReasonSpecs []TraceAnalysisEndReasonSpec
 
 	endReasonCounts     map[string]int
@@ -199,7 +203,6 @@ func (r *traceAnalysisReport) add(trace TraceMatch, stats TraceMetricStats) {
 	winner := TraceWinner(trace)
 	if winner == 0 || winner == 1 {
 		r.decided++
-		r.sideWins[winner]++
 		r.decidedMargin += math.Abs(float64(trace.Scores[0] - trace.Scores[1]))
 	} else {
 		r.draws++
@@ -214,6 +217,15 @@ func (r *traceAnalysisReport) add(trace TraceMatch, stats TraceMetricStats) {
 		case 1 - blueSide:
 			r.blueLosses++
 		}
+		r.blueScoreSum += float64(trace.Scores[blueSide])
+		r.redScoreSum += float64(trace.Scores[1-blueSide])
+		if trace.Timing != nil {
+			r.timingMatches++
+			r.blueFirstResp += trace.Timing.FirstResponse[blueSide]
+			r.redFirstResp += trace.Timing.FirstResponse[1-blueSide]
+			r.blueTurnResp += trace.Timing.ResponseAverage[blueSide]
+			r.redTurnResp += trace.Timing.ResponseAverage[1-blueSide]
+		}
 	}
 
 	turns := len(trace.Turns)
@@ -224,17 +236,6 @@ func (r *traceAnalysisReport) add(trace TraceMatch, stats TraceMetricStats) {
 	}
 	if turns > r.turnMax {
 		r.turnMax = turns
-	}
-
-	r.scoreSum[0] += float64(trace.Scores[0])
-	r.scoreSum[1] += float64(trace.Scores[1])
-
-	if trace.Timing != nil {
-		r.timingMatches++
-		for side := 0; side < 2; side++ {
-			r.firstResponse[side] += trace.Timing.FirstResponse[side]
-			r.turnResponse[side] += trace.Timing.ResponseAverage[side]
-		}
 	}
 
 	if trace.EndReason != "" {
@@ -288,89 +289,109 @@ func (r *traceAnalysisReport) Write(w io.Writer) error {
 	if title == "" {
 		title = "Trace"
 	}
-	if _, err := fmt.Fprintf(w, "%s analysis: %d trace files analyzed [%s]\n",
+	if _, err := fmt.Fprintf(w, "%s — %d traces — %s\n\n",
 		title, r.files, analysisTraceDirLabel(r.traceDir)); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "Decided matches: %.1f%% / Draws: %.1f%%\n",
-		percent(r.decided, r.files), percent(r.draws, r.files)); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprintf(w, "Side wins: p0 %.1f%% / p1 %.1f%%\n",
-		percent(r.sideWins[0], r.files), percent(r.sideWins[1], r.files)); err != nil {
-		return err
-	}
-	if r.blueMatches > 0 {
-		if _, err := fmt.Fprintf(w, "Blue: Wins: %.1f%% Losses: %.1f%% Draws: %.1f%%\n",
-			percent(r.blueWins, r.blueMatches),
-			percent(r.blueLosses, r.blueMatches),
-			percent(r.blueMatches-r.blueWins-r.blueLosses, r.blueMatches)); err != nil {
-			return err
-		}
-	} else if _, err := fmt.Fprintln(w, "Blue: not identified in traces"); err != nil {
-		return err
-	}
 
-	if err := r.writeGenericStats(w); err != nil {
+	if err := r.writeOutcome(w); err != nil {
+		return err
+	}
+	if err := r.writeMatchStats(w); err != nil {
 		return err
 	}
 	if err := r.writeEndReasons(w); err != nil {
 		return err
 	}
 	if len(r.metricSpecs) > 0 {
-		if err := r.writeMetricComparison(w, "Winner vs loser metrics", r.winnerA, r.winnerB, "winner", "loser"); err != nil {
+		if err := r.writeMetricComparison(w, "METRICS — winner vs loser", r.winnerA, r.winnerB, "winner", "loser"); err != nil {
 			return err
 		}
-		if err := r.writeMetricComparison(w, "Blue vs enemy metrics", r.blueA, r.blueB, "blue", "enemy"); err != nil {
+		if err := r.writeMetricComparison(w, "METRICS — blue vs red", r.blueA, r.blueB, "blue", "red"); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *traceAnalysisReport) writeGenericStats(w io.Writer) error {
-	if r.files == 0 {
-		if _, err := fmt.Fprintln(w, "Turns: none"); err != nil {
+func (r *traceAnalysisReport) writeOutcome(w io.Writer) error {
+	if _, err := fmt.Fprintln(w, "OUTCOME"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "  Decided  %5.1f%%   Draws  %5.1f%%\n",
+		percent(r.decided, r.files), percent(r.draws, r.files)); err != nil {
+		return err
+	}
+	if r.blueMatches > 0 {
+		if _, err := fmt.Fprintf(w, "  Blue     W %5.1f%%   L %5.1f%%   D %5.1f%%\n",
+			percent(r.blueWins, r.blueMatches),
+			percent(r.blueLosses, r.blueMatches),
+			percent(r.blueMatches-r.blueWins-r.blueLosses, r.blueMatches)); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintln(w, "Scores: none"); err != nil {
+	} else {
+		if _, err := fmt.Fprintln(w, "  Blue     not identified"); err != nil {
 			return err
 		}
-		return nil
+	}
+	_, err := fmt.Fprintln(w)
+	return err
+}
+
+func (r *traceAnalysisReport) writeMatchStats(w io.Writer) error {
+	if _, err := fmt.Fprintln(w, "MATCH"); err != nil {
+		return err
 	}
 
-	if _, err := fmt.Fprintf(w, "Turns: avg %.1f min %d max %d\n",
+	if r.files == 0 {
+		if _, err := fmt.Fprintln(w, "  Turns    none"); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(w)
+		return err
+	}
+
+	if _, err := fmt.Fprintf(w, "  Turns    avg %.1f   min %d   max %d\n",
 		float64(r.turnSum)/float64(r.files), r.turnMin, r.turnMax); err != nil {
 		return err
 	}
 
-	line := fmt.Sprintf("Scores: avg p0 %.1f p1 %.1f",
-		r.scoreSum[0]/float64(r.files), r.scoreSum[1]/float64(r.files))
-	if r.decided > 0 {
-		line += fmt.Sprintf(" margin %.1f", r.decidedMargin/float64(r.decided))
-	}
-	if _, err := fmt.Fprintln(w, line); err != nil {
-		return err
-	}
-
-	if r.timingMatches > 0 {
-		if _, err := fmt.Fprintf(w, "Timing: first_response %.0fmsx%.0fms avg_turn_response %.0fmsx%.0fms\n",
-			r.firstResponse[0]/float64(r.timingMatches),
-			r.firstResponse[1]/float64(r.timingMatches),
-			r.turnResponse[0]/float64(r.timingMatches),
-			r.turnResponse[1]/float64(r.timingMatches)); err != nil {
+	if r.blueMatches > 0 {
+		line := fmt.Sprintf("  Scores   blue %.1f   red %.1f",
+			r.blueScoreSum/float64(r.blueMatches), r.redScoreSum/float64(r.blueMatches))
+		if r.decided > 0 {
+			line += fmt.Sprintf("   margin %.1f", r.decidedMargin/float64(r.decided))
+		}
+		if _, err := fmt.Fprintln(w, line); err != nil {
 			return err
 		}
 	}
-	return nil
+
+	if r.timingMatches > 0 {
+		if _, err := fmt.Fprintf(w, "  Timing   first  blue %.0fms / red %.0fms\n",
+			r.blueFirstResp/float64(r.timingMatches),
+			r.redFirstResp/float64(r.timingMatches)); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "           turn   blue %.0fms / red %.0fms\n",
+			r.blueTurnResp/float64(r.timingMatches),
+			r.redTurnResp/float64(r.timingMatches)); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintln(w)
+	return err
 }
 
 func (r *traceAnalysisReport) writeEndReasons(w io.Writer) error {
-	if _, err := fmt.Fprintln(w, "\nEnd reasons:"); err != nil {
+	if _, err := fmt.Fprintln(w, "END REASONS"); err != nil {
 		return err
 	}
 	if len(r.endReasonCounts) == 0 {
-		_, err := fmt.Fprintln(w, "  none recorded")
+		if _, err := fmt.Fprintln(w, "  none recorded"); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(w)
 		return err
 	}
 
@@ -381,13 +402,14 @@ func (r *traceAnalysisReport) writeEndReasons(w io.Writer) error {
 		}
 		line := fmt.Sprintf("  %-14s %5.1f%%", row.label(), percent(row.count, r.files))
 		if row.count > 0 && row.spec.ShowBlue && r.blueMatches > 0 {
-			line += fmt.Sprintf(" (blue: %.1f%%)", percent(row.blueCount, r.blueMatches))
+			line += fmt.Sprintf("  (blue %.1f%%)", percent(row.blueCount, r.blueMatches))
 		}
 		if _, err := fmt.Fprintln(w, line); err != nil {
 			return err
 		}
 	}
-	return nil
+	_, err := fmt.Fprintln(w)
+	return err
 }
 
 type traceAnalysisEndReasonRow struct {
@@ -472,7 +494,7 @@ func (r traceAnalysisEndReasonRow) label() string {
 func (r *traceAnalysisReport) writeMetricComparison(w io.Writer, title string,
 	a, b map[string]traceAnalysisMetricAggregate, aLabel, bLabel string,
 ) error {
-	if _, err := fmt.Fprintf(w, "\n%s:\n", title); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\n", title); err != nil {
 		return err
 	}
 
@@ -487,7 +509,7 @@ func (r *traceAnalysisReport) writeMetricComparison(w io.Writer, title string,
 			continue
 		}
 		wrote = true
-		if _, err := fmt.Fprintf(w, "  %-14s %s %s  %s %s  (%s)\n",
+		if _, err := fmt.Fprintf(w, "  %-10s %s %s   %s %s   (%s)\n",
 			spec.Label,
 			aLabel, formatTraceMetricValue(spec.Kind, av.value),
 			bLabel, formatTraceMetricValue(spec.Kind, bv.value),
@@ -496,10 +518,12 @@ func (r *traceAnalysisReport) writeMetricComparison(w io.Writer, title string,
 		}
 	}
 	if !wrote {
-		_, err := fmt.Fprintln(w, "  none")
-		return err
+		if _, err := fmt.Fprintln(w, "  none"); err != nil {
+			return err
+		}
 	}
-	return nil
+	_, err := fmt.Fprintln(w)
+	return err
 }
 
 type traceAnalysisMetricAverage struct {
@@ -550,22 +574,23 @@ func analysisTraceDirLabel(dir string) string {
 	return "." + string(filepath.Separator) + label
 }
 
+// traceAnalysisValueExplanation summarizes the gap between two metric values
+// as a single ratio in the form "<bigger> N.NNx <smaller>". Edge cases:
+// equal values render as "equal"; a zero on one side renders as "<other> only".
 func traceAnalysisValueExplanation(a, b float64, aLabel, bLabel string) string {
-	a = math.Round(a*10) / 10
-	b = math.Round(b*10) / 10
+	a = math.Round(a*100) / 100
+	b = math.Round(b*100) / 100
 	const epsilon = 0.0000001
 	switch {
 	case math.Abs(a-b) < epsilon:
-		return "same value"
+		return "equal"
 	case a == 0:
-		return fmt.Sprintf("%s never; %s did", aLabel, bLabel)
+		return fmt.Sprintf("%s only", bLabel)
 	case b == 0:
-		return fmt.Sprintf("%s did; %s never", aLabel, bLabel)
-	case a < b:
-		return fmt.Sprintf("%s only %.0f%% as often as %s; %s %.1fx %s",
-			aLabel, a/b*100, bLabel, bLabel, b/a, aLabel)
+		return fmt.Sprintf("%s only", aLabel)
+	case a > b:
+		return fmt.Sprintf("%s %.2fx %s", aLabel, a/b, bLabel)
 	default:
-		return fmt.Sprintf("%s %.1fx %s; %s only %.0f%% as often as %s",
-			aLabel, a/b, bLabel, bLabel, b/a*100, aLabel)
+		return fmt.Sprintf("%s %.2fx %s", bLabel, b/a, aLabel)
 	}
 }

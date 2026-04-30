@@ -84,7 +84,7 @@ func TestAnalyzeUsesGameFlagToFilterTraceFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"trace-a.json"}, factory.files)
-	assert.Contains(t, out.String(), gameA+" analysis: 1 trace files analyzed")
+	assert.Contains(t, out.String(), gameA+" — 1 traces")
 }
 
 func makeAnalyzeTestDir(t *testing.T) string {

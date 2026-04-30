@@ -77,13 +77,16 @@ func TestAnalysisReportSummarizesGenericMatchStats(t *testing.T) {
 
 	text := runTestAnalysis(t, files, nil)
 
-	assert.Contains(t, text, "test analysis: 4 trace files analyzed [./traces]")
-	assert.Contains(t, text, "Decided matches: 75.0% / Draws: 25.0%")
-	assert.Contains(t, text, "Side wins: p0 25.0% / p1 50.0%")
-	assert.Contains(t, text, "Blue: Wins: 50.0% Losses: 25.0% Draws: 25.0%")
-	assert.Contains(t, text, "Turns: avg 1.5 min 0 max 3")
-	assert.Contains(t, text, "Scores: avg p0 3.5 p1 6.0 margin 6.7")
-	assert.Contains(t, text, "Timing: first_response 100msx200ms avg_turn_response 10msx20ms")
+	assert.Contains(t, text, "test — 4 traces — ./traces")
+	assert.Contains(t, text, "OUTCOME")
+	assert.Contains(t, text, "Decided   75.0%   Draws   25.0%")
+	assert.Contains(t, text, "Blue     W  50.0%   L  25.0%   D  25.0%")
+	assert.NotContains(t, text, "Side wins")
+	assert.Contains(t, text, "MATCH")
+	assert.Contains(t, text, "Turns    avg 1.5   min 0   max 3")
+	assert.Contains(t, text, "Scores   blue 5.5   red 4.0   margin 6.7")
+	assert.Contains(t, text, "Timing   first  blue 100ms / red 200ms")
+	assert.Contains(t, text, "turn   blue 10ms / red 20ms")
 }
 
 func TestAnalysisReportEndReasonsAttributeBlueFault(t *testing.T) {
@@ -109,10 +112,10 @@ func TestAnalysisReportEndReasonsAttributeBlueFault(t *testing.T) {
 
 	text := runTestAnalysis(t, files, nil)
 
-	assert.Contains(t, text, "End reasons:")
+	assert.Contains(t, text, "END REASONS")
 	assert.Contains(t, text, "SCORE")
-	assert.Contains(t, text, "TIMEOUT         33.3% (blue: 33.3%)")
-	assert.Contains(t, text, "INVALID         33.3% (blue: 0.0%)")
+	assert.Contains(t, text, "TIMEOUT         33.3%  (blue 33.3%)")
+	assert.Contains(t, text, "INVALID         33.3%  (blue 0.0%)")
 	assert.Contains(t, text, "TIMEOUT_START    0.0%")
 }
 
@@ -150,12 +153,12 @@ func TestAnalysisReportAggregatesMetricKinds(t *testing.T) {
 
 	text := runTestAnalysis(t, files, analyzer)
 
-	assert.Contains(t, text, "Winner vs loser metrics:")
-	assert.Contains(t, text, "DIED           winner  1.50/match  loser  3.50/match")
-	assert.Contains(t, text, "NO_EAT         winner  12.5%  loser  75.0%")
-	assert.Contains(t, text, "Blue vs enemy metrics:")
-	assert.Contains(t, text, "DIED           blue  2.50/match  enemy  2.50/match")
-	assert.Contains(t, text, "NO_EAT         blue  62.5%  enemy  25.0%")
+	assert.Contains(t, text, "METRICS — winner vs loser")
+	assert.Contains(t, text, "DIED       winner  1.50/match   loser  3.50/match   (loser 2.33x winner)")
+	assert.Contains(t, text, "NO_EAT     winner  12.5%   loser  75.0%   (loser 6.00x winner)")
+	assert.Contains(t, text, "METRICS — blue vs red")
+	assert.Contains(t, text, "DIED       blue  2.50/match   red  2.50/match   (equal)")
+	assert.Contains(t, text, "NO_EAT     blue  62.5%   red  25.0%   (blue 2.50x red)")
 }
 
 func TestAnalysisReportRejectsPerTurnMetricAboveTurnCount(t *testing.T) {
@@ -189,6 +192,6 @@ func TestAnalysisReportSkipsPerTurnMetricsForZeroTurnMatches(t *testing.T) {
 
 	text := runTestAnalysis(t, files, analyzer)
 
-	assert.Contains(t, text, "Winner vs loser metrics:")
+	assert.Contains(t, text, "METRICS — winner vs loser")
 	assert.Contains(t, text, "  none")
 }
