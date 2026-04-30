@@ -56,7 +56,11 @@ type TraceMatch struct {
 	// EndReason categorizes how the match terminated. Game-specific; see the
 	// EndReason* constants for shared values. Empty when the referee doesn't
 	// implement EndReasonProvider.
-	EndReason    string        `json:"end_reason,omitempty"`
+	EndReason string `json:"end_reason,omitempty"`
+	// Deactivated[i] is true when side i was deactivated (timeout / bad
+	// command) during the match. Used by analyzers to attribute fault end
+	// reasons to a specific side.
+	Deactivated  [2]bool       `json:"deactivated,omitzero"`
 	Scores       [2]TraceScore `json:"scores"`
 	Ranks        [2]int        `json:"ranks"`
 	Players      [2]string     `json:"players"`

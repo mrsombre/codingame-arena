@@ -282,6 +282,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		if erp, ok := referee.(EndReasonProvider); ok {
 			endReason = erp.EndReason(turn, players, deactivationTurns)
 		}
+		deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
 		traceMatch := TraceMatch{
 			MatchID:      simulationID,
 			GameID:       runner.Factory.Name(),
@@ -291,6 +292,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			League:       league,
 			CreatedAt:    time.Now().UTC().Format(time.RFC3339),
 			EndReason:    endReason,
+			Deactivated:  deactivated,
 			Scores:       [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
 			Ranks:        RanksFromWinner(traceWinner),
 			Players:      [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},

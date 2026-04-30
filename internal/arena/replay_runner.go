@@ -186,12 +186,15 @@ func RunReplay(
 		endReason = erp.EndReason(turn, players, deactivationTurns)
 	}
 
+	deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
+
 	return TraceMatch{
 		MatchID:      0,
 		GameID:       factory.Name(),
 		PuzzleID:     factory.PuzzleID(),
 		Seed:         seed,
 		EndReason:    endReason,
+		Deactivated:  deactivated,
 		Scores:       [2]TraceScore{TraceScore(scores[0]), TraceScore(scores[1])},
 		Ranks:        RanksFromWinner(winner),
 		Players:      [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
