@@ -171,6 +171,48 @@ func (r *Referee) RawScores() [2]int {
 	return scores
 }
 
+// EndReason categorizes how the match terminated. Priority: deactivation
+// reason (if any side is deactivated) > IsGameOver branch (player wiped out
+// → ELIMINATED, otherwise apples consumed → SCORE) > turn cap. Winter 2026
+// has no score lock-in shortcut, so SCORE_EARLY is not produced.
+//
+// "Timeout!" is the literal deactivation message used by both the arena
+// runner (on no output) and CommandManager.ParseCommands (on empty input).
+func (r *Referee) EndReason(turn int, players []arena.Player, deactivationTurns [2]int) string {
+	for i, p := range players {
+		if !p.IsDeactivated() {
+			continue
+		}
+		reason := p.DeactivationReason()
+		switch {
+		case reason == "Timeout!" && deactivationTurns[i] == 0:
+			return arena.EndReasonTimeoutStart
+		case reason == "Timeout!":
+			return arena.EndReasonTimeout
+		default:
+			return arena.EndReasonInvalid
+		}
+	}
+
+	if r.Game.IsGameOver() {
+		for _, p := range r.Game.Players {
+			alive := false
+			for _, b := range p.Birds {
+				if b.Alive {
+					alive = true
+					break
+				}
+			}
+			if !alive {
+				return arena.EndReasonEliminated
+			}
+		}
+		return arena.EndReasonScore
+	}
+
+	return arena.EndReasonTurnsOut
+}
+
 func (r *Referee) Metrics() []arena.Metric {
 	return []arena.Metric{
 		{Label: "apples_remaining", Value: float64(len(r.Game.Grid.Apples))},
