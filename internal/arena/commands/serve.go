@@ -43,6 +43,10 @@ func Serve(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 		return err
 	}
 
+	factories, err := serveFactories(factory, v)
+	if err != nil {
+		return err
+	}
 	bots := scanBots(opts.BinDir)
 
 	assets, err := fs.Sub(viewer.Assets, "dist")
@@ -51,6 +55,7 @@ func Serve(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 	}
 	handler := server.New(server.Options{
 		Factory:   factory,
+		Factories: factories,
 		Assets:    assets,
 		TraceDir:  opts.TraceDir,
 		ReplayDir: opts.ReplayDir,
@@ -127,6 +132,29 @@ func Serve(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 			}
 		}
 	}
+}
+
+func serveFactories(factory arena.GameFactory, v *viper.Viper) (map[string]arena.GameFactory, error) {
+	if factory != nil {
+		return map[string]arena.GameFactory{factory.Name(): factory}, nil
+	}
+	names := arena.Games()
+	if selected := v.GetString("game"); selected != "" {
+		f := arena.GetFactory(selected)
+		if f == nil {
+			return nil, fmt.Errorf("unknown game %q; available: %s", selected, strings.Join(names, ", "))
+		}
+		return map[string]arena.GameFactory{selected: f}, nil
+	}
+
+	factories := make(map[string]arena.GameFactory, len(names))
+	for _, name := range names {
+		f := arena.GetFactory(name)
+		if f != nil {
+			factories[name] = f
+		}
+	}
+	return factories, nil
 }
 
 func readStdinCommands(ctx context.Context) <-chan string {

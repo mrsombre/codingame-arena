@@ -106,10 +106,9 @@ func commandSet() map[string]commandSpec {
 			usage:        commands.ConvertUsage,
 		},
 		"serve": {
-			addFlags:     commands.AddServeFlags,
-			handler:      commands.Serve,
-			needsFactory: true,
-			usage:        commands.ServeUsage,
+			addFlags: commands.AddServeFlags,
+			handler:  commands.Serve,
+			usage:    commands.ServeUsage,
 		},
 		"serialize": {
 			addFlags:     commands.AddSerializeFlags,

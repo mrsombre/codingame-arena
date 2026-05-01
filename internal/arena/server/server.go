@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,16 @@ import (
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
+
+const (
+	singleMatchID       = "cg-match"
+	singleMatchFileName = singleMatchID + ".json"
+	singleMatchTraceID  = int64(0)
+)
+
+func singleMatchTracePath() string {
+	return filepath.Join(os.TempDir(), singleMatchFileName)
+}
 
 // gameOptionsViper builds a viper instance carrying the per-request
 // gameOptions map so it can be passed to GameFactory.NewGame.
@@ -33,6 +44,7 @@ func gameOptionsViper(opts map[string]string) *viper.Viper {
 // Options configures a Handler built by New.
 type Options struct {
 	Factory   arena.GameFactory
+	Factories map[string]arena.GameFactory
 	Assets    fs.FS
 	TraceDir  string
 	ReplayDir string
@@ -43,29 +55,86 @@ type Options struct {
 // JSON API consumed by the viewer.
 func New(opts Options) http.Handler {
 	mux := http.NewServeMux()
+	resolver := newFactoryResolver(opts)
 
-	gameRoot := "/" + opts.Factory.Name() + "/"
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, gameRoot, http.StatusFound)
-	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
 
 	mux.HandleFunc("GET /api/games", handleGames())
-	mux.HandleFunc("GET /api/game", handleGame(opts.Factory))
-	mux.HandleFunc("GET /api/serialize", handleSerialize(opts.Factory))
+	mux.HandleFunc("GET /api/game", handleGame(resolver))
+	mux.HandleFunc("GET /api/serialize", handleSerialize(resolver))
 	mux.HandleFunc("GET /api/bots", handleBots(opts.Bots))
 	mux.HandleFunc("GET /api/matches", handleMatchList(opts.TraceDir))
 	mux.HandleFunc("GET /api/matches/{id}", handleMatchGet(opts.TraceDir))
 	mux.HandleFunc("GET /api/replays", handleReplayList(opts.ReplayDir))
-	mux.HandleFunc("GET /api/replays/{id}", handleReplayGet(opts.ReplayDir, opts.Factory))
-	mux.HandleFunc("POST /api/run", handleRun(opts.Factory, opts.TraceDir))
-	mux.HandleFunc("POST /api/batch", handleBatch(opts.Factory, opts.TraceDir))
+	mux.HandleFunc("GET /api/replays/{id}", handleReplayGet(opts.ReplayDir, resolver))
+	mux.HandleFunc("POST /api/run", handleRun(resolver, opts.TraceDir))
+	mux.HandleFunc("POST /api/batch", handleBatch(resolver, opts.TraceDir))
 
 	mux.Handle("/", http.FileServer(http.FS(opts.Assets)))
 	return mux
+}
+
+type factoryResolver struct {
+	factories   map[string]arena.GameFactory
+	defaultName string
+}
+
+func newFactoryResolver(opts Options) factoryResolver {
+	factories := make(map[string]arena.GameFactory)
+	if opts.Factory != nil {
+		factories[opts.Factory.Name()] = opts.Factory
+	}
+	for name, factory := range opts.Factories {
+		if factory != nil {
+			factories[name] = factory
+		}
+	}
+
+	defaultName := ""
+	if _, ok := factories["winter2026"]; ok {
+		defaultName = "winter2026"
+	} else {
+		names := make([]string, 0, len(factories))
+		for name := range factories {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		if len(names) > 0 {
+			defaultName = names[0]
+		}
+	}
+
+	return factoryResolver{factories: factories, defaultName: defaultName}
+}
+
+func (resolver factoryResolver) fromRequest(r *http.Request) (arena.GameFactory, bool, string) {
+	name := r.URL.Query().Get("game")
+	if name == "" {
+		name = resolver.defaultName
+	}
+	return resolver.byName(name)
+}
+
+func (resolver factoryResolver) byName(name string) (arena.GameFactory, bool, string) {
+	if name == "" {
+		name = resolver.defaultName
+	}
+	if name == "" {
+		return nil, false, "no games configured"
+	}
+	factory := resolver.factories[name]
+	if factory == nil {
+		names := make([]string, 0, len(resolver.factories))
+		for available := range resolver.factories {
+			names = append(names, available)
+		}
+		sort.Strings(names)
+		return nil, false, fmt.Sprintf("unknown game %q; available: %s", name, strings.Join(names, ", "))
+	}
+	return factory, true, ""
 }
 
 type gameInfo struct {
@@ -79,8 +148,13 @@ func handleGames() http.HandlerFunc {
 	}
 }
 
-func handleGame(factory arena.GameFactory) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
+func handleGame(resolver factoryResolver) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		factory, ok, msg := resolver.fromRequest(r)
+		if !ok {
+			writeError(w, http.StatusBadRequest, msg)
+			return
+		}
 		writeJSON(w, http.StatusOK, gameInfo{
 			Name:     factory.Name(),
 			MaxTurns: factory.MaxTurns(),
@@ -109,9 +183,14 @@ func handleBots(bots []string) http.HandlerFunc {
 // handleSerialize mirrors the `arena serialize` command: globals + first frame
 // for a player, as plain text. Query params: seed (required), player (0|1,
 // default 0). Extra query params are forwarded as game options.
-func handleSerialize(factory arena.GameFactory) http.HandlerFunc {
-	reserved := map[string]struct{}{"seed": {}, "player": {}}
+func handleSerialize(resolver factoryResolver) http.HandlerFunc {
+	reserved := map[string]struct{}{"game": {}, "seed": {}, "player": {}}
 	return func(w http.ResponseWriter, r *http.Request) {
+		factory, ok, msg := resolver.fromRequest(r)
+		if !ok {
+			writeError(w, http.StatusBadRequest, msg)
+			return
+		}
 		q := r.URL.Query()
 
 		seedRaw := q.Get("seed")
@@ -209,16 +288,18 @@ var matchIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 func handleMatchGet(traceDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if traceDir == "" {
-			writeError(w, http.StatusNotFound, "no trace-dir configured; start arena serve with --trace-dir <path>")
-			return
-		}
 		id := r.PathValue("id")
 		if !matchIDPattern.MatchString(id) {
 			writeError(w, http.StatusBadRequest, "invalid match id")
 			return
 		}
 		path := filepath.Join(traceDir, id+".json")
+		if id == singleMatchID {
+			path = singleMatchTracePath()
+		} else if traceDir == "" {
+			writeError(w, http.StatusNotFound, "no trace-dir configured; start arena serve with --trace-dir <path>")
+			return
+		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
@@ -237,18 +318,24 @@ func handleMatchGet(traceDir string) http.HandlerFunc {
 type runRequest struct {
 	BlueBotBin  string            `json:"blueBin"`
 	RedBotBin   string            `json:"redBin"`
+	Game        string            `json:"game,omitempty"`
 	Seed        *int64            `json:"seed,string,omitempty"`
 	MaxTurns    int               `json:"maxTurns,omitempty"`
 	NoSwap      bool              `json:"noSwap,omitempty"`
 	GameOptions map[string]string `json:"gameOptions,omitempty"`
 }
 
-func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
+func handleRun(resolver factoryResolver, traceDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() { _ = r.Body.Close() }()
 		var req runRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid json: "+err.Error())
+			return
+		}
+		factory, ok, msg := resolver.byName(req.Game)
+		if !ok {
+			writeError(w, http.StatusBadRequest, msg)
 			return
 		}
 		if req.BlueBotBin == "" || req.RedBotBin == "" {
@@ -264,7 +351,7 @@ func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			BlueBotBin:  req.BlueBotBin,
 			RedBotBin:   req.RedBotBin,
 			NoSwap:      req.NoSwap,
-			TraceWriter: arena.NewTraceWriter(traceDir, time.Now().Unix()),
+			TraceWriter: arena.NewFixedTraceWriter(singleMatchTracePath(), singleMatchTraceID),
 			GameOptions: gameOptionsViper(req.GameOptions),
 		})
 		result := runner.RunMatch(0, seed)
@@ -277,6 +364,7 @@ func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 type batchRequest struct {
 	BlueBotBin  string            `json:"blueBin"`
 	RedBotBin   string            `json:"redBin"`
+	Game        string            `json:"game,omitempty"`
 	Seed        *int64            `json:"seed,string,omitempty"`
 	Simulations int               `json:"simulations,omitempty"`
 	MaxTurns    int               `json:"maxTurns,omitempty"`
@@ -321,12 +409,17 @@ type batchResponse struct {
 	Matches      []batchMatchSummary `json:"matches"`
 }
 
-func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
+func handleBatch(resolver factoryResolver, traceDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() { _ = r.Body.Close() }()
 		var req batchRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid json: "+err.Error())
+			return
+		}
+		factory, ok, msg := resolver.byName(req.Game)
+		if !ok {
+			writeError(w, http.StatusBadRequest, msg)
 			return
 		}
 		if req.BlueBotBin == "" || req.RedBotBin == "" {

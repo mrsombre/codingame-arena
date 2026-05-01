@@ -181,9 +181,10 @@ type TraceTurnTiming struct {
 // a batch share traceID (typically the batch start timestamp); each file is
 // keyed by traceID + per-match MatchID so multiple batches can coexist.
 type TraceWriter struct {
-	mu      sync.Mutex
-	dir     string
-	traceID int64
+	mu        sync.Mutex
+	dir       string
+	traceID   int64
+	fixedName string
 }
 
 const (
@@ -200,6 +201,14 @@ func NewTraceWriter(dir string, traceID int64) *TraceWriter {
 		return nil
 	}
 	return &TraceWriter{dir: dir, traceID: traceID}
+}
+
+// NewFixedTraceWriter creates a TraceWriter that overwrites a single JSON file.
+func NewFixedTraceWriter(path string, traceID int64) *TraceWriter {
+	if path == "" {
+		return nil
+	}
+	return &TraceWriter{dir: filepath.Dir(path), traceID: traceID, fixedName: filepath.Base(path)}
 }
 
 // WriteMatch writes a single match trace as a JSON file:
@@ -219,7 +228,11 @@ func (w *TraceWriter) WriteMatch(match TraceMatch) error {
 	if match.Type == "" {
 		match.Type = TraceTypeTrace
 	}
-	path := filepath.Join(w.dir, TraceFileName(match.Type, w.traceID, match.MatchID))
+	name := TraceFileName(match.Type, w.traceID, match.MatchID)
+	if w.fixedName != "" {
+		name = w.fixedName
+	}
+	path := filepath.Join(w.dir, name)
 	data, err := json.MarshalIndent(match, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal trace: %w", err)

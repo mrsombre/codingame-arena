@@ -102,8 +102,13 @@ func handleReplayList(replayDir string) http.HandlerFunc {
 	}
 }
 
-func handleReplayGet(replayDir string, factory arena.GameFactory) http.HandlerFunc {
+func handleReplayGet(replayDir string, resolver factoryResolver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		factory, ok, msg := resolver.fromRequest(r)
+		if !ok {
+			writeError(w, http.StatusBadRequest, msg)
+			return
+		}
 		if replayDir == "" {
 			writeError(w, http.StatusNotFound, "no replay-dir configured")
 			return
