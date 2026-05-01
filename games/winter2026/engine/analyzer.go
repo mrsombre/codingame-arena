@@ -16,11 +16,16 @@ import (
 // regardless of length.
 func (f *factory) TraceMetricSpecs() []arena.TraceMetricSpec {
 	return []arena.TraceMetricSpec{
-		{Key: TraceDead, Label: TraceDead, Kind: arena.TraceMetricPerMatchCount},
-		{Key: TraceHitEnemy, Label: TraceHitEnemy, Kind: arena.TraceMetricPerMatchCount},
-		{Key: TraceHitWall, Label: TraceHitWall, Kind: arena.TraceMetricPerMatchCount},
-		{Key: TraceHitSelf, Label: TraceHitSelf, Kind: arena.TraceMetricPerMatchCount},
-		{Key: TraceFall, Label: TraceFall, Kind: arena.TraceMetricPerMatchCount},
+		{Key: TraceDead, Label: TraceDead, Kind: arena.TraceMetricPerMatchCount,
+			Description: "Snake deaths per match (each death loses the bird's remaining 3 segments)"},
+		{Key: TraceHitEnemy, Label: TraceHitEnemy, Kind: arena.TraceMetricPerMatchCount,
+			Description: "Segments lost per match from crashing into an enemy snake"},
+		{Key: TraceHitWall, Label: TraceHitWall, Kind: arena.TraceMetricPerMatchCount,
+			Description: "Segments lost per match from crashing into a wall"},
+		{Key: TraceHitSelf, Label: TraceHitSelf, Kind: arena.TraceMetricPerMatchCount,
+			Description: "Segments lost per match from crashing into own or ally body"},
+		{Key: TraceFall, Label: TraceFall, Kind: arena.TraceMetricPerMatchCount,
+			Description: "Segments lost per match from snakes falling off the grid"},
 	}
 }
 

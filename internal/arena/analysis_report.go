@@ -314,6 +314,9 @@ func (r *traceAnalysisReport) Write(w io.Writer) error {
 		return err
 	}
 	if len(r.metricSpecs) > 0 {
+		if err := r.writeMetricLegend(w); err != nil {
+			return err
+		}
 		if err := r.writeMetricComparison(w, "METRICS — winner vs loser", r.winnerA, r.winnerB, "winner", "loser"); err != nil {
 			return err
 		}
@@ -325,6 +328,35 @@ func (r *traceAnalysisReport) Write(w io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// writeMetricLegend prints a `Metrics:` block listing each spec's description.
+// Lower-cased title with `- key: text` bullets intentionally diverges from the
+// uppercase data sections below it, so the reader can tell at a glance that
+// this is documentation rather than measured values. Skipped entirely when no
+// spec carries a Description.
+func (r *traceAnalysisReport) writeMetricLegend(w io.Writer) error {
+	rows := make([]TraceMetricSpec, 0, len(r.metricSpecs))
+	for _, spec := range r.metricSpecs {
+		if spec.Description == "" {
+			continue
+		}
+		rows = append(rows, spec)
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+
+	if _, err := fmt.Fprintln(w, "Metrics:"); err != nil {
+		return err
+	}
+	for _, spec := range rows {
+		if _, err := fmt.Fprintf(w, "- %s: %s\n", spec.Label, spec.Description); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintln(w)
+	return err
 }
 
 func (r *traceAnalysisReport) writeOutcome(w io.Writer) error {

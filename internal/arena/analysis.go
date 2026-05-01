@@ -33,11 +33,18 @@ const (
 
 // TraceMetricSpec declares one game-owned metric that arena can aggregate.
 // Arena owns ordering, comparison, and presentation; games own metric meaning.
+//
+// Description is a one-line human explanation rendered in a `Metrics:` legend
+// before the comparison sections, so a reader unfamiliar with the game can
+// interpret labels like DEAD or HIT_ENEMY without reading source. Optional —
+// specs without a description are omitted from the legend, and a game whose
+// specs all lack one renders no legend block.
 type TraceMetricSpec struct {
-	Key      string
-	Label    string
-	Kind     TraceMetricKind
-	ShowZero bool
+	Key         string
+	Label       string
+	Kind        TraceMetricKind
+	ShowZero    bool
+	Description string
 }
 
 // TraceMetricStats holds per-side metric values for one match.

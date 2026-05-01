@@ -163,6 +163,48 @@ func TestAnalysisReportAggregatesMetricKinds(t *testing.T) {
 	assert.Contains(t, text, "NO_EAT      won       25.0%   lost    100.0%   (lost 4.00x won)")
 }
 
+func TestAnalysisReportRendersMetricLegendWhenSpecsCarryDescriptions(t *testing.T) {
+	files := []TraceFile{{Trace: TraceMatch{
+		Type: "ok",
+		Blue: "us", Players: [2]string{"us", "rival"},
+		Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1},
+		Turns: testTurns(5),
+	}}}
+	analyzer := testMetricAnalyzer{
+		specs: []TraceMetricSpec{
+			{Key: testMetricDied, Label: "DIED", Kind: TraceMetricPerMatchCount, Description: "Deaths per match"},
+			// No description: this spec should be skipped from the legend but
+			// still appear in the comparison sections below.
+			{Key: testMetricNoEat, Label: "NO_EAT", Kind: TraceMetricPerTurnRate},
+		},
+		stats: map[string]TraceMetricStats{
+			"ok": {testMetricDied: [2]int{1, 0}, testMetricNoEat: [2]int{2, 1}},
+		},
+	}
+
+	text := runTestAnalysis(t, files, analyzer)
+
+	assert.Contains(t, text, "Metrics:\n- DIED: Deaths per match\n\n")
+	assert.NotContains(t, text, "NO_EAT:")
+}
+
+func TestAnalysisReportSkipsLegendWhenNoSpecHasDescription(t *testing.T) {
+	files := []TraceFile{{Trace: TraceMatch{
+		Type: "ok",
+		Blue: "us", Players: [2]string{"us", "rival"},
+		Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1},
+		Turns: testTurns(5),
+	}}}
+	analyzer := testMetricAnalyzer{
+		specs: []TraceMetricSpec{{Key: testMetricDied, Label: "DIED", Kind: TraceMetricPerMatchCount}},
+		stats: map[string]TraceMetricStats{"ok": {testMetricDied: [2]int{1, 0}}},
+	}
+
+	text := runTestAnalysis(t, files, analyzer)
+
+	assert.NotContains(t, text, "Metrics:")
+}
+
 func TestAnalysisReportRejectsPerTurnMetricAboveTurnCount(t *testing.T) {
 	files := []TraceFile{{Name: "trace.json", Trace: TraceMatch{
 		Type: "bad",
