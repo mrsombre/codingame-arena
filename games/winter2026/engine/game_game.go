@@ -208,8 +208,13 @@ private void doBeheadings() {
 }
 */
 
+type beheadCandidate struct {
+	bird  *Bird
+	cause string
+}
+
 func (g *Game) DoBeheadings() {
-	birdsToBehead := make([]*Bird, 0)
+	candidates := make([]beheadCandidate, 0)
 	for _, bird := range g.LiveBirds() {
 		isInWall := g.Grid.Get(bird.HeadPos()).IsWall()
 		intersectingBirds := make([]*Bird, 0)
@@ -239,19 +244,32 @@ func (g *Game) DoBeheadings() {
 			g.trace(arena.MakeTurnTrace(TraceHitSelf, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
 		}
 
-		if isInWall || isInEnemy || isInSelf {
-			birdsToBehead = append(birdsToBehead, bird)
+		// Single-cause attribution by priority: WALL outranks the body
+		// intersections (which themselves can co-occur, with ENEMY winning
+		// over SELF). Picking one cause keeps DEAD_* metrics honest sums of
+		// distinct deaths instead of double-counting bird losses.
+		cause := ""
+		switch {
+		case isInWall:
+			cause = DeathCauseWall
+		case isInEnemy:
+			cause = DeathCauseEnemy
+		case isInSelf:
+			cause = DeathCauseSelf
+		}
+		if cause != "" {
+			candidates = append(candidates, beheadCandidate{bird: bird, cause: cause})
 		}
 	}
 
-	for _, b := range birdsToBehead {
-		if len(b.Body) <= 3 {
-			b.Alive = false
-			g.Losses[b.Owner.GetIndex()] += len(b.Body)
-			g.trace(arena.MakeTurnTrace(TraceDead, BirdMeta{Bird: b.ID}))
+	for _, c := range candidates {
+		if len(c.bird.Body) <= 3 {
+			c.bird.Alive = false
+			g.Losses[c.bird.Owner.GetIndex()] += len(c.bird.Body)
+			g.trace(arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: c.bird.ID, Cause: c.cause}))
 		} else {
-			b.Body = b.Body[1:]
-			g.Losses[b.Owner.GetIndex()]++
+			c.bird.Body = c.bird.Body[1:]
+			g.Losses[c.bird.Owner.GetIndex()]++
 		}
 	}
 }
@@ -415,7 +433,7 @@ func (g *Game) DoFalls() {
 			if allOut {
 				bird.Alive = false
 				outOfBounds = append(outOfBounds, bird)
-				g.trace(arena.MakeTurnTrace(TraceFall, BirdSegmentsMeta{Bird: bird.ID, Segments: len(bird.Body)}))
+				g.trace(arena.MakeTurnTrace(TraceDeadFall, BirdSegmentsMeta{Bird: bird.ID, Segments: len(bird.Body)}))
 			}
 		}
 		for _, bird := range outOfBounds {

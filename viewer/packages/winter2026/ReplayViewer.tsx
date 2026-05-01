@@ -6,7 +6,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { type BirdCoordMeta, type BirdMeta, type FrameData, lerpFrame, type MapData, parseFrameLines, type TraceMatch, type TraceTurn } from "./parser.ts"
 import { destroyRenderer, initRenderer, updateFrame } from "./renderer.ts"
 
-type TraceKind = "EAT" | "HIT_WALL" | "HIT_ITSELF" | "HIT_ENEMY" | "DEAD" | "FALL"
+type TraceKind = "EAT" | "HIT_SELF" | "HIT_WALL" | "HIT_ENEMY" | "DEAD" | "DEAD_FALL"
 
 interface MoveTrace {
   kind: TraceKind
@@ -24,10 +24,10 @@ interface MoveRow {
 
 const TRACE_ORDER: Record<TraceKind, number> = {
   EAT: 0,
-  HIT_WALL: 1,
-  HIT_ENEMY: 2,
-  HIT_ITSELF: 3,
-  FALL: 4,
+  HIT_SELF: 1,
+  HIT_WALL: 2,
+  HIT_ENEMY: 3,
+  DEAD_FALL: 4,
   DEAD: 5,
 }
 
@@ -37,15 +37,15 @@ function TraceBadge({ trace }: { trace: MoveTrace }) {
     switch (trace.kind) {
       case "EAT":
         return <AppleIcon className={`${iconClass} text-red-500`} />
+      case "HIT_SELF":
+        return <RotateCcwIcon className={`${iconClass} text-purple-500`} />
       case "HIT_WALL":
         return <BrickWallIcon className={`${iconClass} text-amber-600`} />
-      case "HIT_ITSELF":
-        return <RotateCcwIcon className={`${iconClass} text-purple-500`} />
       case "HIT_ENEMY":
         return <SwordsIcon className={`${iconClass} text-orange-500`} />
       case "DEAD":
         return <SkullIcon className={`${iconClass} text-neutral-600`} />
-      case "FALL":
+      case "DEAD_FALL":
         return <ArrowDownIcon className={`${iconClass} text-sky-500`} />
     }
   })()
