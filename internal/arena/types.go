@@ -56,9 +56,10 @@ const (
 // Scores are the referee's reported final values (may include tie-break
 // adjustments and therefore be negative). RawScores is populated when the
 // Referee implements RawScoresProvider and reflects the intrinsic game state
-// (e.g. sum of alive bird segments). Both arrays follow the user-selected bot
-// perspective — Scores[0]/RawScores[0] belong to the bot the user chose as P0
-// even when sides were randomly swapped during the match.
+// before end-of-game adjustments. Both arrays follow the user-selected bot
+// perspective: index 0 is the blue/our bot selected by --p0, index 1 is the
+// red/their bot selected by --p1, even when sides were randomly swapped during
+// the match.
 type MatchResult struct {
 	ID                int
 	Seed              int64

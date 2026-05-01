@@ -68,8 +68,8 @@ type TurnTraceProvider interface {
 
 // RawScoresProvider returns per-player raw scores before any end-of-game
 // tiebreaker adjustments run. Used by the trace writer so match traces record
-// the intrinsic game state (e.g. sum of alive bird segments) rather than the
-// adjusted value the referee reports via Player.GetScore after OnEnd.
+// the engine's intrinsic scoring state rather than the adjusted value the
+// referee reports via Player.GetScore after OnEnd.
 // Optional — if Referee also implements this, match captures raw scores.
 type RawScoresProvider interface {
 	RawScores() [2]int

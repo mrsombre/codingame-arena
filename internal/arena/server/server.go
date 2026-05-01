@@ -235,8 +235,8 @@ func handleMatchGet(traceDir string) http.HandlerFunc {
 }
 
 type runRequest struct {
-	P0Bin       string            `json:"p0Bin"`
-	P1Bin       string            `json:"p1Bin"`
+	BlueBotBin  string            `json:"p0Bin"`
+	RedBotBin   string            `json:"p1Bin"`
 	Seed        *int64            `json:"seed,string,omitempty"`
 	MaxTurns    int               `json:"maxTurns,omitempty"`
 	NoSwap      bool              `json:"noSwap,omitempty"`
@@ -251,7 +251,7 @@ func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "invalid json: "+err.Error())
 			return
 		}
-		if req.P0Bin == "" || req.P1Bin == "" {
+		if req.BlueBotBin == "" || req.RedBotBin == "" {
 			writeError(w, http.StatusBadRequest, "p0Bin and p1Bin are required")
 			return
 		}
@@ -261,8 +261,8 @@ func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 		}
 		runner := arena.NewRunner(factory, arena.MatchOptions{
 			MaxTurns:    req.MaxTurns,
-			P0Bin:       req.P0Bin,
-			P1Bin:       req.P1Bin,
+			BlueBotBin:  req.BlueBotBin,
+			RedBotBin:   req.RedBotBin,
 			NoSwap:      req.NoSwap,
 			TraceWriter: arena.NewTraceWriter(traceDir, time.Now().Unix()),
 			GameOptions: gameOptionsViper(req.GameOptions),
@@ -275,8 +275,8 @@ func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 }
 
 type batchRequest struct {
-	P0Bin       string            `json:"p0Bin"`
-	P1Bin       string            `json:"p1Bin"`
+	BlueBotBin  string            `json:"p0Bin"`
+	RedBotBin   string            `json:"p1Bin"`
 	Seed        *int64            `json:"seed,string,omitempty"`
 	Simulations int               `json:"simulations,omitempty"`
 	MaxTurns    int               `json:"maxTurns,omitempty"`
@@ -284,41 +284,41 @@ type batchRequest struct {
 	GameOptions map[string]string `json:"gameOptions,omitempty"`
 }
 
-// batchMatchSummary describes one match from the batch. Fields with a "p0"/"p1"
-// suffix are relative to the in-match side (left side of the map is p0); under
-// random swap that may be the user's P1 bot. Aggregate counters at the top of
-// batchResponse stay on the user-selected bot perspective.
+// batchMatchSummary describes one match from the batch. Fields with p0/p1 JSON
+// names are left/right side values for viewer compatibility. Under random swap,
+// the left side may be the red bot rather than our blue bot. Aggregate counters
+// at the top of batchResponse stay in blue/red bot perspective.
 type batchMatchSummary struct {
-	ID      int     `json:"id"`
-	Seed    int64   `json:"seed,string"`
-	Winner  int     `json:"winner"`
-	ScoreP0 int     `json:"score_p0"`
-	ScoreP1 int     `json:"score_p1"`
-	Turns   int     `json:"turns"`
-	TTFOP0  float64 `json:"ttfo_p0_ms"`
-	TTFOP1  float64 `json:"ttfo_p1_ms"`
-	AOTP0   float64 `json:"aot_p0_ms"`
-	AOTP1   float64 `json:"aot_p1_ms"`
-	P0Bot   string  `json:"p0_bot"`
-	P1Bot   string  `json:"p1_bot"`
+	ID           int     `json:"id"`
+	Seed         int64   `json:"seed,string"`
+	Winner       int     `json:"winner"`
+	LeftScore    int     `json:"score_p0"`
+	RightScore   int     `json:"score_p1"`
+	Turns        int     `json:"turns"`
+	LeftTTFO     float64 `json:"ttfo_p0_ms"`
+	RightTTFO    float64 `json:"ttfo_p1_ms"`
+	LeftAOT      float64 `json:"aot_p0_ms"`
+	RightAOT     float64 `json:"aot_p1_ms"`
+	LeftBotName  string  `json:"p0_bot"`
+	RightBotName string  `json:"p1_bot"`
 }
 
 type batchResponse struct {
-	Simulations int                 `json:"simulations"`
-	WinsP0      int                 `json:"wins_p0"`
-	WinsP1      int                 `json:"wins_p1"`
-	Draws       int                 `json:"draws"`
-	AvgScoreP0  float64             `json:"avg_score_p0"`
-	AvgScoreP1  float64             `json:"avg_score_p1"`
-	AvgTurns    float64             `json:"avg_turns"`
-	AvgTTFOP0   float64             `json:"avg_ttfo_p0_ms"`
-	AvgTTFOP1   float64             `json:"avg_ttfo_p1_ms"`
-	AvgAOTP0    float64             `json:"avg_aot_p0_ms"`
-	AvgAOTP1    float64             `json:"avg_aot_p1_ms"`
-	Seed        int64               `json:"seed,string"`
-	P0Bot       string              `json:"p0_bot"`
-	P1Bot       string              `json:"p1_bot"`
-	Matches     []batchMatchSummary `json:"matches"`
+	Simulations  int                 `json:"simulations"`
+	BlueWins     int                 `json:"wins_p0"`
+	RedWins      int                 `json:"wins_p1"`
+	Draws        int                 `json:"draws"`
+	AvgBlueScore float64             `json:"avg_score_p0"`
+	AvgRedScore  float64             `json:"avg_score_p1"`
+	AvgTurns     float64             `json:"avg_turns"`
+	AvgBlueTTFO  float64             `json:"avg_ttfo_p0_ms"`
+	AvgRedTTFO   float64             `json:"avg_ttfo_p1_ms"`
+	AvgBlueAOT   float64             `json:"avg_aot_p0_ms"`
+	AvgRedAOT    float64             `json:"avg_aot_p1_ms"`
+	Seed         int64               `json:"seed,string"`
+	BlueBotName  string              `json:"p0_bot"`
+	RedBotName   string              `json:"p1_bot"`
+	Matches      []batchMatchSummary `json:"matches"`
 }
 
 func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
@@ -329,7 +329,7 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "invalid json: "+err.Error())
 			return
 		}
-		if req.P0Bin == "" || req.P1Bin == "" {
+		if req.BlueBotBin == "" || req.RedBotBin == "" {
 			writeError(w, http.StatusBadRequest, "p0Bin and p1Bin are required")
 			return
 		}
@@ -355,8 +355,8 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 		}
 		runner := arena.NewRunner(factory, arena.MatchOptions{
 			MaxTurns:    req.MaxTurns,
-			P0Bin:       req.P0Bin,
-			P1Bin:       req.P1Bin,
+			BlueBotBin:  req.BlueBotBin,
+			RedBotBin:   req.RedBotBin,
 			NoSwap:      req.NoSwap,
 			TraceWriter: arena.NewTraceWriter(traceDir, time.Now().Unix()),
 			GameOptions: gameOptionsViper(req.GameOptions),
@@ -371,21 +371,20 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			Seed:        seed,
 		}, runner.RunMatch)
 
-		userP0 := filepath.Base(req.P0Bin)
-		userP1 := filepath.Base(req.P1Bin)
+		blueBot := filepath.Base(req.BlueBotBin)
+		redBot := filepath.Base(req.RedBotBin)
 		resp := batchResponse{
 			Simulations: len(results),
 			Seed:        seed,
-			P0Bot:       userP0,
-			P1Bot:       userP1,
+			BlueBotName: blueBot,
+			RedBotName:  redBot,
 			Matches:     make([]batchMatchSummary, 0, len(results)),
 		}
-		var totalScoreP0, totalScoreP1, totalTurns float64
-		var totalTTFOP0, totalTTFOP1, totalAOTP0, totalAOTP1 float64
+		var totalBlueScore, totalRedScore, totalTurns float64
+		var totalBlueTTFO, totalRedTTFO, totalBlueAOT, totalRedAOT float64
 		for _, res := range results {
-			// Prefer raw scores (sum of alive bird segments) over the
-			// referee's tie-break-adjusted Scores so displayed values can't
-			// go negative and match what the viewer computes from bird bodies.
+			// Prefer raw scores over referee-adjusted Scores so displayed
+			// values can match the engine's intrinsic scoring state.
 			userScores := res.Scores
 			userWinner := res.Winner
 			if res.HaveRawScores {
@@ -400,63 +399,63 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 				}
 			}
 
-			// Aggregate counters follow user-selected bots.
+			// Aggregate counters follow blue/red bot identity.
 			switch userWinner {
 			case 0:
-				resp.WinsP0++
+				resp.BlueWins++
 			case 1:
-				resp.WinsP1++
+				resp.RedWins++
 			default:
 				resp.Draws++
 			}
-			totalScoreP0 += float64(userScores[0])
-			totalScoreP1 += float64(userScores[1])
+			totalBlueScore += float64(userScores[0])
+			totalRedScore += float64(userScores[1])
 			totalTurns += float64(res.Turns)
 			ttfo := res.TTFO()
 			aot := res.AOT()
-			totalTTFOP0 += ttfo[0]
-			totalTTFOP1 += ttfo[1]
-			totalAOTP0 += aot[0]
-			totalAOTP1 += aot[1]
+			totalBlueTTFO += ttfo[0]
+			totalRedTTFO += ttfo[1]
+			totalBlueAOT += aot[0]
+			totalRedAOT += aot[1]
 
-			// Per-match row reports from the in-match side perspective so the
-			// replay map (blue = p0, red = p1) lines up with the numbers.
-			matchScoreP0, matchScoreP1 := userScores[0], userScores[1]
-			matchWinner := userWinner
-			matchP0Bot, matchP1Bot := userP0, userP1
-			matchTTFO, matchAOT := ttfo, aot
+			// Per-match rows report from left/right side perspective so the
+			// replay map lines up with the numbers.
+			leftScore, rightScore := userScores[0], userScores[1]
+			sideWinner := userWinner
+			leftBot, rightBot := blueBot, redBot
+			sideTTFO, sideAOT := ttfo, aot
 			if res.Swapped {
-				matchScoreP0, matchScoreP1 = matchScoreP1, matchScoreP0
-				if matchWinner != -1 {
-					matchWinner = 1 - matchWinner
+				leftScore, rightScore = rightScore, leftScore
+				if sideWinner != -1 {
+					sideWinner = 1 - sideWinner
 				}
-				matchP0Bot, matchP1Bot = userP1, userP0
-				matchTTFO[0], matchTTFO[1] = matchTTFO[1], matchTTFO[0]
-				matchAOT[0], matchAOT[1] = matchAOT[1], matchAOT[0]
+				leftBot, rightBot = redBot, blueBot
+				sideTTFO[0], sideTTFO[1] = sideTTFO[1], sideTTFO[0]
+				sideAOT[0], sideAOT[1] = sideAOT[1], sideAOT[0]
 			}
 			resp.Matches = append(resp.Matches, batchMatchSummary{
-				ID:      res.ID,
-				Seed:    res.Seed,
-				Winner:  matchWinner,
-				ScoreP0: matchScoreP0,
-				ScoreP1: matchScoreP1,
-				Turns:   res.Turns,
-				TTFOP0:  matchTTFO[0],
-				TTFOP1:  matchTTFO[1],
-				AOTP0:   matchAOT[0],
-				AOTP1:   matchAOT[1],
-				P0Bot:   matchP0Bot,
-				P1Bot:   matchP1Bot,
+				ID:           res.ID,
+				Seed:         res.Seed,
+				Winner:       sideWinner,
+				LeftScore:    leftScore,
+				RightScore:   rightScore,
+				Turns:        res.Turns,
+				LeftTTFO:     sideTTFO[0],
+				RightTTFO:    sideTTFO[1],
+				LeftAOT:      sideAOT[0],
+				RightAOT:     sideAOT[1],
+				LeftBotName:  leftBot,
+				RightBotName: rightBot,
 			})
 		}
 		if n := float64(len(results)); n > 0 {
-			resp.AvgScoreP0 = round2(totalScoreP0 / n)
-			resp.AvgScoreP1 = round2(totalScoreP1 / n)
+			resp.AvgBlueScore = round2(totalBlueScore / n)
+			resp.AvgRedScore = round2(totalRedScore / n)
 			resp.AvgTurns = round2(totalTurns / n)
-			resp.AvgTTFOP0 = round2(totalTTFOP0 / n)
-			resp.AvgTTFOP1 = round2(totalTTFOP1 / n)
-			resp.AvgAOTP0 = round2(totalAOTP0 / n)
-			resp.AvgAOTP1 = round2(totalAOTP1 / n)
+			resp.AvgBlueTTFO = round2(totalBlueTTFO / n)
+			resp.AvgRedTTFO = round2(totalRedTTFO / n)
+			resp.AvgBlueAOT = round2(totalBlueAOT / n)
+			resp.AvgRedAOT = round2(totalRedAOT / n)
 		}
 		writeJSON(w, http.StatusOK, resp)
 	}

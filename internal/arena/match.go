@@ -14,8 +14,8 @@ import (
 // MatchOptions configures a single match execution.
 type MatchOptions struct {
 	MaxTurns    int
-	P0Bin       string
-	P1Bin       string
+	BlueBotBin  string
+	RedBotBin   string
 	Debug       bool
 	NoSwap      bool
 	TraceWriter *TraceWriter
@@ -38,17 +38,17 @@ func NewRunner(factory GameFactory, options MatchOptions) *Runner {
 
 // RunMatch executes a single match simulation.
 func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
-	swapSides := !runner.Options.Debug && !runner.Options.NoSwap && seed%2 != 0
+	bluePlaysRight := !runner.Options.Debug && !runner.Options.NoSwap && seed%2 != 0
 
 	referee, players := runner.Factory.NewGame(seed, runner.Options.GameOptions)
 	referee.Init(players)
 
-	matchOptions := runner.Options
-	if swapSides {
-		matchOptions.P0Bin, matchOptions.P1Bin = matchOptions.P1Bin, matchOptions.P0Bin
+	sideOptions := runner.Options
+	if bluePlaysRight {
+		sideOptions.BlueBotBin, sideOptions.RedBotBin = sideOptions.RedBotBin, sideOptions.BlueBotBin
 	}
 
-	controllers, cleanup, err := attachCommandPlayers(matchOptions, players)
+	controllers, cleanup, err := attachCommandPlayers(sideOptions, players)
 	if err != nil {
 		panic(err)
 	}
@@ -97,12 +97,12 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		wasDeactivated := [2]bool{players[0].IsDeactivated(), players[1].IsDeactivated()}
 		playerOutputs := [2]string{}
 		var turnInput []string
-		// Blue is the user's intended p0; after seed-driven swap, blue plays
-		// in-match side 1. Capturing only blue's view keeps traces compact;
+		// Blue is our bot identity from --p0; after seed-driven swap, blue
+		// plays the right side. Capturing only blue's view keeps traces compact;
 		// for symmetric-input games either side would yield the same lines.
-		blueSide := 0
-		if swapSides {
-			blueSide = 1
+		blueSideIndex := 0
+		if bluePlaysRight {
+			blueSideIndex = 1
 		}
 
 		if liveTurn {
@@ -118,7 +118,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				for _, line := range lines {
 					player.SendInputLine(line)
 				}
-				if tracing && player.GetIndex() == blueSide {
+				if tracing && player.GetIndex() == blueSideIndex {
 					turnInput = append([]string(nil), lines...)
 				}
 				if runner.Options.Debug {
@@ -176,8 +176,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 
 		// Record turn-of-deactivation for any side that became deactivated
 		// this turn (covers both bad-command parses earlier in the iteration
-		// and engine-driven deactivations during PerformGameUpdate, e.g.
-		// "all pacmen dead").
+		// and engine-driven deactivations during PerformGameUpdate).
 		for i, player := range players {
 			if deactivationTurns[i] == -1 && player.IsDeactivated() {
 				deactivationTurns[i] = turn
@@ -195,9 +194,9 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		referee.EndGame()
 	}
 
-	// Capture raw in-match scores before OnEnd so the trace records the
-	// intrinsic sum (e.g. alive bird segments) rather than the tie-break-
-	// adjusted values Player.GetScore returns afterward.
+	// Capture raw in-match scores before OnEnd so the trace records intrinsic
+	// game scores rather than tie-break-adjusted values Player.GetScore may
+	// return afterward.
 	var rawScores [2]int
 	var haveRawScores bool
 	if rsp, ok := referee.(RawScoresProvider); ok {
@@ -219,15 +218,15 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		result.Metrics = append(result.Metrics, mp.Metrics()...)
 	}
 
-	if swapSides {
+	if bluePlaysRight {
 		result = swapMatchSides(result)
 		result.Swapped = true
 	}
 
 	if tracing {
-		// Trace uses in-match side perspective (p0 = left of the map).
-		// result fields are user-perspective after the potential swap-back;
-		// un-swap to restore the in-match view.
+		// Trace uses in-match side perspective: index 0 is left side, index 1
+		// is right side. result fields are blue/red perspective after the
+		// potential swap-back; un-swap to restore the in-match view.
 		traceScores := result.Scores
 		if haveRawScores {
 			traceScores = result.RawScores
@@ -281,14 +280,14 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			GameID:      runner.Factory.Name(),
 			PuzzleID:    runner.Factory.PuzzleID(),
 			Seed:        seed,
-			Blue:        filepath.Base(runner.Options.P0Bin),
+			Blue:        filepath.Base(runner.Options.BlueBotBin),
 			League:      league,
 			CreatedAt:   time.Now().UTC().Format(time.RFC3339),
 			EndReason:   endReason,
 			Deactivated: deactivated,
 			Scores:      [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
 			Ranks:       RanksFromWinner(traceWinner),
-			Players:     [2]string{filepath.Base(matchOptions.P0Bin), filepath.Base(matchOptions.P1Bin)},
+			Players:     [2]string{filepath.Base(sideOptions.BlueBotBin), filepath.Base(sideOptions.RedBotBin)},
 			Timing:      traceTiming,
 			Turns:       traceTurns,
 		}
@@ -320,15 +319,15 @@ func handlePlayerCommands(players []Player, referee Referee) {
 
 func attachCommandPlayers(options MatchOptions, players []Player) ([]*commandPlayer, func(), error) {
 	controllers := make([]*commandPlayer, 0, len(players))
-	bins := []string{options.P0Bin, options.P1Bin}
+	sideBotBins := []string{options.BlueBotBin, options.RedBotBin}
 
-	for i, path := range bins {
-		cp, err := newCommandPlayer(players[i], path)
+	for sideIndex, path := range sideBotBins {
+		cp, err := newCommandPlayer(players[sideIndex], path)
 		if err != nil {
 			for _, controller := range controllers {
 				_ = controller.Close()
 			}
-			return nil, nil, fmt.Errorf("failed to start player %d session: %w", i, err)
+			return nil, nil, fmt.Errorf("failed to start side %d session: %w", sideIndex, err)
 		}
 		// Spawn eagerly so subprocess startup runs in parallel with referee
 		// setup and global-info dispatch instead of being charged to the
@@ -338,10 +337,10 @@ func attachCommandPlayers(options MatchOptions, players []Player) ([]*commandPla
 			for _, controller := range controllers {
 				_ = controller.Close()
 			}
-			return nil, nil, fmt.Errorf("failed to start player %d session: %w", i, err)
+			return nil, nil, fmt.Errorf("failed to start side %d session: %w", sideIndex, err)
 		}
-		cp.playerIdx = i
-		players[i].SetExecuteFunc(cp.Execute)
+		cp.playerIdx = sideIndex
+		players[sideIndex].SetExecuteFunc(cp.Execute)
 		controllers = append(controllers, cp)
 	}
 
@@ -368,23 +367,23 @@ func buildMatchResult(simulationID int, seed int64, turns int, players []Player,
 		aot[i] = stats.AverageOutputTime
 	}
 
-	// Build common metrics: win/loss/draw + scores + timing.
-	winsP0, winsP1, draws := 0.0, 0.0, 0.0
+	// Build common side metrics: win/loss/draw + scores + timing.
+	leftWins, rightWins, draws := 0.0, 0.0, 0.0
 	switch winner {
 	case 0:
-		winsP0 = 1.0
+		leftWins = 1.0
 	case 1:
-		winsP1 = 1.0
+		rightWins = 1.0
 	default:
 		draws = 1.0
 	}
 
 	metrics := []Metric{
 		{Label: "turns", Value: float64(turns)},
-		{Label: "wins_p0", Value: winsP0},
-		{Label: "wins_p1", Value: winsP1},
-		{Label: "loses_p0", Value: winsP1},
-		{Label: "loses_p1", Value: winsP0},
+		{Label: "wins_p0", Value: leftWins},
+		{Label: "wins_p1", Value: rightWins},
+		{Label: "loses_p0", Value: rightWins},
+		{Label: "loses_p1", Value: leftWins},
 		{Label: "draws", Value: draws},
 		{Label: "score_p0", Value: float64(players[0].GetScore())},
 		{Label: "score_p1", Value: float64(players[1].GetScore())},
@@ -424,7 +423,7 @@ func swapMatchSides(r MatchResult) MatchResult {
 	for i := range r.BadCommands {
 		r.BadCommands[i].Player = 1 - r.BadCommands[i].Player
 	}
-	// Swap metric labels: build index, then swap _p0 <-> _p1 values in one pass.
+	// Swap compatibility metric labels from left/right to blue/red perspective.
 	labelIdx := make(map[string]int, len(r.Metrics))
 	for i, m := range r.Metrics {
 		labelIdx[m.Label] = i
@@ -435,8 +434,8 @@ func swapMatchSides(r MatchResult) MatchResult {
 			continue
 		}
 		if strings.HasSuffix(m.Label, "_p0") {
-			p1Label := strings.TrimSuffix(m.Label, "_p0") + "_p1"
-			if j, ok := labelIdx[p1Label]; ok {
+			otherSideLabel := strings.TrimSuffix(m.Label, "_p0") + "_p1"
+			if j, ok := labelIdx[otherSideLabel]; ok {
 				r.Metrics[i].Value, r.Metrics[j].Value = r.Metrics[j].Value, r.Metrics[i].Value
 				swapped[i] = true
 				swapped[j] = true

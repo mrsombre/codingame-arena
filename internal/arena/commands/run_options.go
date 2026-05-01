@@ -26,22 +26,22 @@ func AddRunFlags(fs *pflag.FlagSet) {
 	fs.Bool("trace", false, "Write per-match JSON trace files for every match")
 	fs.String("trace-dir", "./traces", "Directory for trace files (used with --trace)")
 	fs.Int("max-turns", 200, "Maximum turns per match")
-	fs.String("p0", "", "Player 0 binary (required)")
-	fs.String("p1", filepath.Clean("./bin/opponent"), "Player 1 binary")
+	fs.String("p0", "", "Blue/our bot binary (required)")
+	fs.String("p1", filepath.Clean("./bin/opponent"), "Red/their bot binary")
 	fs.Bool("verbose", false, "Output full JSON (default: short summary line)")
 }
 
 // RunOptions holds the parsed configuration for the "run" subcommand.
 type RunOptions struct {
 	arena.BatchOptions
-	P0Bin    string
-	P1Bin    string
-	MaxTurns int
-	TraceDir string
-	Trace    bool
-	Debug    bool
-	NoSwap   bool
-	Verbose  bool
+	BlueBotBin string
+	RedBotBin  string
+	MaxTurns   int
+	TraceDir   string
+	Trace      bool
+	Debug      bool
+	NoSwap     bool
+	Verbose    bool
 }
 
 func parseRunOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (RunOptions, error) {
@@ -49,22 +49,7 @@ func parseRunOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (RunOptio
 		return RunOptions{}, err
 	}
 
-	opts := RunOptions{
-		BatchOptions: arena.BatchOptions{
-			Simulations:   v.GetInt("simulations"),
-			Parallel:      v.GetInt("parallel"),
-			SeedIncrement: int64(v.GetInt("seedx")),
-			OutputMatches: v.GetBool("output-matches"),
-		},
-		P0Bin:    v.GetString("p0"),
-		P1Bin:    v.GetString("p1"),
-		MaxTurns: v.GetInt("max-turns"),
-		TraceDir: v.GetString("trace-dir"),
-		Trace:    v.GetBool("trace"),
-		Debug:    v.GetBool("debug"),
-		NoSwap:   v.GetBool("no-swap"),
-		Verbose:  v.GetBool("verbose"),
-	}
+	opts := runOptionsFromConfig(v)
 
 	if raw := v.GetString("seed"); raw != "" {
 		n, err := arena.ParseSeed(raw)
@@ -76,25 +61,7 @@ func parseRunOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (RunOptio
 		opts.Seed = time.Now().UnixNano()
 	}
 
-	if opts.Simulations < 1 {
-		return RunOptions{}, fmt.Errorf("--simulations must be >= 1")
-	}
-	if opts.Parallel < 1 {
-		return RunOptions{}, fmt.Errorf("--parallel must be >= 1")
-	}
-	if opts.MaxTurns < 1 {
-		return RunOptions{}, fmt.Errorf("--max-turns must be >= 1")
-	}
-	if opts.SeedIncrement < 1 {
-		return RunOptions{}, fmt.Errorf("--seedx must be >= 1")
-	}
-	if opts.P0Bin == "" {
-		return RunOptions{}, fmt.Errorf("--p0 is required")
-	}
-	if err := checkBotBinary("--p0", opts.P0Bin); err != nil {
-		return RunOptions{}, err
-	}
-	if err := checkBotBinary("--p1", opts.P1Bin); err != nil {
+	if err := validateRunOptions(opts); err != nil {
 		return RunOptions{}, err
 	}
 	if opts.Debug {
@@ -103,6 +70,50 @@ func parseRunOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (RunOptio
 	}
 
 	return opts, nil
+}
+
+func runOptionsFromConfig(v *viper.Viper) RunOptions {
+	return RunOptions{
+		BatchOptions: arena.BatchOptions{
+			Simulations:   v.GetInt("simulations"),
+			Parallel:      v.GetInt("parallel"),
+			SeedIncrement: int64(v.GetInt("seedx")),
+			OutputMatches: v.GetBool("output-matches"),
+		},
+		BlueBotBin: v.GetString("p0"),
+		RedBotBin:  v.GetString("p1"),
+		MaxTurns:   v.GetInt("max-turns"),
+		TraceDir:   v.GetString("trace-dir"),
+		Trace:      v.GetBool("trace"),
+		Debug:      v.GetBool("debug"),
+		NoSwap:     v.GetBool("no-swap"),
+		Verbose:    v.GetBool("verbose"),
+	}
+}
+
+func validateRunOptions(opts RunOptions) error {
+	if opts.Simulations < 1 {
+		return fmt.Errorf("--simulations must be >= 1")
+	}
+	if opts.Parallel < 1 {
+		return fmt.Errorf("--parallel must be >= 1")
+	}
+	if opts.MaxTurns < 1 {
+		return fmt.Errorf("--max-turns must be >= 1")
+	}
+	if opts.SeedIncrement < 1 {
+		return fmt.Errorf("--seedx must be >= 1")
+	}
+	if opts.BlueBotBin == "" {
+		return fmt.Errorf("--p0 is required")
+	}
+	if err := checkBotBinary("--p0", opts.BlueBotBin); err != nil {
+		return err
+	}
+	if err := checkBotBinary("--p1", opts.RedBotBin); err != nil {
+		return err
+	}
+	return nil
 }
 
 func checkBotBinary(flag, path string) error {
