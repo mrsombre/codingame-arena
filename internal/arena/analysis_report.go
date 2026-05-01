@@ -48,6 +48,8 @@ func AnalyzeTraceFiles(input TraceAnalysisInput, metricAnalyzer TraceMetricAnaly
 		winnerB:             make(map[string]traceAnalysisMetricAggregate),
 		blueA:               make(map[string]traceAnalysisMetricAggregate),
 		blueB:               make(map[string]traceAnalysisMetricAggregate),
+		blueWon:             make(map[string]traceAnalysisMetricAggregate),
+		blueLost:            make(map[string]traceAnalysisMetricAggregate),
 	}
 
 	for _, file := range input.Files {
@@ -191,6 +193,12 @@ type traceAnalysisReport struct {
 	winnerB     map[string]traceAnalysisMetricAggregate
 	blueA       map[string]traceAnalysisMetricAggregate
 	blueB       map[string]traceAnalysisMetricAggregate
+	// blueWon / blueLost track blue's own metric values split by match
+	// outcome — so "blue wins vs blue losses" answers "what does our bot
+	// do differently when it wins vs when it loses?", which is the
+	// highest-leverage diagnostic axis for tuning the bot.
+	blueWon  map[string]traceAnalysisMetricAggregate
+	blueLost map[string]traceAnalysisMetricAggregate
 }
 
 type traceAnalysisMetricAggregate struct {
@@ -250,6 +258,12 @@ func (r *traceAnalysisReport) add(trace TraceMatch, stats TraceMetricStats) {
 		}
 		addTraceMetricSample(r.blueA, spec, values[blueSide], turns)
 		addTraceMetricSample(r.blueB, spec, values[1-blueSide], turns)
+		switch winner {
+		case blueSide:
+			addTraceMetricSample(r.blueWon, spec, values[blueSide], turns)
+		case 1 - blueSide:
+			addTraceMetricSample(r.blueLost, spec, values[blueSide], turns)
+		}
 	}
 }
 
@@ -302,6 +316,9 @@ func (r *traceAnalysisReport) Write(w io.Writer) error {
 			return err
 		}
 		if err := r.writeMetricComparison(w, "METRICS — blue vs red", r.blueA, r.blueB, "blue", "red"); err != nil {
+			return err
+		}
+		if err := r.writeMetricComparison(w, "METRICS — blue wins vs blue losses", r.blueWon, r.blueLost, "won", "lost"); err != nil {
 			return err
 		}
 	}

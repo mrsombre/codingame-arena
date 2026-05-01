@@ -159,6 +159,9 @@ func TestAnalysisReportAggregatesMetricKinds(t *testing.T) {
 	assert.Contains(t, text, "METRICS — blue vs red")
 	assert.Contains(t, text, "DIED       blue  2.50/match   red  2.50/match   (equal)")
 	assert.Contains(t, text, "NO_EAT     blue  62.5%   red  25.0%   (blue 2.50x red)")
+	assert.Contains(t, text, "METRICS — blue wins vs blue losses")
+	assert.Contains(t, text, "DIED       won  1.00/match   lost  4.00/match   (lost 4.00x won)")
+	assert.Contains(t, text, "NO_EAT     won  25.0%   lost 100.0%   (lost 4.00x won)")
 }
 
 func TestAnalysisReportRejectsPerTurnMetricAboveTurnCount(t *testing.T) {

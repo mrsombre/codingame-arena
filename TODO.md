@@ -19,7 +19,7 @@ Below are improvements grouped by impact. P0 = blocking the goal, P1 = high leve
 |----|---------------------------------------|-------------|
 | 1  | Identify "us" in every trace          | DONE        |
 | 2  | Winter 2026 analyzer                  | DONE        |
-| 3  | Switch axis to us-vs-them             | PARTIAL     |
+| 3  | Switch axis to us-vs-them             | DONE        |
 | 4  | Worst losses from disk                | NOT DONE    |
 | 5  | Filter trace cohorts                  | NOT DONE    |
 | 6  | Provenance on every trace             | PARTIAL     |
@@ -35,7 +35,7 @@ Below are improvements grouped by impact. P0 = blocking the goal, P1 = high leve
 | 16 | Move legality / wasted-action         | NOT DONE    |
 | 17 | Replay viewer integration             | NOT DONE    |
 
-P0 milestone (#1+#2+#3) is two-thirds done; finishing #3's `--axis` flag and "blue-when-winning vs blue-when-losing" diff closes it. Suggested next move: #4 + #5 to make the report navigable across hundreds of accumulated traces.
+P0 milestone (#1+#2+#3) is done. Suggested next move: #4 + #5 to make the report navigable across hundreds of accumulated traces.
 
 ---
 
@@ -60,9 +60,9 @@ Implement `games/winter2026/engine/analyzer.go` with the same shape but Snake-re
 - Average bird length over time per side (proxy for territorial dominance).
 - Losses count from `Referee.Metrics()` (already exposes `losses_p0`, `losses_p1`).
 
-### 3. Switch analyze from "winner vs loser" to "us vs them" — PARTIAL
+### 3. Switch analyze from "winner vs loser" to "us vs them" — DONE
 
-The report now prints a `METRICS — blue vs red` section alongside `METRICS — winner vs loser` (`analysis_report.go:301`), and the OUTCOME block carries `Blue W/L/D` rates. Still missing: a `--axis` flag to suppress the winner-vs-loser axis, and an explicit "our wins vs our losses" diff (currently it's blue-side aggregate vs red-side aggregate, not blue-when-winning vs blue-when-losing).
+The report prints three metric axes side by side: `METRICS — winner vs loser` (anonymous field-wide), `METRICS — blue vs red` (us vs opponent across all matches), and `METRICS — blue wins vs blue losses` (the diagnostic axis: our metrics in matches we won vs our metrics in matches we lost). The OUTCOME block carries `Blue W/L/D` rates as the summary. The originally-proposed `--axis` flag was dropped — the report is small enough that printing all three axes at once is fine.
 
 Once `Blue` lands, change the default reporting axis from anonymous winner/loser to **us-when-winning** vs **us-when-losing**. That's the comparison that maps directly to "what should I change in the bot".
 
