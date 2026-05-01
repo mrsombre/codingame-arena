@@ -15,14 +15,14 @@ import (
 )
 
 type replayListEntry struct {
-	ID      string    `json:"id"`
-	Size    int64     `json:"size"`
-	MTime   time.Time `json:"mtime"`
-	P0Name  string    `json:"p0_name,omitempty"`
-	P1Name  string    `json:"p1_name,omitempty"`
-	League  int       `json:"league,omitempty"`
-	ScoreP0 int       `json:"score_p0"`
-	ScoreP1 int       `json:"score_p1"`
+	ID         string    `json:"id"`
+	Size       int64     `json:"size"`
+	MTime      time.Time `json:"mtime"`
+	LeftName   string    `json:"left_name,omitempty"`
+	RightName  string    `json:"right_name,omitempty"`
+	League     int       `json:"league,omitempty"`
+	ScoreLeft  int       `json:"score_left"`
+	ScoreRight int       `json:"score_right"`
 	// Winner: 0, 1, or -1 for draw. Derived from CodinGame ranks (rank 0 wins).
 	Winner int `json:"winner"`
 }
@@ -70,17 +70,17 @@ func handleReplayList(replayDir string) http.HandlerFunc {
 					for _, a := range r.GameResult.Agents {
 						switch a.Index {
 						case 0:
-							e.P0Name = a.CodinGamer.Pseudo
+							e.LeftName = a.CodinGamer.Pseudo
 						case 1:
-							e.P1Name = a.CodinGamer.Pseudo
+							e.RightName = a.CodinGamer.Pseudo
 						}
 					}
 					e.League = arena.ParseReplayLeague(r.QuestionTitle)
 					if len(r.GameResult.Scores) > 0 {
-						e.ScoreP0 = int(r.GameResult.Scores[0])
+						e.ScoreLeft = int(r.GameResult.Scores[0])
 					}
 					if len(r.GameResult.Scores) > 1 {
-						e.ScoreP1 = int(r.GameResult.Scores[1])
+						e.ScoreRight = int(r.GameResult.Scores[1])
 					}
 					// CodinGame ranks[i] is the finishing rank of agent i
 					// (0 = winner). Ties would give equal ranks; treat as draw.

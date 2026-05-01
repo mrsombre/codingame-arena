@@ -18,8 +18,8 @@ interface PlayViewProps {
 export function PlayView({ bots }: PlayViewProps) {
   const [seed, setSeed] = useState("")
   const [league, setLeague] = useState("4")
-  const [p0Bot, setP0Bot] = useState(bots[0]?.path ?? "")
-  const [p1Bot, setP1Bot] = useState(bots[1]?.path ?? bots[0]?.path ?? "")
+  const [blueBot, setBlueBot] = useState(bots[0]?.path ?? "")
+  const [redBot, setRedBot] = useState(bots[1]?.path ?? bots[0]?.path ?? "")
 
   const [status, setStatus] = useState(lastSingleMatch?.status ?? "")
   const [running, setRunning] = useState(false)
@@ -28,7 +28,7 @@ export function PlayView({ bots }: PlayViewProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!p0Bot || !p1Bot) {
+    if (!blueBot || !redBot) {
       setStatus("select bots for both players")
       return
     }
@@ -41,8 +41,8 @@ export function PlayView({ bots }: PlayViewProps) {
 
     try {
       const runBody: Record<string, unknown> = {
-        p0Bin: p0Bot,
-        p1Bin: p1Bot,
+        blueBin: blueBot,
+        redBin: redBot,
         gameOptions: { league },
       }
       const seedTrimmed = seed.trim()
@@ -82,11 +82,11 @@ export function PlayView({ bots }: PlayViewProps) {
         return
       }
 
-      const winnerStr = runData.winner === -1 ? "draw" : `p${runData.winner}`
+      const winnerStr = runData.winner === -1 ? "draw" : runData.winner === 0 ? "blue" : "red"
       const mainTurns = traceJson.turns.filter((t) => t.game_input).length
       const ttfo = runData.ttfo_ms ?? [0, 0]
       const aot = runData.aot_ms ?? [0, 0]
-      const statusLine = `seed=${actualSeed}  ${map.width}\u00d7${map.height}  winner=${winnerStr}  score=${runData.score_p0}:${runData.score_p1}  turns=${runData.turns} [${mainTurns}]  p0 ttfo=${ttfo[0].toFixed(0)}ms aot=${aot[0].toFixed(0)}ms  p1 ttfo=${ttfo[1].toFixed(0)}ms aot=${aot[1].toFixed(0)}ms`
+      const statusLine = `seed=${actualSeed}  ${map.width}\u00d7${map.height}  winner=${winnerStr}  score=${runData.score_blue}:${runData.score_red}  turns=${runData.turns} [${mainTurns}]  blue ttfo=${ttfo[0].toFixed(0)}ms aot=${aot[0].toFixed(0)}ms  red ttfo=${ttfo[1].toFixed(0)}ms aot=${aot[1].toFixed(0)}ms`
       setStatus(statusLine)
       lastSingleMatch = { mapData: map, trace: traceJson, status: statusLine }
       setMapData(map)
@@ -127,8 +127,8 @@ export function PlayView({ bots }: PlayViewProps) {
 
           <div className="flex gap-4">
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <Label>P0</Label>
-              <Select value={p0Bot} onValueChange={setP0Bot}>
+              <Label>Blue</Label>
+              <Select value={blueBot} onValueChange={setBlueBot}>
                 <SelectTrigger className="w-full" size="sm">
                   <SelectValue />
                 </SelectTrigger>
@@ -144,8 +144,8 @@ export function PlayView({ bots }: PlayViewProps) {
               </Select>
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <Label>P1</Label>
-              <Select value={p1Bot} onValueChange={setP1Bot}>
+              <Label>Red</Label>
+              <Select value={redBot} onValueChange={setRedBot}>
                 <SelectTrigger className="w-full" size="sm">
                   <SelectValue />
                 </SelectTrigger>

@@ -14,8 +14,8 @@ import (
 const worstLossLimit = 5
 
 type runnerOutput struct {
-	BlueBotBin  string                 `json:"p0_bin"`
-	RedBotBin   string                 `json:"p1_bin"`
+	BlueBotBin  string                 `json:"blue_bin"`
+	RedBotBin   string                 `json:"red_bin"`
 	Runner      runnerMetadata         `json:"runner"`
 	Summary     arena.MatchSummary     `json:"summary"`
 	BadCommands []arena.BadCommandInfo `json:"bad_commands,omitempty"`
@@ -32,8 +32,8 @@ type runnerMetadata struct {
 	TraceDir      string `json:"trace_dir,omitempty"`
 	MaxTurns      int    `json:"max_turns"`
 	NoSwap        bool   `json:"no_swap"`
-	BlueLeft      int    `json:"p0_left"`
-	BlueRight     int    `json:"p0_right"`
+	BlueLeft      int    `json:"blue_left"`
+	BlueRight     int    `json:"blue_right"`
 }
 
 // RunUsage returns the help text shown for `arena help run`.

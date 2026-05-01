@@ -6,11 +6,11 @@ interface ReplayEntry {
   id: string
   size: number
   mtime: string
-  p0_name?: string
-  p1_name?: string
+  left_name?: string
+  right_name?: string
   league?: number
-  score_p0: number
-  score_p1: number
+  score_left: number
+  score_right: number
   winner: number
 }
 
@@ -54,21 +54,21 @@ export function ReplaysView() {
               </thead>
               <tbody>
                 {list.map((r) => {
-                  const winnerLabel = r.winner === 0 ? (r.p0_name ?? "p0") : r.winner === 1 ? (r.p1_name ?? "p1") : "draw"
+                  const winnerLabel = r.winner === 0 ? (r.left_name ?? "left") : r.winner === 1 ? (r.right_name ?? "right") : "draw"
                   const winnerClass = r.winner === 0 ? "text-sky-400" : r.winner === 1 ? "text-red-400" : "text-muted-foreground"
                   return (
                     <tr key={r.id} className="border-t hover:bg-accent/40">
                       <td className="px-3 py-1.5">{r.id}</td>
                       <td className="px-3 py-1.5">
-                        <span className="text-sky-400">{r.p0_name ?? "p0"}</span>
+                        <span className="text-sky-400">{r.left_name ?? "left"}</span>
                         <span className="text-muted-foreground"> vs </span>
-                        <span className="text-red-400">{r.p1_name ?? "p1"}</span>
+                        <span className="text-red-400">{r.right_name ?? "right"}</span>
                       </td>
                       <td className={`px-3 py-1.5 ${winnerClass}`}>{winnerLabel}</td>
                       <td className="px-3 py-1.5">
-                        <span className="text-sky-400">{r.score_p0}</span>
+                        <span className="text-sky-400">{r.score_left}</span>
                         <span className="text-muted-foreground">:</span>
-                        <span className="text-red-400">{r.score_p1}</span>
+                        <span className="text-red-400">{r.score_right}</span>
                       </td>
                       <td className="px-3 py-1.5 text-muted-foreground">{new Date(r.mtime).toLocaleString()}</td>
                       <td className="px-3 py-1.5 text-right">

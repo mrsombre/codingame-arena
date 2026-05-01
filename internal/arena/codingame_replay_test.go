@@ -297,8 +297,8 @@ func TestReplayMovesFromFramesAndTurnCount(t *testing.T) {
 
 	moves := ReplayMovesFromFrames(replay)
 	wantMoves := ReplayMoves{
-		P0: []string{"MOVE A\n"},
-		P1: []string{"MOVE B\n", "MOVE C\n"},
+		Left:  []string{"MOVE A\n"},
+		Right: []string{"MOVE B\n", "MOVE C\n"},
 	}
 	if !reflect.DeepEqual(moves, wantMoves) {
 		t.Fatalf("ReplayMovesFromFrames() = %#v, want %#v", moves, wantMoves)

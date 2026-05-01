@@ -143,7 +143,7 @@ func normalizeCommand(args []string) (string, []string) {
 		return "help", nil
 	}
 	// If the first token isn't a subcommand name, assume implicit "run"
-	// and feed every arg as a flag (preserves `arena --p0 ...` ergonomics).
+	// and feed every arg as a flag (preserves `arena --blue ...` ergonomics).
 	if strings.HasPrefix(command, "-") {
 		return "run", args
 	}

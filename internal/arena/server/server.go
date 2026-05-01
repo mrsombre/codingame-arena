@@ -235,8 +235,8 @@ func handleMatchGet(traceDir string) http.HandlerFunc {
 }
 
 type runRequest struct {
-	BlueBotBin  string            `json:"p0Bin"`
-	RedBotBin   string            `json:"p1Bin"`
+	BlueBotBin  string            `json:"blueBin"`
+	RedBotBin   string            `json:"redBin"`
 	Seed        *int64            `json:"seed,string,omitempty"`
 	MaxTurns    int               `json:"maxTurns,omitempty"`
 	NoSwap      bool              `json:"noSwap,omitempty"`
@@ -252,7 +252,7 @@ func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			return
 		}
 		if req.BlueBotBin == "" || req.RedBotBin == "" {
-			writeError(w, http.StatusBadRequest, "p0Bin and p1Bin are required")
+			writeError(w, http.StatusBadRequest, "blueBin and redBin are required")
 			return
 		}
 		seed := time.Now().UnixNano()
@@ -275,8 +275,8 @@ func handleRun(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 }
 
 type batchRequest struct {
-	BlueBotBin  string            `json:"p0Bin"`
-	RedBotBin   string            `json:"p1Bin"`
+	BlueBotBin  string            `json:"blueBin"`
+	RedBotBin   string            `json:"redBin"`
 	Seed        *int64            `json:"seed,string,omitempty"`
 	Simulations int               `json:"simulations,omitempty"`
 	MaxTurns    int               `json:"maxTurns,omitempty"`
@@ -284,40 +284,40 @@ type batchRequest struct {
 	GameOptions map[string]string `json:"gameOptions,omitempty"`
 }
 
-// batchMatchSummary describes one match from the batch. Fields with p0/p1 JSON
-// names are left/right side values for viewer compatibility. Under random swap,
-// the left side may be the red bot rather than our blue bot. Aggregate counters
-// at the top of batchResponse stay in blue/red bot perspective.
+// batchMatchSummary describes one match from the batch. The left/right fields
+// are in-match engine-slot values (under random swap, the left slot may hold
+// the red bot rather than our blue bot). Aggregate counters at the top of
+// batchResponse stay in blue/red bot perspective.
 type batchMatchSummary struct {
 	ID           int     `json:"id"`
 	Seed         int64   `json:"seed,string"`
 	Winner       int     `json:"winner"`
-	LeftScore    int     `json:"score_p0"`
-	RightScore   int     `json:"score_p1"`
+	LeftScore    int     `json:"score_left"`
+	RightScore   int     `json:"score_right"`
 	Turns        int     `json:"turns"`
-	LeftTTFO     float64 `json:"ttfo_p0_ms"`
-	RightTTFO    float64 `json:"ttfo_p1_ms"`
-	LeftAOT      float64 `json:"aot_p0_ms"`
-	RightAOT     float64 `json:"aot_p1_ms"`
-	LeftBotName  string  `json:"p0_bot"`
-	RightBotName string  `json:"p1_bot"`
+	LeftTTFO     float64 `json:"ttfo_left_ms"`
+	RightTTFO    float64 `json:"ttfo_right_ms"`
+	LeftAOT      float64 `json:"aot_left_ms"`
+	RightAOT     float64 `json:"aot_right_ms"`
+	LeftBotName  string  `json:"left_bot"`
+	RightBotName string  `json:"right_bot"`
 }
 
 type batchResponse struct {
 	Simulations  int                 `json:"simulations"`
-	BlueWins     int                 `json:"wins_p0"`
-	RedWins      int                 `json:"wins_p1"`
+	BlueWins     int                 `json:"wins_blue"`
+	RedWins      int                 `json:"wins_red"`
 	Draws        int                 `json:"draws"`
-	AvgBlueScore float64             `json:"avg_score_p0"`
-	AvgRedScore  float64             `json:"avg_score_p1"`
+	AvgBlueScore float64             `json:"avg_score_blue"`
+	AvgRedScore  float64             `json:"avg_score_red"`
 	AvgTurns     float64             `json:"avg_turns"`
-	AvgBlueTTFO  float64             `json:"avg_ttfo_p0_ms"`
-	AvgRedTTFO   float64             `json:"avg_ttfo_p1_ms"`
-	AvgBlueAOT   float64             `json:"avg_aot_p0_ms"`
-	AvgRedAOT    float64             `json:"avg_aot_p1_ms"`
+	AvgBlueTTFO  float64             `json:"avg_ttfo_blue_ms"`
+	AvgRedTTFO   float64             `json:"avg_ttfo_red_ms"`
+	AvgBlueAOT   float64             `json:"avg_aot_blue_ms"`
+	AvgRedAOT    float64             `json:"avg_aot_red_ms"`
 	Seed         int64               `json:"seed,string"`
-	BlueBotName  string              `json:"p0_bot"`
-	RedBotName   string              `json:"p1_bot"`
+	BlueBotName  string              `json:"blue_bot"`
+	RedBotName   string              `json:"red_bot"`
 	Matches      []batchMatchSummary `json:"matches"`
 }
 
@@ -330,7 +330,7 @@ func handleBatch(factory arena.GameFactory, traceDir string) http.HandlerFunc {
 			return
 		}
 		if req.BlueBotBin == "" || req.RedBotBin == "" {
-			writeError(w, http.StatusBadRequest, "p0Bin and p1Bin are required")
+			writeError(w, http.StatusBadRequest, "blueBin and redBin are required")
 			return
 		}
 		sims := req.Simulations

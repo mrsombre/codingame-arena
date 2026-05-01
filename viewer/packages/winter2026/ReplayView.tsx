@@ -60,11 +60,11 @@ export function ReplayView({ replayId }: ReplayViewProps) {
   )
 
   if (mapData && trace) {
-    const p0 = trace.players[0] ?? "p0"
-    const p1 = trace.players[1] ?? "p1"
+    const left = trace.players[0] ?? "left"
+    const right = trace.players[1] ?? "right"
     const winner = winnerFromRanks(trace.ranks)
-    const winnerLabel = winner === -1 ? "draw" : `p${winner}`
-    const replayStatus = `replay ${replayId}  seed=${trace.seed}  ${p0} vs ${p1}  winner=${winnerLabel}  score=${trace.scores[0]}:${trace.scores[1]}  turns=${trace.turns.length}`
+    const winnerLabel = winner === -1 ? "draw" : winner === 0 ? left : right
+    const replayStatus = `replay ${replayId}  seed=${trace.seed}  ${left} vs ${right}  winner=${winnerLabel}  score=${trace.scores[0]}:${trace.scores[1]}  turns=${trace.turns.length}`
     return <ReplayViewer mapData={mapData} trace={trace} status={replayStatus} leftSlot={backCard} />
   }
 

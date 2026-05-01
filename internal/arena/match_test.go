@@ -80,12 +80,12 @@ func TestSwapMatchSidesSwapsScoresAndWinner(t *testing.T) {
 		TimeToFirstOutput: [2]time.Duration{100 * time.Millisecond, 200 * time.Millisecond},
 		AverageOutputTime: [2]time.Duration{10 * time.Millisecond, 20 * time.Millisecond},
 		Metrics: []Metric{
-			{Label: "wins_p0", Value: 1},
-			{Label: "wins_p1", Value: 0},
-			{Label: "loses_p0", Value: 0},
-			{Label: "loses_p1", Value: 1},
-			{Label: "score_p0", Value: 10},
-			{Label: "score_p1", Value: 20},
+			{Label: "wins_blue", Value: 1},
+			{Label: "wins_red", Value: 0},
+			{Label: "loses_blue", Value: 0},
+			{Label: "loses_red", Value: 1},
+			{Label: "score_blue", Value: 10},
+			{Label: "score_red", Value: 20},
 		},
 	}
 
@@ -102,12 +102,12 @@ func TestSwapMatchSidesSwapsScoresAndWinner(t *testing.T) {
 	for _, m := range swapped.Metrics {
 		metricMap[m.Label] = m.Value
 	}
-	assert.Equal(t, 0.0, metricMap["wins_p0"])
-	assert.Equal(t, 1.0, metricMap["wins_p1"])
-	assert.Equal(t, 1.0, metricMap["loses_p0"])
-	assert.Equal(t, 0.0, metricMap["loses_p1"])
-	assert.Equal(t, 20.0, metricMap["score_p0"])
-	assert.Equal(t, 10.0, metricMap["score_p1"])
+	assert.Equal(t, 0.0, metricMap["wins_blue"])
+	assert.Equal(t, 1.0, metricMap["wins_red"])
+	assert.Equal(t, 1.0, metricMap["loses_blue"])
+	assert.Equal(t, 0.0, metricMap["loses_red"])
+	assert.Equal(t, 20.0, metricMap["score_blue"])
+	assert.Equal(t, 10.0, metricMap["score_red"])
 }
 
 func TestSwapMatchSidesBadCommands(t *testing.T) {

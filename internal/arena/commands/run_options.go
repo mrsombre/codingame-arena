@@ -26,8 +26,8 @@ func AddRunFlags(fs *pflag.FlagSet) {
 	fs.Bool("trace", false, "Write per-match JSON trace files for every match")
 	fs.String("trace-dir", "./traces", "Directory for trace files (used with --trace)")
 	fs.Int("max-turns", 200, "Maximum turns per match")
-	fs.String("p0", "", "Blue/our bot binary (required)")
-	fs.String("p1", filepath.Clean("./bin/opponent"), "Red/their bot binary")
+	fs.StringP("blue", "b", "", "Our bot binary (required)")
+	fs.StringP("red", "r", filepath.Clean("./bin/opponent"), "Opponent bot binary")
 	fs.Bool("verbose", false, "Output full JSON (default: short summary line)")
 }
 
@@ -80,8 +80,8 @@ func runOptionsFromConfig(v *viper.Viper) RunOptions {
 			SeedIncrement: int64(v.GetInt("seedx")),
 			OutputMatches: v.GetBool("output-matches"),
 		},
-		BlueBotBin: v.GetString("p0"),
-		RedBotBin:  v.GetString("p1"),
+		BlueBotBin: v.GetString("blue"),
+		RedBotBin:  v.GetString("red"),
 		MaxTurns:   v.GetInt("max-turns"),
 		TraceDir:   v.GetString("trace-dir"),
 		Trace:      v.GetBool("trace"),
@@ -105,12 +105,12 @@ func validateRunOptions(opts RunOptions) error {
 		return fmt.Errorf("--seedx must be >= 1")
 	}
 	if opts.BlueBotBin == "" {
-		return fmt.Errorf("--p0 is required")
+		return fmt.Errorf("--blue is required")
 	}
-	if err := checkBotBinary("--p0", opts.BlueBotBin); err != nil {
+	if err := checkBotBinary("--blue", opts.BlueBotBin); err != nil {
 		return err
 	}
-	if err := checkBotBinary("--p1", opts.RedBotBin); err != nil {
+	if err := checkBotBinary("--red", opts.RedBotBin); err != nil {
 		return err
 	}
 	return nil

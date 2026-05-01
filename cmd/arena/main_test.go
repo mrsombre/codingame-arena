@@ -39,12 +39,12 @@ func TestRunReportsUnknownCommand(t *testing.T) {
 }
 
 func TestNormalizeCommandSupportsImplicitRun(t *testing.T) {
-	command, rest := normalizeCommand([]string{"--p0=./bot", "--game=winter2026"})
+	command, rest := normalizeCommand([]string{"--blue=./bot", "--game=winter2026"})
 
 	if command != "run" {
 		t.Fatalf("command = %q, want run", command)
 	}
-	if got, want := strings.Join(rest, " "), "--p0=./bot --game=winter2026"; got != want {
+	if got, want := strings.Join(rest, " "), "--blue=./bot --game=winter2026"; got != want {
 		t.Fatalf("rest = %q, want %q", got, want)
 	}
 }

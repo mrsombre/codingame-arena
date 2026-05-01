@@ -50,14 +50,16 @@ build-winter2026-agents:
 	cp -f $(WINTER2026_AGENTS)/bot.py $(WINTER2026_PYBOT)
 
 match-winter2026:
-	./$(BIN_DIR)/arena --game=winter2026 --p0=./$(WINTER2026_CPPBOT) --p1=./$(WINTER2026_PYBOT) \
+	./$(BIN_DIR)/arena --game=winter2026 --blue=./$(WINTER2026_CPPBOT) --red=./$(WINTER2026_PYBOT) \
 		--seed=100030005000700089 --simulations 100
 
 # analytics
 .PHONY: leaderboard convert analyze
 
 leaderboard:
-	./$(BIN_DIR)/arena replay leaderboard mrsombre https://www.codingame.com/multiplayer/bot-programming/winter-challenge-2026-snakebyte/leaderboard --game winter2026
+	./$(BIN_DIR)/arena replay leaderboard \
+		mrsombre https://www.codingame.com/multiplayer/bot-programming/winter-challenge-2026-snakebyte/leaderboard \
+		--game winter2026
 
 convert:
 	./$(BIN_DIR)/arena convert --game winter2026

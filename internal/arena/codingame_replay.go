@@ -143,9 +143,9 @@ func ReplayMovesFromFrames(replay CodinGameReplay[CodinGameReplayFrame]) ReplayM
 		}
 		switch f.AgentID {
 		case 0:
-			moves.P0 = append(moves.P0, f.Stdout)
+			moves.Left = append(moves.Left, f.Stdout)
 		case 1:
-			moves.P1 = append(moves.P1, f.Stdout)
+			moves.Right = append(moves.Right, f.Stdout)
 		}
 	}
 	return moves
@@ -154,10 +154,10 @@ func ReplayMovesFromFrames(replay CodinGameReplay[CodinGameReplayFrame]) ReplayM
 // ReplayTurnCount returns the number of recorded decision turns in the replay.
 func ReplayTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	moves := ReplayMovesFromFrames(replay)
-	if len(moves.P0) > len(moves.P1) {
-		return len(moves.P0)
+	if len(moves.Left) > len(moves.Right) {
+		return len(moves.Left)
 	}
-	return len(moves.P1)
+	return len(moves.Right)
 }
 
 // ReplayTraceTurnCount returns the number of engine frames represented by the
@@ -229,7 +229,7 @@ func hasTrailingEngineFrame(replay CodinGameReplay[CodinGameReplayFrame]) bool {
 
 // ReplayPlayerNames extracts player display names from replay agent metadata.
 func ReplayPlayerNames(replay CodinGameReplay[CodinGameReplayFrame]) [2]string {
-	names := [2]string{"p0", "p1"}
+	names := [2]string{"left", "right"}
 	for _, a := range replay.GameResult.Agents {
 		switch a.Index {
 		case 0:

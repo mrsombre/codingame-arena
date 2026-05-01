@@ -27,32 +27,32 @@ export interface BatchMatch {
   id: number
   seed: string
   winner: number
-  score_p0: number
-  score_p1: number
+  score_left: number
+  score_right: number
   turns: number
-  ttfo_p0_ms: number
-  ttfo_p1_ms: number
-  aot_p0_ms: number
-  aot_p1_ms: number
-  p0_bot: string
-  p1_bot: string
+  ttfo_left_ms: number
+  ttfo_right_ms: number
+  aot_left_ms: number
+  aot_right_ms: number
+  left_bot: string
+  right_bot: string
 }
 
 interface BatchResponse {
   simulations: number
-  wins_p0: number
-  wins_p1: number
+  wins_blue: number
+  wins_red: number
   draws: number
-  avg_score_p0: number
-  avg_score_p1: number
+  avg_score_blue: number
+  avg_score_red: number
   avg_turns: number
-  avg_ttfo_p0_ms: number
-  avg_ttfo_p1_ms: number
-  avg_aot_p0_ms: number
-  avg_aot_p1_ms: number
+  avg_ttfo_blue_ms: number
+  avg_ttfo_red_ms: number
+  avg_aot_blue_ms: number
+  avg_aot_red_ms: number
   seed: string
-  p0_bot: string
-  p1_bot: string
+  blue_bot: string
+  red_bot: string
   matches: BatchMatch[]
 }
 
@@ -60,8 +60,8 @@ export function MassView({ bots }: MassViewProps) {
   const navigate = useNavigate()
   const [seed, setSeed] = useState("")
   const [league, setLeague] = useState(lastBatch?.league ?? "4")
-  const [p0Bot, setP0Bot] = useState(bots[0]?.path ?? "")
-  const [p1Bot, setP1Bot] = useState(bots[1]?.path ?? bots[0]?.path ?? "")
+  const [blueBot, setBlueBot] = useState(bots[0]?.path ?? "")
+  const [redBot, setRedBot] = useState(bots[1]?.path ?? bots[0]?.path ?? "")
   const [simulations, setSimulations] = useState("50")
   const [maxTurns, setMaxTurns] = useState("200")
 
@@ -73,7 +73,7 @@ export function MassView({ bots }: MassViewProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!p0Bot || !p1Bot) {
+    if (!blueBot || !redBot) {
       setStatus("select bots for both players")
       return
     }
@@ -89,15 +89,15 @@ export function MassView({ bots }: MassViewProps) {
     }
 
     setRunning(true)
-    setStatus(`running batch: ${sims} match${sims === 1 ? "" : "es"}\u2026`)
+    setStatus(`running batch: ${sims} match${sims === 1 ? "" : "es"}…`)
     setBatch(null)
     lastBatch = null
     batchMatchCache.clear()
 
     try {
       const body: Record<string, unknown> = {
-        p0Bin: p0Bot,
-        p1Bin: p1Bot,
+        blueBin: blueBot,
+        redBin: redBot,
         simulations: sims,
         maxTurns: turns,
         gameOptions: { league },
@@ -127,7 +127,7 @@ export function MassView({ bots }: MassViewProps) {
 
   const openMatch = async (m: BatchMatch) => {
     setLoadingMatch(m.id)
-    setStatus(`loading match ${m.id}\u2026`)
+    setStatus(`loading match ${m.id}…`)
     try {
       const [serRes, traceRes] = await Promise.all([fetch(`/api/serialize?seed=${encodeURIComponent(m.seed)}&league=${encodeURIComponent(league)}`), fetch(`/api/matches/${m.id}`)])
       if (!serRes.ok) {
@@ -180,8 +180,8 @@ export function MassView({ bots }: MassViewProps) {
 
           <div className="flex gap-4">
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <Label>P0</Label>
-              <Select value={p0Bot} onValueChange={setP0Bot}>
+              <Label>Blue</Label>
+              <Select value={blueBot} onValueChange={setBlueBot}>
                 <SelectTrigger className="w-full" size="sm">
                   <SelectValue />
                 </SelectTrigger>
@@ -197,8 +197,8 @@ export function MassView({ bots }: MassViewProps) {
               </Select>
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <Label>P1</Label>
-              <Select value={p1Bot} onValueChange={setP1Bot}>
+              <Label>Red</Label>
+              <Select value={redBot} onValueChange={setRedBot}>
                 <SelectTrigger className="w-full" size="sm">
                   <SelectValue />
                 </SelectTrigger>
@@ -230,7 +230,7 @@ export function MassView({ bots }: MassViewProps) {
       <CardFooter className="border-t">
         <Button type="submit" form="mass-form" className="w-full" disabled={running}>
           {running ? <LoaderIcon data-icon="inline-start" className="animate-spin" /> : <PlayIcon data-icon="inline-start" />}
-          {running ? "Running\u2026" : "Run Batch"}
+          {running ? "Running…" : "Run Batch"}
         </Button>
       </CardFooter>
     </Card>
@@ -250,31 +250,31 @@ export function MassView({ bots }: MassViewProps) {
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
               <dt>Matches</dt>
               <dd>{batch.simulations}</dd>
-              <dt className="text-sky-400">{batch.p0_bot} wins</dt>
+              <dt className="text-sky-400">{batch.blue_bot} wins</dt>
               <dd>
-                {batch.wins_p0} ({winPct(batch.wins_p0)})
+                {batch.wins_blue} ({winPct(batch.wins_blue)})
               </dd>
-              <dt className="text-red-400">{batch.p1_bot} wins</dt>
+              <dt className="text-red-400">{batch.red_bot} wins</dt>
               <dd>
-                {batch.wins_p1} ({winPct(batch.wins_p1)})
+                {batch.wins_red} ({winPct(batch.wins_red)})
               </dd>
               <dt>Draws</dt>
               <dd>
                 {batch.draws} ({winPct(batch.draws)})
               </dd>
-              <dt className="text-sky-400">{batch.p0_bot} avg</dt>
-              <dd>{batch.avg_score_p0.toFixed(2)}</dd>
-              <dt className="text-red-400">{batch.p1_bot} avg</dt>
-              <dd>{batch.avg_score_p1.toFixed(2)}</dd>
+              <dt className="text-sky-400">{batch.blue_bot} avg</dt>
+              <dd>{batch.avg_score_blue.toFixed(2)}</dd>
+              <dt className="text-red-400">{batch.red_bot} avg</dt>
+              <dd>{batch.avg_score_red.toFixed(2)}</dd>
               <dt>Avg turns</dt>
               <dd>{batch.avg_turns.toFixed(1)}</dd>
-              <dt className="text-sky-400">p0 ttfo/aot</dt>
+              <dt className="text-sky-400">blue ttfo/aot</dt>
               <dd>
-                {batch.avg_ttfo_p0_ms.toFixed(0)}ms/{batch.avg_aot_p0_ms.toFixed(0)}ms
+                {batch.avg_ttfo_blue_ms.toFixed(0)}ms/{batch.avg_aot_blue_ms.toFixed(0)}ms
               </dd>
-              <dt className="text-red-400">p1 ttfo/aot</dt>
+              <dt className="text-red-400">red ttfo/aot</dt>
               <dd>
-                {batch.avg_ttfo_p1_ms.toFixed(0)}ms/{batch.avg_aot_p1_ms.toFixed(0)}ms
+                {batch.avg_ttfo_red_ms.toFixed(0)}ms/{batch.avg_aot_red_ms.toFixed(0)}ms
               </dd>
               <dt>Seed</dt>
               <dd className="truncate" title={String(batch.seed)}>
@@ -311,32 +311,33 @@ export function MassView({ bots }: MassViewProps) {
               </thead>
               <tbody>
                 {batch.matches.map((m) => {
-                  // Color by user-selected role: user's P0 bot is always blue,
-                  // user's P1 bot is always red, no matter which in-match side
-                  // they played. Winner column picks up the winning bot's color.
+                  // Color by bot identity: the user's blue bot is always sky,
+                  // red bot is always red, regardless of which engine side
+                  // (left/right) it played in this match. Winner picks up the
+                  // winning bot's color.
                   const userColor = (botName: string) => {
-                    if (botName === batch.p0_bot) return "text-sky-400"
-                    if (botName === batch.p1_bot) return "text-red-400"
+                    if (botName === batch.blue_bot) return "text-sky-400"
+                    if (botName === batch.red_bot) return "text-red-400"
                     return ""
                   }
-                  const winnerLabel = m.winner === -1 ? "draw" : `p${m.winner}`
-                  const winnerClass = m.winner === 0 ? userColor(m.p0_bot) : m.winner === 1 ? userColor(m.p1_bot) : "text-muted-foreground"
+                  const winnerLabel = m.winner === -1 ? "draw" : m.winner === 0 ? m.left_bot : m.right_bot
+                  const winnerClass = m.winner === 0 ? userColor(m.left_bot) : m.winner === 1 ? userColor(m.right_bot) : "text-muted-foreground"
                   return (
                     <tr key={m.id} className="border-t hover:bg-accent/40">
                       <td className="px-3 py-1.5">{m.id}</td>
                       <td className="px-3 py-1.5 text-muted-foreground">{m.seed}</td>
                       <td className="px-3 py-1.5">
-                        <span className={userColor(m.p0_bot)}>{m.p0_bot}</span>
+                        <span className={userColor(m.left_bot)}>{m.left_bot}</span>
                         <span className="text-muted-foreground"> vs </span>
-                        <span className={userColor(m.p1_bot)}>{m.p1_bot}</span>
+                        <span className={userColor(m.right_bot)}>{m.right_bot}</span>
                       </td>
                       <td className={`px-3 py-1.5 ${winnerClass}`}>{winnerLabel}</td>
                       <td className="px-3 py-1.5">
-                        {m.score_p0}:{m.score_p1}
+                        {m.score_left}:{m.score_right}
                       </td>
                       <td className="px-3 py-1.5 text-muted-foreground">{m.turns}</td>
                       <td className="px-3 py-1.5 text-muted-foreground">
-                        {m.ttfo_p0_ms.toFixed(0)}/{m.aot_p0_ms.toFixed(0)} vs {m.ttfo_p1_ms.toFixed(0)}/{m.aot_p1_ms.toFixed(0)}ms
+                        {m.ttfo_left_ms.toFixed(0)}/{m.aot_left_ms.toFixed(0)} vs {m.ttfo_right_ms.toFixed(0)}/{m.aot_right_ms.toFixed(0)}ms
                       </td>
                       <td className="px-3 py-1.5 text-right">
                         <Button variant="outline" size="sm" disabled={loadingMatch !== null} onClick={() => openMatch(m)}>

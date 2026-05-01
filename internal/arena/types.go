@@ -57,8 +57,8 @@ const (
 // adjustments and therefore be negative). RawScores is populated when the
 // Referee implements RawScoresProvider and reflects the intrinsic game state
 // before end-of-game adjustments. Both arrays follow the user-selected bot
-// perspective: index 0 is the blue/our bot selected by --p0, index 1 is the
-// red/their bot selected by --p1, even when sides were randomly swapped during
+// perspective: index 0 is the blue/our bot selected by --blue, index 1 is the
+// red/their bot selected by --red, even when sides were randomly swapped during
 // the match.
 type MatchResult struct {
 	ID                int

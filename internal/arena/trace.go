@@ -36,7 +36,7 @@ func (s TraceScore) MarshalJSON() ([]byte, error) {
 // downstream trace consumers (e.g. training).
 //
 // Blue is the bot/agent name analyze treats as "us". It is required on every
-// trace: self-play sets it to the basename of --p0 (which always equals one
+// trace: self-play sets it to the basename of --blue (which always equals one
 // of Players); convert sets it to the saved replay's blue field (which is
 // the username supplied to `replay get` / `replay leaderboard`). Analyzers
 // locate our side by scanning Players[i] == Blue (so seed-driven side swaps

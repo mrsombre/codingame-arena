@@ -15,8 +15,8 @@ Local game engine runner for [CodinGame](https://www.codingame.com/) bot program
 
 ```shell
 $ bin/arena --game=winter2026 \
-    --p0=bin/bot-winter2026-cpp \
-    --p1=bin/bot-winter2026-py \
+    --blue=bin/bot-winter2026-cpp \
+    --red=bin/bot-winter2026-py \
     --seed=100030005000 --simulations 100
 
 Summary: 100 matches played (3.15s)

@@ -43,7 +43,7 @@ P0 milestone (#1+#2+#3) is done. Suggested next move: #4 + #5 to make the report
 
 ### 1. Identify "us" in every trace — DONE
 
-`TraceMatch.Blue` is required on every loaded trace. Self-play sets it to `filepath.Base(--p0)` (P0 is always "us" — `--p0` is required by the CLI). Replays carry blue from `replay get`/`leaderboard` (username is required there too); `convert` errors out on a replay without blue or where blue doesn't match either player. `analyze` rejects any on-disk trace that lacks blue, so `BlueSide()` is treated as 0/1 throughout the report and the "Blue not identified" branch is gone. A `--trace-blue` flag on `arena run` was deemed unnecessary while P0 == us.
+`TraceMatch.Blue` is required on every loaded trace. Self-play sets it to `filepath.Base(--blue)` (blue is always "us" — `--blue` is required by the CLI). Replays carry blue from `replay get`/`leaderboard` (username is required there too); `convert` errors out on a replay without blue or where blue doesn't match either player. `analyze` rejects any on-disk trace that lacks blue, so `BlueSide()` is treated as 0/1 throughout the report and the "Blue not identified" branch is gone. A `--trace-blue` flag on `arena run` was deemed unnecessary while P0 == us.
 
 ### 2. Winter 2026 has no analyzer — DONE
 
@@ -162,9 +162,9 @@ For each apple eaten, record turn + side. Compute (per match) the "apple race" b
 
 ### 14. Auto-rerun replay seeds in simulator — NOT DONE
 
-After `convert` saves `replay-<id>.json`, optionally also run `arena run --seed <replay.seed> --p0 <our-current-bot> --p1 <something>` and emit a paired `trace-replay-<id>.json`. We get to see how our **current** bot would have played the same seed, side-by-side with the historical CG match.
+After `convert` saves `replay-<id>.json`, optionally also run `arena run --seed <replay.seed> --blue <our-current-bot> --red <something>` and emit a paired `trace-replay-<id>.json`. We get to see how our **current** bot would have played the same seed, side-by-side with the historical CG match.
 
-CLI: `arena convert --rerun --p0 bin/bot-winter2026-cpp` writes both files; analyze reports the delta.
+CLI: `arena convert --rerun --blue bin/bot-winter2026-cpp` writes both files; analyze reports the delta.
 
 ### 15. Track leaderboard rank at replay-fetch time — PARTIAL
 

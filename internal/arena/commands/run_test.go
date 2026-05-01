@@ -144,15 +144,15 @@ func resultMetrics(blueWins, blueLoses, blueScore, redScore float64) []arena.Met
 		draws = 1
 	}
 	return []arena.Metric{
-		{Label: "wins_p0", Value: blueWins},
-		{Label: "loses_p0", Value: blueLoses},
+		{Label: "wins_blue", Value: blueWins},
+		{Label: "loses_blue", Value: blueLoses},
 		{Label: "draws", Value: draws},
-		{Label: "score_p0", Value: blueScore},
-		{Label: "score_p1", Value: redScore},
+		{Label: "score_blue", Value: blueScore},
+		{Label: "score_red", Value: redScore},
 		{Label: "turns", Value: 10},
-		{Label: "ttfo_p0", Value: 1},
-		{Label: "ttfo_p1", Value: 2},
-		{Label: "aot_p0", Value: 3},
-		{Label: "aot_p1", Value: 4},
+		{Label: "ttfo_blue", Value: 1},
+		{Label: "ttfo_red", Value: 2},
+		{Label: "aot_blue", Value: 3},
+		{Label: "aot_red", Value: 4},
 	}
 }

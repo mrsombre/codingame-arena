@@ -38,8 +38,8 @@ func TestParseRunOptionsParsesAllCommonFlags(t *testing.T) {
 	blueBot, redBot := fakeBots(t)
 	fs, v := newTestRunCtx(t)
 	got, err := parseRunOptions([]string{
-		"--p0", blueBot,
-		"--p1", redBot,
+		"--blue", blueBot,
+		"--red", redBot,
 		"--seed", "-1755827269105404700",
 		"--seedx", "7",
 		"--max-turns", "123",
@@ -66,7 +66,7 @@ func TestParseRunOptionsParsesAllCommonFlags(t *testing.T) {
 func TestParseRunOptionsTraceDirDefault(t *testing.T) {
 	blueBot, redBot := fakeBots(t)
 	fs, v := newTestRunCtx(t)
-	got, err := parseRunOptions([]string{"--p0", blueBot, "--p1", redBot}, fs, v)
+	got, err := parseRunOptions([]string{"--blue", blueBot, "--red", redBot}, fs, v)
 	require.NoError(t, err)
 	assert.False(t, got.Trace)
 	assert.Equal(t, "./traces", got.TraceDir)
@@ -76,8 +76,8 @@ func TestParseRunOptionsAcceptsSeedPrefix(t *testing.T) {
 	blueBot, redBot := fakeBots(t)
 	fs, v := newTestRunCtx(t)
 	got, err := parseRunOptions([]string{
-		"--p0", blueBot,
-		"--p1", redBot,
+		"--blue", blueBot,
+		"--red", redBot,
 		"--seed", "seed=1001",
 	}, fs, v)
 	require.NoError(t, err)
@@ -88,8 +88,8 @@ func TestParseRunOptionsExposesLeagueViaViper(t *testing.T) {
 	blueBot, redBot := fakeBots(t)
 	fs, v := newTestRunCtx(t)
 	_, err := parseRunOptions([]string{
-		"--p0", blueBot,
-		"--p1", redBot,
+		"--blue", blueBot,
+		"--red", redBot,
 		"--league", "3",
 	}, fs, v)
 	require.NoError(t, err)
@@ -100,8 +100,8 @@ func TestParseRunOptionsRejectsUnknownFlags(t *testing.T) {
 	blueBot, redBot := fakeBots(t)
 	fs, v := newTestRunCtx(t)
 	_, err := parseRunOptions([]string{
-		"--p0", blueBot,
-		"--p1", redBot,
+		"--blue", blueBot,
+		"--red", redBot,
 		"--unknown", "value",
 	}, fs, v)
 	require.Error(t, err)
@@ -113,8 +113,8 @@ func TestParseRunOptionsRejectsNonPositiveSeedIncrement(t *testing.T) {
 			blueBot, redBot := fakeBots(t)
 			fs, v := newTestRunCtx(t)
 			_, err := parseRunOptions([]string{
-				"--p0", blueBot,
-				"--p1", redBot,
+				"--blue", blueBot,
+				"--red", redBot,
 				"--seedx", value,
 			}, fs, v)
 			require.Error(t, err)
@@ -127,16 +127,16 @@ func TestParseRunOptionsRequiresBlueBotBin(t *testing.T) {
 	fs, v := newTestRunCtx(t)
 	_, err := parseRunOptions([]string{}, fs, v)
 	require.Error(t, err)
-	assert.EqualError(t, err, "--p0 is required")
+	assert.EqualError(t, err, "--blue is required")
 }
 
 func TestParseRunOptionsRejectsMissingBlueBot(t *testing.T) {
 	_, redBot := fakeBots(t)
 	fs, v := newTestRunCtx(t)
 	missing := filepath.Join(t.TempDir(), "missing")
-	_, err := parseRunOptions([]string{"--p0", missing, "--p1", redBot}, fs, v)
+	_, err := parseRunOptions([]string{"--blue", missing, "--red", redBot}, fs, v)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--p0")
+	assert.Contains(t, err.Error(), "--blue")
 	assert.Contains(t, err.Error(), "does not exist")
 }
 
@@ -146,17 +146,17 @@ func TestParseRunOptionsRejectsNonExecutableRedBot(t *testing.T) {
 	redBot := filepath.Join(dir, "red")
 	require.NoError(t, os.WriteFile(redBot, []byte{}, 0o644))
 	fs, v := newTestRunCtx(t)
-	_, err := parseRunOptions([]string{"--p0", blueBot, "--p1", redBot}, fs, v)
+	_, err := parseRunOptions([]string{"--blue", blueBot, "--red", redBot}, fs, v)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--p1")
+	assert.Contains(t, err.Error(), "--red")
 	assert.Contains(t, err.Error(), "not executable")
 }
 
 func TestParseRunOptionsReadsFromViperConfig(t *testing.T) {
 	blueBot, redBot := fakeBots(t)
 	fs, v := newTestRunCtx(t)
-	v.Set("p0", blueBot)
-	v.Set("p1", redBot)
+	v.Set("blue", blueBot)
+	v.Set("red", redBot)
 	v.Set("max-turns", 77)
 	got, err := parseRunOptions([]string{}, fs, v)
 	require.NoError(t, err)
@@ -168,8 +168,8 @@ func TestParseRunOptionsDebugForcesSingleSerialMatch(t *testing.T) {
 	blueBot, redBot := fakeBots(t)
 	fs, v := newTestRunCtx(t)
 	got, err := parseRunOptions([]string{
-		"--p0", blueBot,
-		"--p1", redBot,
+		"--blue", blueBot,
+		"--red", redBot,
 		"--debug",
 		"--simulations", "25",
 		"--parallel", "8",

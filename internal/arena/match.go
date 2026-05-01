@@ -97,7 +97,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		wasDeactivated := [2]bool{players[0].IsDeactivated(), players[1].IsDeactivated()}
 		playerOutputs := [2]string{}
 		var turnInput []string
-		// Blue is our bot identity from --p0; after seed-driven swap, blue
+		// Blue is our bot identity from --blue; after seed-driven swap, blue
 		// plays the right side. Capturing only blue's view keeps traces compact;
 		// for symmetric-input games either side would yield the same lines.
 		blueSideIndex := 0
@@ -122,7 +122,11 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 					turnInput = append([]string(nil), lines...)
 				}
 				if runner.Options.Debug {
-					fmt.Fprintf(os.Stderr, "--- turn %d p%d input ---\n", turn, player.GetIndex())
+					side := "left"
+					if player.GetIndex() == 1 {
+						side = "right"
+					}
+					fmt.Fprintf(os.Stderr, "--- turn %d %s input ---\n", turn, side)
 					for _, line := range lines {
 						fmt.Fprintln(os.Stderr, line)
 					}
@@ -132,7 +136,11 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 					playerOutputs[player.GetIndex()] = strings.Join(outs, "\n")
 				}
 				if runner.Options.Debug {
-					fmt.Fprintf(os.Stderr, "turn %d p%d output: %s\n", turn, player.GetIndex(), strings.Join(player.GetOutputs(), " | "))
+					side := "left"
+					if player.GetIndex() == 1 {
+						side = "right"
+					}
+					fmt.Fprintf(os.Stderr, "turn %d %s output: %s\n", turn, side, strings.Join(player.GetOutputs(), " | "))
 				}
 			}
 		}
@@ -380,17 +388,17 @@ func buildMatchResult(simulationID int, seed int64, turns int, players []Player,
 
 	metrics := []Metric{
 		{Label: "turns", Value: float64(turns)},
-		{Label: "wins_p0", Value: leftWins},
-		{Label: "wins_p1", Value: rightWins},
-		{Label: "loses_p0", Value: rightWins},
-		{Label: "loses_p1", Value: leftWins},
+		{Label: "wins_blue", Value: leftWins},
+		{Label: "wins_red", Value: rightWins},
+		{Label: "loses_blue", Value: rightWins},
+		{Label: "loses_red", Value: leftWins},
 		{Label: "draws", Value: draws},
-		{Label: "score_p0", Value: float64(players[0].GetScore())},
-		{Label: "score_p1", Value: float64(players[1].GetScore())},
-		{Label: "ttfo_p0", Value: durationMillis(ttfo[0])},
-		{Label: "ttfo_p1", Value: durationMillis(ttfo[1])},
-		{Label: "aot_p0", Value: durationMillis(aot[0])},
-		{Label: "aot_p1", Value: durationMillis(aot[1])},
+		{Label: "score_blue", Value: float64(players[0].GetScore())},
+		{Label: "score_red", Value: float64(players[1].GetScore())},
+		{Label: "ttfo_blue", Value: durationMillis(ttfo[0])},
+		{Label: "ttfo_red", Value: durationMillis(ttfo[1])},
+		{Label: "aot_blue", Value: durationMillis(aot[0])},
+		{Label: "aot_red", Value: durationMillis(aot[1])},
 	}
 
 	return MatchResult{
@@ -433,8 +441,8 @@ func swapMatchSides(r MatchResult) MatchResult {
 		if swapped[i] {
 			continue
 		}
-		if strings.HasSuffix(m.Label, "_p0") {
-			otherSideLabel := strings.TrimSuffix(m.Label, "_p0") + "_p1"
+		if strings.HasSuffix(m.Label, "_blue") {
+			otherSideLabel := strings.TrimSuffix(m.Label, "_blue") + "_red"
 			if j, ok := labelIdx[otherSideLabel]; ok {
 				r.Metrics[i].Value, r.Metrics[j].Value = r.Metrics[j].Value, r.Metrics[i].Value
 				swapped[i] = true

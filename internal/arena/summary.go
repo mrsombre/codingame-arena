@@ -78,11 +78,11 @@ func FindWorstLosses(results []MatchResult, limit int) []int {
 		var blueScore, redScore float64
 		for _, metric := range result.Metrics {
 			switch metric.Label {
-			case "loses_p0":
+			case "loses_blue":
 				blueLost = metric.Value == 1
-			case "score_p0":
+			case "score_blue":
 				blueScore = metric.Value
-			case "score_p1":
+			case "score_red":
 				redScore = metric.Value
 			}
 		}
@@ -128,10 +128,10 @@ func (r MatchResult) RenderMatch() string {
 		Seed      int64      `json:"seed,string"`
 		Turns     int        `json:"turns"`
 		Winner    int        `json:"winner"`
-		BlueLoss  LossReason `json:"loss_reason_p0"`
-		RedLoss   LossReason `json:"loss_reason_p1"`
-		BlueScore int        `json:"score_p0"`
-		RedScore  int        `json:"score_p1"`
+		BlueLoss  LossReason `json:"loss_reason_blue"`
+		RedLoss   LossReason `json:"loss_reason_red"`
+		BlueScore int        `json:"score_blue"`
+		RedScore  int        `json:"score_red"`
 		TTFO      [2]float64 `json:"ttfo_ms"`
 		AOT       [2]float64 `json:"aot_ms"`
 		Metrics   []Metric   `json:"metrics,omitempty"`
@@ -170,21 +170,21 @@ func WriteShortSummary(w io.Writer, s MatchSummary, elapsed time.Duration) error
 		return err
 	}
 	_, err = fmt.Fprintf(w, "Stats: wins=%.0f%% losses=%.0f%% draws=%.0f%% avg_score=%.1fx%.1f avg_turns=%.0f\n",
-		get("wins_p0")*100,
-		get("loses_p0")*100,
+		get("wins_blue")*100,
+		get("loses_blue")*100,
 		get("draws")*100,
-		get("score_p0"),
-		get("score_p1"),
+		get("score_blue"),
+		get("score_red"),
 		get("turns"),
 	)
 	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(w, "Timing: avg_first_response=%.0fmsx%.0fms avg_turn_response=%.0fmsx%.0fms\n",
-		get("ttfo_p0"),
-		get("ttfo_p1"),
-		get("aot_p0"),
-		get("aot_p1"),
+		get("ttfo_blue"),
+		get("ttfo_red"),
+		get("aot_blue"),
+		get("aot_red"),
 	)
 	return err
 }

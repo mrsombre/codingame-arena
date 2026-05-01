@@ -13,27 +13,27 @@ func TestSummarizeMatchesAggregatesMetrics(t *testing.T) {
 	results := []MatchResult{
 		{
 			Metrics: []Metric{
-				{Label: "score_p0", Value: 17},
-				{Label: "ttfo_p0", Value: 111.11},
+				{Label: "score_blue", Value: 17},
+				{Label: "ttfo_blue", Value: 111.11},
 			},
 		},
 		{
 			Metrics: []Metric{
-				{Label: "score_p0", Value: 19},
-				{Label: "ttfo_p0", Value: 111.05},
+				{Label: "score_blue", Value: 19},
+				{Label: "ttfo_blue", Value: 111.05},
 			},
 		},
 	}
 
 	summary := SummarizeMatches(results)
 
-	score := summary.Get("score_p0")
+	score := summary.Get("score_blue")
 	require.NotNil(t, score)
 	require.NotNil(t, score.Total)
 	assert.Equal(t, 36.0, *score.Total)
 	assert.Equal(t, 18.0, score.Avg)
 
-	timing := summary.Get("ttfo_p0")
+	timing := summary.Get("ttfo_blue")
 	require.NotNil(t, timing)
 	assert.Nil(t, timing.Total)
 	assert.Equal(t, 111.08, timing.Avg)
@@ -41,9 +41,9 @@ func TestSummarizeMatchesAggregatesMetrics(t *testing.T) {
 
 func TestFindWorstLossesReturnsTopN(t *testing.T) {
 	results := []MatchResult{
-		{Winner: 0, Metrics: []Metric{{Label: "wins_p0", Value: 1}, {Label: "loses_p0", Value: 0}, {Label: "score_p0", Value: 20}, {Label: "score_p1", Value: 10}}},
-		{Winner: 1, Metrics: []Metric{{Label: "wins_p0", Value: 0}, {Label: "loses_p0", Value: 1}, {Label: "score_p0", Value: 5}, {Label: "score_p1", Value: 25}}},
-		{Winner: 1, Metrics: []Metric{{Label: "wins_p0", Value: 0}, {Label: "loses_p0", Value: 1}, {Label: "score_p0", Value: 10}, {Label: "score_p1", Value: 15}}},
+		{Winner: 0, Metrics: []Metric{{Label: "wins_blue", Value: 1}, {Label: "loses_blue", Value: 0}, {Label: "score_blue", Value: 20}, {Label: "score_red", Value: 10}}},
+		{Winner: 1, Metrics: []Metric{{Label: "wins_blue", Value: 0}, {Label: "loses_blue", Value: 1}, {Label: "score_blue", Value: 5}, {Label: "score_red", Value: 25}}},
+		{Winner: 1, Metrics: []Metric{{Label: "wins_blue", Value: 0}, {Label: "loses_blue", Value: 1}, {Label: "score_blue", Value: 10}, {Label: "score_red", Value: 15}}},
 	}
 	indices := FindWorstLosses(results, 1)
 	require.Len(t, indices, 1)
@@ -54,15 +54,15 @@ func TestWriteShortSummary(t *testing.T) {
 	summary := MatchSummary{
 		Simulations: 10,
 		Metrics: []MetricSummary{
-			{Label: "wins_p0", Avg: 0.7},
-			{Label: "loses_p0", Avg: 0.2},
+			{Label: "wins_blue", Avg: 0.7},
+			{Label: "loses_blue", Avg: 0.2},
 			{Label: "draws", Avg: 0.1},
-			{Label: "score_p0", Avg: 15.3},
-			{Label: "score_p1", Avg: 12.1},
-			{Label: "ttfo_p0", Avg: 820},
-			{Label: "aot_p0", Avg: 12},
-			{Label: "ttfo_p1", Avg: 900},
-			{Label: "aot_p1", Avg: 14},
+			{Label: "score_blue", Avg: 15.3},
+			{Label: "score_red", Avg: 12.1},
+			{Label: "ttfo_blue", Avg: 820},
+			{Label: "aot_blue", Avg: 12},
+			{Label: "ttfo_red", Avg: 900},
+			{Label: "aot_red", Avg: 14},
 		},
 	}
 	var buf bytes.Buffer

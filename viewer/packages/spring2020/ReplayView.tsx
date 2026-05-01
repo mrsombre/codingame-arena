@@ -60,15 +60,15 @@ export function ReplayView({ replayId }: ReplayViewProps) {
   )
 
   if (mapData && trace) {
-    const p0 = trace.players[0] ?? "p0"
-    const p1 = trace.players[1] ?? "p1"
+    const left = trace.players[0] ?? "left"
+    const right = trace.players[1] ?? "right"
     const shortId = replayId.startsWith("replay-") ? replayId.slice("replay-".length) : replayId
     const winner = winnerFromRanks(trace.ranks)
-    const winnerName = winner === 0 ? p0 : winner === 1 ? p1 : null
+    const winnerName = winner === 0 ? left : winner === 1 ? right : null
     const winnerClass = winner === 0 ? "text-sky-400" : winner === 1 ? "text-red-400" : "text-muted-foreground"
     const replayStatus = (
       <>
-        replay: {shortId}&nbsp;&nbsp;seed={trace.seed}&nbsp;&nbsp;<span className="text-sky-400">{p0}</span> vs <span className="text-red-400">{p1}</span>&nbsp;&nbsp;winner=
+        replay: {shortId}&nbsp;&nbsp;seed={trace.seed}&nbsp;&nbsp;<span className="text-sky-400">{left}</span> vs <span className="text-red-400">{right}</span>&nbsp;&nbsp;winner=
         <span className={winnerClass}>{winnerName ?? "draw"}</span>&nbsp;&nbsp;score=<span className="text-sky-400">{trace.scores[0]}</span>:<span className="text-red-400">{trace.scores[1]}</span>
         &nbsp;&nbsp;turns={trace.turns.length}
       </>

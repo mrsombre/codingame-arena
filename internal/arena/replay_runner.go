@@ -11,8 +11,8 @@ import (
 // Each string is one turn's complete output (typically a single line with
 // semicolon-separated commands). Strings are 0-indexed by turn.
 type ReplayMoves struct {
-	P0 []string
-	P1 []string
+	Left  []string
+	Right []string
 }
 
 // RunReplay re-simulates a match by feeding pre-recorded player outputs into
@@ -48,7 +48,7 @@ func RunReplay(
 		maxTurns = factory.MaxTurns()
 	}
 
-	moveLists := [2][]string{moves.P0, moves.P1}
+	moveLists := [2][]string{moves.Left, moves.Right}
 	turnCounts := [2]int{0, 0}
 	for i, player := range players {
 		idx := i
