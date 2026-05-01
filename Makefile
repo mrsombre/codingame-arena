@@ -51,7 +51,7 @@ build-winter2026-agents:
 
 match-winter2026:
 	./$(BIN_DIR)/arena --game=winter2026 --blue=./$(WINTER2026_CPPBOT) --red=./$(WINTER2026_PYBOT) \
-		--seed=100030005000700089 --simulations 100
+		--seed=100030005000700089 --simulations 50 --trace
 
 # analytics
 .PHONY: leaderboard convert analyze

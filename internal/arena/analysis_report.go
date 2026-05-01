@@ -50,6 +50,7 @@ func AnalyzeTraceFiles(input TraceAnalysisInput, metricAnalyzer TraceMetricAnaly
 		blueB:               make(map[string]traceAnalysisMetricAggregate),
 		blueWon:             make(map[string]traceAnalysisMetricAggregate),
 		blueLost:            make(map[string]traceAnalysisMetricAggregate),
+		worstBlue:           make(map[string]traceAnalysisMetricWorst),
 	}
 
 	for _, file := range input.Files {
@@ -63,7 +64,7 @@ func AnalyzeTraceFiles(input TraceAnalysisInput, metricAnalyzer TraceMetricAnaly
 				return nil, err
 			}
 		}
-		report.add(file.Trace, stats)
+		report.add(file, stats)
 	}
 
 	return report, nil
@@ -199,6 +200,11 @@ type traceAnalysisReport struct {
 	// highest-leverage diagnostic axis for tuning the bot.
 	blueWon  map[string]traceAnalysisMetricAggregate
 	blueLost map[string]traceAnalysisMetricAggregate
+
+	// worstBlue tracks blue's single-match peak per hazard metric and the
+	// trace file where it happened, so the WORST section can point the
+	// reader at the exact replay to inspect.
+	worstBlue map[string]traceAnalysisMetricWorst
 }
 
 type traceAnalysisMetricAggregate struct {
@@ -207,7 +213,13 @@ type traceAnalysisMetricAggregate struct {
 	RawCount int
 }
 
-func (r *traceAnalysisReport) add(trace TraceMatch, stats TraceMetricStats) {
+type traceAnalysisMetricWorst struct {
+	Value int
+	File  string
+}
+
+func (r *traceAnalysisReport) add(file TraceFile, stats TraceMetricStats) {
+	trace := file.Trace
 	winner := TraceWinner(trace)
 	if winner == 0 || winner == 1 {
 		r.decided++
@@ -264,6 +276,13 @@ func (r *traceAnalysisReport) add(trace TraceMatch, stats TraceMetricStats) {
 			addTraceMetricSample(r.blueWon, spec, values[blueSide], turns)
 		case 1 - blueSide:
 			addTraceMetricSample(r.blueLost, spec, values[blueSide], turns)
+		}
+
+		if !spec.HigherIsBetter && blueSide >= 0 {
+			blueValue := values[blueSide]
+			if w, seen := r.worstBlue[spec.Key]; !seen || blueValue > w.Value {
+				r.worstBlue[spec.Key] = traceAnalysisMetricWorst{Value: blueValue, File: file.Name}
+			}
 		}
 	}
 }
@@ -326,8 +345,69 @@ func (r *traceAnalysisReport) Write(w io.Writer) error {
 		if err := r.writeMetricComparison(w, "METRICS — blue wins vs blue losses", r.blueWon, r.blueLost, "won", "lost"); err != nil {
 			return err
 		}
+		if err := r.writeWorstCases(w); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// writeWorstCases prints blue's single-match peak per hazard metric, naming
+// the trace file so the reader can open the replay and see what went wrong.
+// Only specs with HigherIsBetter=false are listed; rows with a peak of 0
+// are skipped (no incidents → no replay worth opening). The whole section
+// is suppressed when no spec qualifies, keeping the report compact for
+// games whose metrics are all score-style.
+func (r *traceAnalysisReport) writeWorstCases(w io.Writer) error {
+	type worstRow struct {
+		Label string
+		Value int
+		ID    string
+	}
+	rows := make([]worstRow, 0, len(r.metricSpecs))
+	for _, spec := range r.metricSpecs {
+		if spec.HigherIsBetter {
+			continue
+		}
+		worst, ok := r.worstBlue[spec.Key]
+		if !ok || worst.Value == 0 {
+			continue
+		}
+		rows = append(rows, worstRow{
+			Label: spec.Label,
+			Value: worst.Value,
+			ID:    worstTraceID(worst.File),
+		})
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+
+	if _, err := fmt.Fprintln(w, "WORST"); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if _, err := fmt.Fprintf(w, "  %-11s %4d   %s\n", row.Label, row.Value, row.ID); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintln(w)
+	return err
+}
+
+// worstTraceID extracts the readable identifier from a trace filename,
+// stripping the .json extension and the conventional `replay-`/`trace-`
+// prefix so the WORST listing reads as a bare match ID (882464252) rather
+// than a redundant `replay-882464252.json`. Unknown shapes pass through
+// extension-only stripping.
+func worstTraceID(name string) string {
+	s := strings.TrimSuffix(name, ".json")
+	for _, prefix := range []string{"replay-", "trace-"} {
+		if strings.HasPrefix(s, prefix) {
+			return strings.TrimPrefix(s, prefix)
+		}
+	}
+	return s
 }
 
 // writeMetricLegend prints a `Metrics:` block listing each spec's description.

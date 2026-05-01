@@ -73,5 +73,6 @@ Sections:
 - **END REASONS** — match termination reasons as a percentage of trace files. Side-specific rows include the share attributable to blue.
 - **Metrics:** — optional legend rendered when a game's `TraceMetricSpec`s carry `Description` strings. One bullet per labelled metric so a reader unfamiliar with the game can interpret rows like `DEAD` or `HIT_ENEMY`. Specs without a description are skipped, and a game with no descriptions at all renders no legend.
 - **METRICS** — game-selected metrics rendered as counts per match or per-turn percentages, with a single ratio summarizing the gap (`bigger Nx smaller`). When both sides of a per-turn-rate row average under 1%, the row switches to raw cumulative event counts so noisy 0.0%-vs-0.1% comparisons don't read as a 5x gap.
+- **WORST** — per hazard metric, blue's single-match peak value and the trace ID where it happened. Skipped for `HigherIsBetter` specs (a low-eating match deserves different framing than a hazard peak) and for hazards that never fired. Useful for "open the replay where I lost 17 segments to falls" follow-ups.
 
 Draws are counted in the header but excluded from winner-vs-loser metric aggregation.

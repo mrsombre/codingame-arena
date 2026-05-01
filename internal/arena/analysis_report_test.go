@@ -163,6 +163,78 @@ func TestAnalysisReportAggregatesMetricKinds(t *testing.T) {
 	assert.Contains(t, text, "NO_EAT      won       25.0%   lost    100.0%   (lost 4.00x won)")
 }
 
+func TestAnalysisReportWorstSectionPicksBluePeakPerHazardMetric(t *testing.T) {
+	files := []TraceFile{
+		{Name: "replay-100.json", Trace: TraceMatch{
+			Type: "lo",
+			Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1},
+			Turns: testTurns(5),
+		}},
+		// Same metric on a different file with a higher blue value: this
+		// trace must replace the prior entry so WORST always points at the
+		// peak, not the first-seen non-zero match.
+		{Name: "replay-200.json", Trace: TraceMatch{
+			Type: "hi",
+			Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1},
+			Turns: testTurns(5),
+		}},
+		// Blue plays right here: the value to track for WORST is values[1],
+		// not values[0]. Trace-300 has blue's value below the running peak,
+		// so it must NOT change the WORST row.
+		{Name: "trace-300.json", Trace: TraceMatch{
+			Type: "side",
+			Blue: "us", Players: [2]string{"rival", "us"},
+			Scores: [2]TraceScore{0, 1}, Ranks: [2]int{1, 0},
+			Turns: testTurns(5),
+		}},
+	}
+	analyzer := testMetricAnalyzer{
+		specs: []TraceMetricSpec{
+			{Key: testMetricDied, Label: "DIED", Kind: TraceMetricPerMatchCount},
+			// HigherIsBetter excludes this spec from WORST (a low EAT match
+			// is interesting but is a different framing than a hazard peak).
+			{Key: testMetricNoEat, Label: "EAT_T20", Kind: TraceMetricPerMatchCount, HigherIsBetter: true},
+		},
+		stats: map[string]TraceMetricStats{
+			"lo":   {testMetricDied: [2]int{1, 0}, testMetricNoEat: [2]int{2, 0}},
+			"hi":   {testMetricDied: [2]int{4, 0}, testMetricNoEat: [2]int{8, 0}},
+			"side": {testMetricDied: [2]int{0, 2}, testMetricNoEat: [2]int{0, 1}},
+		},
+	}
+
+	text := runTestAnalysis(t, files, analyzer)
+
+	// The trailing blank line is part of the assertion: it pins WORST to a
+	// single-row section. If EAT_T20 leaked in (HigherIsBetter ignored), an
+	// extra row would push the blank line down and this match would fail.
+	assert.Contains(t, text, "WORST\n  DIED           4   200\n\n")
+}
+
+func TestAnalysisReportWorstSectionSkippedWhenNoHazardEverFires(t *testing.T) {
+	files := []TraceFile{
+		{Name: "trace-1.json", Trace: TraceMatch{
+			Type: "clean",
+			Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1},
+			Turns: testTurns(5),
+		}},
+	}
+	analyzer := testMetricAnalyzer{
+		specs: []TraceMetricSpec{{Key: testMetricDied, Label: "DIED", Kind: TraceMetricPerMatchCount}},
+		stats: map[string]TraceMetricStats{
+			// All-zero hazard across every match: no replay worth opening,
+			// so the entire WORST section is suppressed.
+			"clean": {testMetricDied: [2]int{0, 0}},
+		},
+	}
+
+	text := runTestAnalysis(t, files, analyzer)
+
+	assert.NotContains(t, text, "WORST")
+}
+
 func TestAnalysisReportRendersMetricLegendWhenSpecsCarryDescriptions(t *testing.T) {
 	files := []TraceFile{{Trace: TraceMatch{
 		Type: "ok",

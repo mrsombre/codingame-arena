@@ -39,12 +39,19 @@ const (
 // interpret labels like DEAD or HIT_ENEMY without reading source. Optional —
 // specs without a description are omitted from the legend, and a game whose
 // specs all lack one renders no legend block.
+//
+// HigherIsBetter flips the polarity for the WORST section: hazard metrics
+// (DEAD_*, HIT_*, FALL counts) leave it false so the WORST list reports the
+// match with the highest blue value, while score-style metrics (EAT_T20)
+// set it true and are excluded from WORST entirely (their "worst" would be
+// a min-eat match, which deserves a different framing than a hazard peak).
 type TraceMetricSpec struct {
-	Key         string
-	Label       string
-	Kind        TraceMetricKind
-	ShowZero    bool
-	Description string
+	Key            string
+	Label          string
+	Kind           TraceMetricKind
+	ShowZero       bool
+	Description    string
+	HigherIsBetter bool
 }
 
 // TraceMetricStats holds per-side metric values for one match.

@@ -48,7 +48,8 @@ func (f *factory) TraceMetricSpecs() []arena.TraceMetricSpec {
 		{Key: TraceHitEnemy, Label: TraceHitEnemy, Kind: arena.TraceMetricPerMatchCount,
 			Description: "Segments lost per match from crashing into an enemy snake"},
 		{Key: winterMetricEatByTurn20, Label: winterMetricEatByTurn20, Kind: arena.TraceMetricPerMatchCount,
-			Description: "Power sources eaten in the first 20 turns (early-game grow rate)"},
+			Description:    "Power sources eaten in the first 20 turns (early-game grow rate)",
+			HigherIsBetter: true},
 	}
 }
 
