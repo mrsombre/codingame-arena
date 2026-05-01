@@ -10,17 +10,20 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-func TestAnalyzeWinterTraceMetricsAttributesAndCollapsesPerTurnMetrics(t *testing.T) {
+func TestAnalyzeWinterTraceMetricsCountsEverySegmentLossEvent(t *testing.T) {
 	trace := arena.TraceMatch{
 		Turns: []arena.TraceTurn{
 			{
 				Output: [2]string{"0 UP;1 UP", "2 UP;3 UP"},
 				Traces: []arena.TurnTrace{
+					// Two HIT_WALL on the same side in one turn must both count
+					// — each event is one lost segment.
 					arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: 0, Coord: [2]int{5, 5}}),
 					arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: 1, Coord: [2]int{4, 5}}),
 					arena.MakeTurnTrace(TraceHitEnemy, BirdCoordMeta{Bird: 2, Coord: [2]int{1, 1}}),
 					arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: 0, Coord: [2]int{2, 2}}),
 					arena.MakeTurnTrace(TraceDead, BirdMeta{Bird: 3}),
+					arena.MakeTurnTrace(TraceFall, BirdSegmentsMeta{Bird: 2, Segments: 5}),
 				},
 			},
 			{
@@ -36,8 +39,8 @@ func TestAnalyzeWinterTraceMetricsAttributesAndCollapsesPerTurnMetrics(t *testin
 
 	assert.Equal(t, [2]int{0, 1}, stats[TraceDead])
 	assert.Equal(t, [2]int{0, 1}, stats[TraceHitEnemy])
-	assert.Equal(t, [2]int{1, 1}, stats[TraceHitWall])
-	assert.Equal(t, [2]int{1, 2}, stats[winterMetricNoEatTurn])
+	assert.Equal(t, [2]int{2, 1}, stats[TraceHitWall])
+	assert.Equal(t, [2]int{0, 5}, stats[TraceFall])
 }
 
 func TestAnalyzeWinterTraceMetricsWithoutBirdMappingReturnsZeroes(t *testing.T) {
@@ -52,7 +55,6 @@ func TestAnalyzeWinterTraceMetricsWithoutBirdMappingReturnsZeroes(t *testing.T) 
 	stats := analyzeWinterTraceMetrics(trace)
 
 	assert.Equal(t, [2]int{}, stats[TraceHitWall])
-	assert.Equal(t, [2]int{}, stats[winterMetricNoEatTurn])
 }
 
 func TestAnalyzeWinterTraceMetricsSkipsUnknownBirdsAndMalformedMeta(t *testing.T) {
@@ -77,13 +79,14 @@ func TestAnalyzeWinterTraceMetricsSkipsUnknownBirdsAndMalformedMeta(t *testing.T
 func TestWinterTraceMetricSpecsListExpectedMetrics(t *testing.T) {
 	specs := NewFactory().(arena.TraceMetricAnalyzer).TraceMetricSpecs()
 
-	require.Len(t, specs, 6)
+	require.Len(t, specs, 5)
 	assert.Equal(t,
-		[]string{TraceDead, TraceHitEnemy, TraceHitWall, TraceHitSelf, TraceFall, winterMetricNoEatTurn},
+		[]string{TraceDead, TraceHitEnemy, TraceHitWall, TraceHitSelf, TraceFall},
 		metricSpecKeys(specs),
 	)
-	assert.Equal(t, arena.TraceMetricPerMatchCount, specs[0].Kind)
-	assert.Equal(t, arena.TraceMetricPerTurnRate, specs[1].Kind)
+	for _, spec := range specs {
+		assert.Equal(t, arena.TraceMetricPerMatchCount, spec.Kind, spec.Key)
+	}
 }
 
 func metricSpecKeys(metrics []arena.TraceMetricSpec) []string {

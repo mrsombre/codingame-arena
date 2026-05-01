@@ -202,8 +202,9 @@ type traceAnalysisReport struct {
 }
 
 type traceAnalysisMetricAggregate struct {
-	Sum     float64
-	Samples int
+	Sum      float64
+	Samples  int
+	RawCount int
 }
 
 func (r *traceAnalysisReport) add(trace TraceMatch, stats TraceMetricStats) {
@@ -275,6 +276,7 @@ func addTraceMetricSample(dst map[string]traceAnalysisMetricAggregate, spec Trac
 	current := dst[spec.Key]
 	current.Sum += sample
 	current.Samples++
+	current.RawCount += value
 	dst[spec.Key] = current
 }
 
@@ -492,6 +494,12 @@ func (r traceAnalysisEndReasonRow) label() string {
 	return r.key
 }
 
+// traceMetricLowRateThreshold is the per-turn-rate cutoff (in percent) below
+// which both sides switch to raw event counts. Tiny averages like 0.0% vs 0.1%
+// produce inflated multipliers (5x) from a 0-vs-1 incident split — raw totals
+// keep the reader anchored on actual frequency.
+const traceMetricLowRateThreshold = 1.0
+
 func (r *traceAnalysisReport) writeMetricComparison(w io.Writer, title string,
 	a, b map[string]traceAnalysisMetricAggregate, aLabel, bLabel string,
 ) error {
@@ -501,8 +509,10 @@ func (r *traceAnalysisReport) writeMetricComparison(w io.Writer, title string,
 
 	wrote := false
 	for _, spec := range r.metricSpecs {
-		av := averageTraceMetric(a[spec.Key])
-		bv := averageTraceMetric(b[spec.Key])
+		aAgg := a[spec.Key]
+		bAgg := b[spec.Key]
+		av := averageTraceMetric(aAgg)
+		bv := averageTraceMetric(bAgg)
 		if !av.ok && !bv.ok {
 			continue
 		}
@@ -510,11 +520,23 @@ func (r *traceAnalysisReport) writeMetricComparison(w io.Writer, title string,
 			continue
 		}
 		wrote = true
+
+		aDisplay, bDisplay := av.value, bv.value
+		aText := formatTraceMetricValue(spec.Kind, av.value)
+		bText := formatTraceMetricValue(spec.Kind, bv.value)
+		if spec.Kind == TraceMetricPerTurnRate &&
+			av.value < traceMetricLowRateThreshold && bv.value < traceMetricLowRateThreshold {
+			aDisplay = float64(aAgg.RawCount)
+			bDisplay = float64(bAgg.RawCount)
+			aText = formatTraceMetricRawCount(aAgg.RawCount)
+			bText = formatTraceMetricRawCount(bAgg.RawCount)
+		}
+
 		if _, err := fmt.Fprintf(w, "  %-11s %-6s %s   %-5s %s   (%s)\n",
 			spec.Label,
-			aLabel, formatTraceMetricValue(spec.Kind, av.value),
-			bLabel, formatTraceMetricValue(spec.Kind, bv.value),
-			traceAnalysisValueExplanation(av.value, bv.value, aLabel, bLabel)); err != nil {
+			aLabel, aText,
+			bLabel, bText,
+			traceAnalysisValueExplanation(aDisplay, bDisplay, aLabel, bLabel)); err != nil {
 			return err
 		}
 	}
@@ -548,6 +570,13 @@ func formatTraceMetricValue(kind TraceMetricKind, value float64) string {
 	default:
 		return fmt.Sprintf("%8.1f", value)
 	}
+}
+
+// formatTraceMetricRawCount renders a cumulative event count for a sub-1%
+// per-turn metric. Width matches formatTraceMetricValue (8 chars) so columns
+// line up with rate-formatted rows in the same comparison block.
+func formatTraceMetricRawCount(count int) string {
+	return fmt.Sprintf("%8d", count)
 }
 
 func percent(num, denom int) float64 {

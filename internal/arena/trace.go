@@ -116,6 +116,31 @@ func RanksFromWinner(winner int) [2]int {
 	}
 }
 
+// TraceWinnerFromScores derives the winner shown in a trace. Deactivation
+// outranks raw scores: a deactivated side cannot win, while an active side
+// beats a deactivated opponent regardless of raw counts. When neither side is
+// deactivated (or both are), the higher score wins; equal scores → -1 (draw).
+//
+// Why deactivation takes precedence: a TIMEOUT_START/TIMEOUT/INVALID_INPUT
+// player never finishes the game, but their pre-existing pieces (e.g. winter
+// 2026 birds) keep contributing to the raw alive-segment count. Without this
+// override the trace would call a 12-vs-12 raw tie a draw even though CG
+// scores it as -1 vs 12.
+func TraceWinnerFromScores(scores [2]int, deactivated [2]bool) int {
+	switch {
+	case deactivated[0] && !deactivated[1]:
+		return 1
+	case deactivated[1] && !deactivated[0]:
+		return 0
+	case scores[0] > scores[1]:
+		return 0
+	case scores[1] > scores[0]:
+		return 1
+	default:
+		return -1
+	}
+}
+
 // TraceTiming aggregates per-side response timings in milliseconds.
 //
 // FirstResponse is the turn-0 latency (typically dominated by bot startup and

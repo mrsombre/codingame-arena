@@ -7,35 +7,37 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-const winterMetricNoEatTurn = "NO_EAT_TURN"
-
 // TraceMetricSpecs implements arena.TraceMetricAnalyzer for Winter 2026.
+//
+// Every metric is per-match because the actionable cost in this game is
+// segments lost over the match, not the rate of incidents. DEAD/HIT_* events
+// each represent a discrete segment loss (1 per HIT, 3 per DEAD beheading);
+// FALL accumulates the bird's body length at fall time since a fall kills
+// regardless of length.
 func (f *factory) TraceMetricSpecs() []arena.TraceMetricSpec {
 	return []arena.TraceMetricSpec{
 		{Key: TraceDead, Label: TraceDead, Kind: arena.TraceMetricPerMatchCount},
-		{Key: TraceHitEnemy, Label: TraceHitEnemy, Kind: arena.TraceMetricPerTurnRate},
-		{Key: TraceHitWall, Label: TraceHitWall, Kind: arena.TraceMetricPerTurnRate},
-		{Key: TraceHitSelf, Label: TraceHitSelf, Kind: arena.TraceMetricPerTurnRate},
-		{Key: TraceFall, Label: TraceFall, Kind: arena.TraceMetricPerTurnRate},
-		{Key: winterMetricNoEatTurn, Label: "NO_EAT", Kind: arena.TraceMetricPerTurnRate},
+		{Key: TraceHitEnemy, Label: TraceHitEnemy, Kind: arena.TraceMetricPerMatchCount},
+		{Key: TraceHitWall, Label: TraceHitWall, Kind: arena.TraceMetricPerMatchCount},
+		{Key: TraceHitSelf, Label: TraceHitSelf, Kind: arena.TraceMetricPerMatchCount},
+		{Key: TraceFall, Label: TraceFall, Kind: arena.TraceMetricPerMatchCount},
 	}
 }
 
 // AnalyzeTraceMetrics interprets Winter 2026's typed trace metas and returns
-// side-attributed metric counts. Per-turn metrics collapse duplicate same-side
-// occurrences within a turn.
+// side-attributed match-total counts. HIT_*/DEAD increment by 1 per event;
+// FALL increments by the segment count carried in BirdSegmentsMeta.
 func (f *factory) AnalyzeTraceMetrics(trace arena.TraceMatch) (arena.TraceMetricStats, error) {
 	return analyzeWinterTraceMetrics(trace), nil
 }
 
 func analyzeWinterTraceMetrics(trace arena.TraceMatch) arena.TraceMetricStats {
 	stats := arena.TraceMetricStats{
-		TraceDead:             {},
-		TraceHitEnemy:         {},
-		TraceHitWall:          {},
-		TraceHitSelf:          {},
-		TraceFall:             {},
-		winterMetricNoEatTurn: {},
+		TraceDead:     {},
+		TraceHitEnemy: {},
+		TraceHitWall:  {},
+		TraceHitSelf:  {},
+		TraceFall:     {},
 	}
 
 	birdSide := winterBirdSideMap(trace)
@@ -44,14 +46,6 @@ func analyzeWinterTraceMetrics(trace arena.TraceMatch) arena.TraceMetricStats {
 	}
 
 	for _, turn := range trace.Turns {
-		eatBySide := [2]bool{}
-		turnMetrics := map[string][2]bool{
-			TraceHitEnemy: {},
-			TraceHitWall:  {},
-			TraceHitSelf:  {},
-			TraceFall:     {},
-		}
-
 		for _, ev := range turn.Traces {
 			birdID, ok := decodeWinterSubject(ev)
 			if !ok {
@@ -63,27 +57,14 @@ func analyzeWinterTraceMetrics(trace arena.TraceMatch) arena.TraceMetricStats {
 			}
 
 			switch ev.Type {
-			case TraceDead:
+			case TraceDead, TraceHitEnemy, TraceHitWall, TraceHitSelf:
 				addWinterTraceMetricCount(stats, ev.Type, side, 1)
-			case TraceEat:
-				eatBySide[side] = true
-			case TraceHitEnemy, TraceHitWall, TraceHitSelf, TraceFall:
-				sides := turnMetrics[ev.Type]
-				sides[side] = true
-				turnMetrics[ev.Type] = sides
-			}
-		}
-
-		for key, sides := range turnMetrics {
-			for side, happened := range sides {
-				if happened {
-					addWinterTraceMetricCount(stats, key, side, 1)
+			case TraceFall:
+				meta, err := arena.DecodeMeta[BirdSegmentsMeta](ev)
+				if err != nil {
+					continue
 				}
-			}
-		}
-		for side, ate := range eatBySide {
-			if !ate {
-				addWinterTraceMetricCount(stats, winterMetricNoEatTurn, side, 1)
+				addWinterTraceMetricCount(stats, ev.Type, side, meta.Segments)
 			}
 		}
 	}

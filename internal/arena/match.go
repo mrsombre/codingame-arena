@@ -246,18 +246,13 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				traceWinner = 1 - traceWinner
 			}
 		}
+		deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
 		// Derive winner from raw scores so traces stay self-consistent even
 		// when tie-break adjustments made result.Winner differ from the raw
-		// outcome.
+		// outcome. Deactivation overrides a raw-score tie so a timed-out side
+		// is never recorded as drawing against the survivor.
 		if haveRawScores {
-			switch {
-			case traceScores[0] > traceScores[1]:
-				traceWinner = 0
-			case traceScores[1] > traceScores[0]:
-				traceWinner = 1
-			default:
-				traceWinner = -1
-			}
+			traceWinner = TraceWinnerFromScores(traceScores, deactivated)
 		}
 		stats := [2]playerTimingStats{controllers[0].TimingStats(), controllers[1].TimingStats()}
 		traceTiming := &TraceTiming{
@@ -282,7 +277,6 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		if erp, ok := referee.(EndReasonProvider); ok {
 			endReason = erp.EndReason(turn, players, deactivationTurns)
 		}
-		deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
 		traceMatch := TraceMatch{
 			MatchID:     simulationID,
 			GameID:      runner.Factory.Name(),

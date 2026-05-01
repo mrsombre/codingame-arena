@@ -162,23 +162,16 @@ func RunReplay(
 
 	finalScores := [2]int{players[0].GetScore(), players[1].GetScore()}
 	scores := finalScores
-	winner := -1
 	if haveRawScores {
 		scores = rawScores
 	}
-	switch {
-	case scores[0] > scores[1]:
-		winner = 0
-	case scores[1] > scores[0]:
-		winner = 1
-	}
+	deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
+	winner := TraceWinnerFromScores(scores, deactivated)
 
 	var endReason string
 	if erp, ok := referee.(EndReasonProvider); ok {
 		endReason = erp.EndReason(turn, players, deactivationTurns)
 	}
-
-	deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
 
 	return TraceMatch{
 		MatchID:     0,

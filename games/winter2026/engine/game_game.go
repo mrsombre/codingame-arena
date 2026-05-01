@@ -415,7 +415,7 @@ func (g *Game) DoFalls() {
 			if allOut {
 				bird.Alive = false
 				outOfBounds = append(outOfBounds, bird)
-				g.trace(arena.MakeTurnTrace(TraceFall, BirdMeta{Bird: bird.ID}))
+				g.trace(arena.MakeTurnTrace(TraceFall, BirdSegmentsMeta{Bird: bird.ID, Segments: len(bird.Body)}))
 			}
 		}
 		for _, bird := range outOfBounds {

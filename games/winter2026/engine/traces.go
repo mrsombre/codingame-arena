@@ -16,8 +16,7 @@ const (
 	TraceFall     = "FALL"
 )
 
-// BirdMeta is the meta for trace events whose only subject is one bird (DEAD,
-// FALL).
+// BirdMeta is the meta for trace events whose only subject is one bird (DEAD).
 type BirdMeta struct {
 	Bird int `json:"bird"`
 }
@@ -27,6 +26,15 @@ type BirdMeta struct {
 type BirdCoordMeta struct {
 	Bird  int    `json:"bird"`
 	Coord [2]int `json:"coord"`
+}
+
+// BirdSegmentsMeta is the meta for FALL events. Segments records the bird's
+// body length the moment it fell off the grid, which equals the segments lost
+// to that fall — needed because a fall kills a snake regardless of length, so
+// the cost is variable (unlike DEAD beheadings, which always cost 3).
+type BirdSegmentsMeta struct {
+	Bird     int `json:"bird"`
+	Segments int `json:"segments"`
 }
 
 func coordPair(c Coord) [2]int {

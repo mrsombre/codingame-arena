@@ -181,6 +181,42 @@ func TestAnalysisReportRejectsPerTurnMetricAboveTurnCount(t *testing.T) {
 	assert.Contains(t, err.Error(), "count 3 exceeds turns 2")
 }
 
+func TestAnalysisReportShowsRawCountsForSubOnePercentRates(t *testing.T) {
+	files := []TraceFile{
+		{Trace: TraceMatch{
+			Type: "long",
+			Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1},
+			Turns: testTurns(200),
+		}},
+	}
+	const rareMetric = "FALL"
+	analyzer := testMetricAnalyzer{
+		specs: []TraceMetricSpec{{Key: rareMetric, Label: rareMetric, Kind: TraceMetricPerTurnRate}},
+		stats: map[string]TraceMetricStats{
+			// 1/200 = 0.5% and 3/200 = 1.5% — winner stays under the 1%
+			// threshold so the loser (3/200) drives the row into rate format.
+			"long": {rareMetric: [2]int{1, 3}},
+		},
+	}
+
+	text := runTestAnalysis(t, files, analyzer)
+
+	assert.Contains(t, text, "FALL        winner     0.5%   loser     1.5%   (loser 3.00x winner)")
+
+	rareOnly := testMetricAnalyzer{
+		specs: []TraceMetricSpec{{Key: rareMetric, Label: rareMetric, Kind: TraceMetricPerTurnRate}},
+		stats: map[string]TraceMetricStats{
+			// Both sides under 1%: 1/200 = 0.5% and 0/200 = 0%. Output should
+			// switch to raw event counts so "0.5% vs 0.0%" doesn't read as a
+			// meaningful gap.
+			"long": {rareMetric: [2]int{1, 0}},
+		},
+	}
+	textRare := runTestAnalysis(t, files, rareOnly)
+	assert.Contains(t, textRare, "FALL        winner        1   loser        0   (winner only)")
+}
+
 func TestAnalysisReportSkipsPerTurnMetricsForZeroTurnMatches(t *testing.T) {
 	files := []TraceFile{{Trace: TraceMatch{
 		Type: "zero",

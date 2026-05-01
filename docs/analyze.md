@@ -71,6 +71,6 @@ Sections:
 - **OUTCOME** — decided/draw split across all matches, plus blue-side W/L/D when `blue` can be resolved from trace players.
 - **MATCH** — turn count plus blue-vs-red score and timing summaries (only when `blue` is resolved; otherwise omitted, since per-side averages are noise under random side swap).
 - **END REASONS** — match termination reasons as a percentage of trace files. Side-specific rows include the share attributable to blue.
-- **METRICS** — game-selected metrics rendered as counts per match or per-turn percentages, with a single ratio summarizing the gap (`bigger Nx smaller`).
+- **METRICS** — game-selected metrics rendered as counts per match or per-turn percentages, with a single ratio summarizing the gap (`bigger Nx smaller`). When both sides of a per-turn-rate row average under 1%, the row switches to raw cumulative event counts so noisy 0.0%-vs-0.1% comparisons don't read as a 5x gap.
 
 Draws are counted in the header but excluded from winner-vs-loser metric aggregation.
