@@ -18,8 +18,17 @@ import (
 func TestLoadAnalyzeTraceFilesSkipsNonTraceJSON(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
 	writeAnalyzeTestFile(t, traceDir, "note.json", `{"hello": "world"}`)
+	writeAnalyzeTestFile(t, traceDir, "trace-2-0.json", `{
+  "gameId": "test-game",
+  "seed": "2",
+  "blue": "us",
+  "players": ["us", "rival"],
+  "scores": [1.0, 0.0],
+  "ranks": [0, 1],
+  "turns": [{"turn": 0, "output": ["WAIT", "WAIT"]}]
+}`)
 	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{
-  "gameId": "spring2020",
+  "gameId": "test-game",
   "seed": "1",
   "blue": "us",
   "players": ["us", "rival"],
@@ -30,15 +39,36 @@ func TestLoadAnalyzeTraceFilesSkipsNonTraceJSON(t *testing.T) {
 
 	files, err := loadAnalyzeTraceFiles(traceDir)
 	require.NoError(t, err)
-	require.Len(t, files, 1)
+	require.Len(t, files, 2)
 	assert.Equal(t, "trace-1-0.json", files[0].Name)
-	assert.Equal(t, "spring2020", files[0].Trace.GameID)
+	assert.Equal(t, "trace-2-0.json", files[1].Name)
+	assert.Equal(t, "test-game", files[0].Trace.GameID)
+}
+
+func TestLoadAnalyzeTraceFilesRequiresBlueSide(t *testing.T) {
+	traceDir := makeAnalyzeTestDir(t)
+	writeAnalyzeTestFile(t, traceDir, "trace-missing-blue.json", `{"gameId": "test-game", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+
+	_, err := loadAnalyzeTraceFiles(traceDir)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "trace missing blue")
+}
+
+func TestLoadAnalyzeTraceFilesRejectsUnknownBlueSide(t *testing.T) {
+	traceDir := makeAnalyzeTestDir(t)
+	writeAnalyzeTestFile(t, traceDir, "trace-bad-blue.json", `{"gameId": "test-game", "blue": "missing", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+
+	_, err := loadAnalyzeTraceFiles(traceDir)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `blue "missing" not found`)
 }
 
 func TestResolveAnalyzeGameInfersSingleGame(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
 	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{
-  "gameId": "spring2020",
+  "gameId": "test-game",
   "seed": "1",
   "blue": "us",
   "players": ["us", "rival"],
@@ -52,13 +82,13 @@ func TestResolveAnalyzeGameInfersSingleGame(t *testing.T) {
 
 	got, err := resolveAnalyzeGame("", files)
 	require.NoError(t, err)
-	assert.Equal(t, "spring2020", got)
+	assert.Equal(t, "test-game", got)
 }
 
 func TestResolveAnalyzeGameRequiresExplicitGameForMixedTraces(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
-	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{"gameId": "spring2020", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
-	writeAnalyzeTestFile(t, traceDir, "trace-2-0.json", `{"gameId": "winter2026", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{"gameId": "test-game-a", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+	writeAnalyzeTestFile(t, traceDir, "trace-2-0.json", `{"gameId": "test-game-b", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
 
 	files, err := loadAnalyzeTraceFiles(traceDir)
 	require.NoError(t, err)
@@ -67,9 +97,9 @@ func TestResolveAnalyzeGameRequiresExplicitGameForMixedTraces(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "multiple games")
 
-	got, err := resolveAnalyzeGame("winter2026", files)
+	got, err := resolveAnalyzeGame("test-game-b", files)
 	require.NoError(t, err)
-	assert.Equal(t, "winter2026", got)
+	assert.Equal(t, "test-game-b", got)
 }
 
 func TestAnalyzeUsesGameFlagToFilterTraceFiles(t *testing.T) {
@@ -89,6 +119,35 @@ func TestAnalyzeUsesGameFlagToFilterTraceFiles(t *testing.T) {
 
 	assert.Equal(t, []string{"trace-a.json"}, factory.files)
 	assert.Contains(t, out.String(), gameA+" — 1 traces")
+}
+
+func TestBuildTraceAnalysisInputFiltersSelectedGame(t *testing.T) {
+	traceDir := makeAnalyzeTestDir(t)
+	gameA := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_a"
+	gameB := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_b"
+	writeAnalyzeTestFile(t, traceDir, "trace-a.json", fmt.Sprintf(`{"type": "trace-a", "gameId": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameA))
+	writeAnalyzeTestFile(t, traceDir, "trace-b.json", fmt.Sprintf(`{"type": "trace-b", "gameId": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameB))
+	factory := &recordingAnalyzeFactory{name: gameB}
+	arena.Register(factory)
+
+	input, analyzer, err := buildTraceAnalysisInput(traceDir, gameB)
+
+	require.NoError(t, err)
+	require.NotNil(t, analyzer)
+	assert.Equal(t, gameB, input.GameID)
+	require.Len(t, input.Files, 1)
+	assert.Equal(t, "trace-b.json", input.Files[0].Name)
+	assert.Equal(t, traceDir, input.TraceDir)
+}
+
+func TestBuildTraceAnalysisInputRejectsUnknownGame(t *testing.T) {
+	traceDir := makeAnalyzeTestDir(t)
+	writeAnalyzeTestFile(t, traceDir, "trace.json", `{"gameId": "missing-game", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+
+	_, _, err := buildTraceAnalysisInput(traceDir, "missing-game")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `unknown game "missing-game"`)
 }
 
 func makeAnalyzeTestDir(t *testing.T) string {

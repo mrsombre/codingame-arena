@@ -177,11 +177,11 @@ type traceAnalysisReport struct {
 	redScoreSum   float64
 	decidedMargin float64
 
-	timingMatches    int
-	blueFirstResp    float64
-	redFirstResp     float64
-	blueTurnResp     float64
-	redTurnResp      float64
+	timingMatches int
+	blueFirstResp float64
+	redFirstResp  float64
+	blueTurnResp  float64
+	redTurnResp   float64
 
 	endReasonSpecs []TraceAnalysisEndReasonSpec
 
@@ -329,12 +329,9 @@ func (r *traceAnalysisReport) writeOutcome(w io.Writer) error {
 	if _, err := fmt.Fprintln(w, "OUTCOME"); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "  Decided  %5.1f%%   Draws  %5.1f%%\n",
-		percent(r.decided, r.files), percent(r.draws, r.files)); err != nil {
-		return err
-	}
 	if r.files > 0 {
-		if _, err := fmt.Fprintf(w, "  Blue     W %5.1f%%   L %5.1f%%   D %5.1f%%\n",
+		if _, err := fmt.Fprintf(w, "  %-8s Wins: %2.0f%% / Loses: %2.0f%% / Draws: %2.0f%%\n",
+			"Blue",
 			percent(r.blueWins, r.files),
 			percent(r.blueLosses, r.files),
 			percent(r.files-r.blueWins-r.blueLosses, r.files)); err != nil {
@@ -366,9 +363,6 @@ func (r *traceAnalysisReport) writeMatchStats(w io.Writer) error {
 	if r.files > 0 {
 		line := fmt.Sprintf("  Scores   blue %.1f   red %.1f",
 			r.blueScoreSum/float64(r.files), r.redScoreSum/float64(r.files))
-		if r.decided > 0 {
-			line += fmt.Sprintf("   margin %.1f", r.decidedMargin/float64(r.decided))
-		}
 		if _, err := fmt.Fprintln(w, line); err != nil {
 			return err
 		}
@@ -409,7 +403,7 @@ func (r *traceAnalysisReport) writeEndReasons(w io.Writer) error {
 		}
 		line := fmt.Sprintf("  %-14s %5.1f%%", row.label(), percent(row.count, r.files))
 		if row.count > 0 && row.spec.ShowBlue && r.files > 0 {
-			line += fmt.Sprintf("  (blue %.1f%%)", percent(row.blueCount, r.files))
+			line += fmt.Sprintf("  (blue %.1f%%)", percent(row.blueCount, row.count))
 		}
 		if _, err := fmt.Fprintln(w, line); err != nil {
 			return err
@@ -516,7 +510,7 @@ func (r *traceAnalysisReport) writeMetricComparison(w io.Writer, title string,
 			continue
 		}
 		wrote = true
-		if _, err := fmt.Fprintf(w, "  %-10s %s %s   %s %s   (%s)\n",
+		if _, err := fmt.Fprintf(w, "  %-11s %-6s %s   %-5s %s   (%s)\n",
 			spec.Label,
 			aLabel, formatTraceMetricValue(spec.Kind, av.value),
 			bLabel, formatTraceMetricValue(spec.Kind, bv.value),
@@ -548,11 +542,11 @@ func averageTraceMetric(agg traceAnalysisMetricAggregate) traceAnalysisMetricAve
 func formatTraceMetricValue(kind TraceMetricKind, value float64) string {
 	switch kind {
 	case TraceMetricPerMatchCount:
-		return fmt.Sprintf("%5.2f/match", value)
+		return fmt.Sprintf("%6.2f/m", value)
 	case TraceMetricPerTurnRate:
-		return fmt.Sprintf("%5.1f%%", value)
+		return fmt.Sprintf("%7.1f%%", value)
 	default:
-		return fmt.Sprintf("%5.1f", value)
+		return fmt.Sprintf("%8.1f", value)
 	}
 }
 

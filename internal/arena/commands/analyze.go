@@ -26,39 +26,56 @@ func Analyze(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.Fla
 		return err
 	}
 
-	files, err := loadAnalyzeTraceFiles(opts.TraceDir)
-	if err != nil {
-		return err
-	}
-	if len(files) == 0 {
-		return fmt.Errorf("no arena trace JSON files found in %s", opts.TraceDir)
-	}
-
-	gameID, err := resolveAnalyzeGame(v.GetString("game"), files)
+	input, metricAnalyzer, err := buildTraceAnalysisInput(opts.TraceDir, v.GetString("game"))
 	if err != nil {
 		return err
 	}
 
-	gameFiles := filterTraceFilesByGame(files, gameID)
-	if len(gameFiles) == 0 {
-		return fmt.Errorf("no %s trace JSON files found in %s", gameID, opts.TraceDir)
-	}
-
-	factory := arena.GetFactory(gameID)
-	if factory == nil {
-		return fmt.Errorf("unknown game %q", gameID)
-	}
-	metricAnalyzer, _ := factory.(arena.TraceMetricAnalyzer)
-
-	report, err := arena.AnalyzeTraceFiles(arena.TraceAnalysisInput{
-		TraceDir: opts.TraceDir,
-		Files:    gameFiles,
-		GameID:   gameID,
-	}, metricAnalyzer)
+	report, err := arena.AnalyzeTraceFiles(input, metricAnalyzer)
 	if err != nil {
 		return err
 	}
 	return report.Write(stdout)
+}
+
+func buildTraceAnalysisInput(traceDir, configuredGame string) (arena.TraceAnalysisInput, arena.TraceMetricAnalyzer, error) {
+	files, err := loadAnalyzeTraceFiles(traceDir)
+	if err != nil {
+		return arena.TraceAnalysisInput{}, nil, err
+	}
+	if len(files) == 0 {
+		return arena.TraceAnalysisInput{}, nil, fmt.Errorf("no arena trace JSON files found in %s", traceDir)
+	}
+
+	gameID, err := resolveAnalyzeGame(configuredGame, files)
+	if err != nil {
+		return arena.TraceAnalysisInput{}, nil, err
+	}
+
+	gameFiles := filterTraceFilesByGame(files, gameID)
+	if len(gameFiles) == 0 {
+		return arena.TraceAnalysisInput{}, nil, fmt.Errorf("no %s trace JSON files found in %s", gameID, traceDir)
+	}
+
+	metricAnalyzer, err := resolveTraceMetricAnalyzer(gameID)
+	if err != nil {
+		return arena.TraceAnalysisInput{}, nil, err
+	}
+
+	return arena.TraceAnalysisInput{
+		TraceDir: traceDir,
+		Files:    gameFiles,
+		GameID:   gameID,
+	}, metricAnalyzer, nil
+}
+
+func resolveTraceMetricAnalyzer(gameID string) (arena.TraceMetricAnalyzer, error) {
+	factory := arena.GetFactory(gameID)
+	if factory == nil {
+		return nil, fmt.Errorf("unknown game %q", gameID)
+	}
+	metricAnalyzer, _ := factory.(arena.TraceMetricAnalyzer)
+	return metricAnalyzer, nil
 }
 
 func loadAnalyzeTraceFiles(traceDir string) ([]arena.TraceFile, error) {
@@ -77,24 +94,15 @@ func loadAnalyzeTraceFiles(traceDir string) ([]arena.TraceFile, error) {
 			continue
 		}
 
-		path := filepath.Join(traceDir, entry.Name())
-		data, err := os.ReadFile(path)
+		trace, err := readAnalyzeTraceFile(filepath.Join(traceDir, entry.Name()))
 		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", path, err)
-		}
-
-		var trace arena.TraceMatch
-		if err := json.Unmarshal(data, &trace); err != nil {
-			return nil, fmt.Errorf("parse %s: %w", path, err)
+			return nil, err
 		}
 		if !looksLikeArenaTrace(trace) {
 			continue
 		}
-		if trace.Blue == "" {
-			return nil, fmt.Errorf("%s: trace missing blue (re-run or re-convert; analyze requires every trace to identify the user side)", entry.Name())
-		}
-		if trace.BlueSide() == -1 {
-			return nil, fmt.Errorf("%s: blue %q not found in players %v", entry.Name(), trace.Blue, trace.Players)
+		if err := validateAnalyzeTrace(entry.Name(), trace); err != nil {
+			return nil, err
 		}
 
 		files = append(files, arena.TraceFile{
@@ -106,8 +114,31 @@ func loadAnalyzeTraceFiles(traceDir string) ([]arena.TraceFile, error) {
 	return files, nil
 }
 
+func readAnalyzeTraceFile(path string) (arena.TraceMatch, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return arena.TraceMatch{}, fmt.Errorf("read %s: %w", path, err)
+	}
+
+	var trace arena.TraceMatch
+	if err := json.Unmarshal(data, &trace); err != nil {
+		return arena.TraceMatch{}, fmt.Errorf("parse %s: %w", path, err)
+	}
+	return trace, nil
+}
+
 func looksLikeArenaTrace(trace arena.TraceMatch) bool {
 	return trace.GameID != "" || len(trace.Turns) > 0
+}
+
+func validateAnalyzeTrace(name string, trace arena.TraceMatch) error {
+	if trace.Blue == "" {
+		return fmt.Errorf("%s: trace missing blue (re-run or re-convert; analyze requires every trace to identify the user side)", name)
+	}
+	if trace.BlueSide() == -1 {
+		return fmt.Errorf("%s: blue %q not found in players %v", name, trace.Blue, trace.Players)
+	}
+	return nil
 }
 
 func resolveAnalyzeGame(configured string, files []arena.TraceFile) (string, error) {

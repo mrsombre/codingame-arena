@@ -79,12 +79,11 @@ func TestAnalysisReportSummarizesGenericMatchStats(t *testing.T) {
 
 	assert.Contains(t, text, "test — 4 traces — ./traces")
 	assert.Contains(t, text, "OUTCOME")
-	assert.Contains(t, text, "Decided   75.0%   Draws   25.0%")
-	assert.Contains(t, text, "Blue     W  50.0%   L  25.0%   D  25.0%")
+	assert.Contains(t, text, "Blue     Wins: 50% / Loses: 25% / Draws: 25%")
 	assert.NotContains(t, text, "Side wins")
 	assert.Contains(t, text, "MATCH")
 	assert.Contains(t, text, "Turns    avg 1.5   min 0   max 3")
-	assert.Contains(t, text, "Scores   blue 5.5   red 4.0   margin 6.7")
+	assert.Contains(t, text, "Scores   blue 5.5   red 4.0")
 	assert.Contains(t, text, "Timing   first  blue 100ms / red 200ms")
 	assert.Contains(t, text, "turn   blue 10ms / red 20ms")
 }
@@ -114,7 +113,7 @@ func TestAnalysisReportEndReasonsAttributeBlueFault(t *testing.T) {
 
 	assert.Contains(t, text, "END REASONS")
 	assert.Contains(t, text, "SCORE")
-	assert.Contains(t, text, "TIMEOUT         33.3%  (blue 33.3%)")
+	assert.Contains(t, text, "TIMEOUT         33.3%  (blue 100.0%)")
 	assert.Contains(t, text, "INVALID         33.3%  (blue 0.0%)")
 	assert.Contains(t, text, "TIMEOUT_START    0.0%")
 }
@@ -154,20 +153,20 @@ func TestAnalysisReportAggregatesMetricKinds(t *testing.T) {
 	text := runTestAnalysis(t, files, analyzer)
 
 	assert.Contains(t, text, "METRICS — winner vs loser")
-	assert.Contains(t, text, "DIED       winner  1.50/match   loser  3.50/match   (loser 2.33x winner)")
-	assert.Contains(t, text, "NO_EAT     winner  12.5%   loser  75.0%   (loser 6.00x winner)")
+	assert.Contains(t, text, "DIED        winner   1.50/m   loser   3.50/m   (loser 2.33x winner)")
+	assert.Contains(t, text, "NO_EAT      winner    12.5%   loser    75.0%   (loser 6.00x winner)")
 	assert.Contains(t, text, "METRICS — blue vs red")
-	assert.Contains(t, text, "DIED       blue  2.50/match   red  2.50/match   (equal)")
-	assert.Contains(t, text, "NO_EAT     blue  62.5%   red  25.0%   (blue 2.50x red)")
+	assert.Contains(t, text, "DIED        blue     2.50/m   red     2.50/m   (equal)")
+	assert.Contains(t, text, "NO_EAT      blue      62.5%   red      25.0%   (blue 2.50x red)")
 	assert.Contains(t, text, "METRICS — blue wins vs blue losses")
-	assert.Contains(t, text, "DIED       won  1.00/match   lost  4.00/match   (lost 4.00x won)")
-	assert.Contains(t, text, "NO_EAT     won  25.0%   lost 100.0%   (lost 4.00x won)")
+	assert.Contains(t, text, "DIED        won      1.00/m   lost    4.00/m   (lost 4.00x won)")
+	assert.Contains(t, text, "NO_EAT      won       25.0%   lost    100.0%   (lost 4.00x won)")
 }
 
 func TestAnalysisReportRejectsPerTurnMetricAboveTurnCount(t *testing.T) {
 	files := []TraceFile{{Name: "trace.json", Trace: TraceMatch{
-		Type:  "bad",
-		Blue:  "us", Players: [2]string{"us", "rival"},
+		Type: "bad",
+		Blue: "us", Players: [2]string{"us", "rival"},
 		Turns: testTurns(2),
 	}}}
 	analyzer := testMetricAnalyzer{
@@ -184,8 +183,8 @@ func TestAnalysisReportRejectsPerTurnMetricAboveTurnCount(t *testing.T) {
 
 func TestAnalysisReportSkipsPerTurnMetricsForZeroTurnMatches(t *testing.T) {
 	files := []TraceFile{{Trace: TraceMatch{
-		Type:   "zero",
-		Blue:   "us", Players: [2]string{"us", "rival"},
+		Type: "zero",
+		Blue: "us", Players: [2]string{"us", "rival"},
 		Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1},
 	}}}
 	analyzer := testMetricAnalyzer{
