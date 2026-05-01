@@ -276,7 +276,11 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		0,
 	)
 
-	if err := verifyReplayTrace(trace, finalScores, replay); err != nil {
+	emitsPostEndFrame := false
+	if e, ok := factory.(arena.PostEndFrameEmitter); ok {
+		emitsPostEndFrame = e.EmitsPostEndFrame()
+	}
+	if err := verifyReplayTrace(trace, finalScores, replay, emitsPostEndFrame); err != nil {
 		return arena.TraceMatch{}, league, err
 	}
 
@@ -289,7 +293,10 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 // trace.Scores cannot be used for this comparison: it stores the raw pre-OnEnd
 // score, which diverges whenever OnEnd touches it (e.g. ties trigger a losses
 // subtraction, deactivated players become -1).
-func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame]) error {
+//
+// emitsPostEndFrame selects the trace-turn counting strategy: see
+// arena.ReplayTraceTurnCount for what it means.
+func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], emitsPostEndFrame bool) error {
 	if len(replay.GameResult.Scores) < 2 {
 		return fmt.Errorf("replay scores must contain two entries")
 	}
@@ -299,7 +306,7 @@ func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.
 			replay.GameResult.Scores[0], replay.GameResult.Scores[1], finalScores[0], finalScores[1])
 	}
 
-	expectedTurns := arena.ReplayTraceTurnCount(replay)
+	expectedTurns := arena.ReplayTraceTurnCount(replay, emitsPostEndFrame)
 	if len(trace.Turns) != expectedTurns {
 		return fmt.Errorf("%w: turn mismatch: replay=%d engine=%d", errReplayMismatch, expectedTurns, len(trace.Turns))
 	}

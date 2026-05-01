@@ -170,6 +170,15 @@ func (r *Referee) ShouldSkipPlayerTurn(player arena.Player) bool {
 	return false
 }
 
+// InGameOverFrame implements arena.GameOverFrameReporter. Once a main turn
+// detects IsGameOver, the next gameTurn runs the post-game branch that
+// performs PerformGameOver and ends the match. The runner uses this signal
+// to skip player polling on that final iteration so exhausted replay bots
+// aren't erroneously timed out.
+func (r *Referee) InGameOverFrame() bool {
+	return r.GameOverFrame
+}
+
 func (r *Referee) ActivePlayers(players []arena.Player) int {
 	active := 0
 	for _, player := range players {

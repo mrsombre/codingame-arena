@@ -91,8 +91,14 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		// game-over frame: skip subprocess polling and command parsing and
 		// just drive the game forward. Mirrors Java's gameTurn else-branch,
 		// where the referee runs only resetGameTurnData / performGameUpdate /
-		// performGameOver / endGame on the trailing frame.
+		// performGameOver / endGame on the trailing frame. The same applies
+		// when the engine has flagged its post-end frame explicitly (Spring
+		// 2020's gameOverFrame branch) — both sides may still be active but
+		// the outcome is decided.
 		liveTurn := referee.ActivePlayers(players) >= 2
+		if reporter, ok := referee.(GameOverFrameReporter); ok && reporter.InGameOverFrame() {
+			liveTurn = false
+		}
 
 		wasDeactivated := [2]bool{players[0].IsDeactivated(), players[1].IsDeactivated()}
 		playerOutputs := [2]string{}

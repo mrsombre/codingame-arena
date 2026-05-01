@@ -84,13 +84,17 @@ func RunReplay(
 	for ; !referee.Ended() && turn < maxTurns; turn++ {
 		referee.ResetGameTurnData()
 
-		// When fewer than two players are active, the engine is running its
-		// game-over frame: don't poll players for outputs and don't re-parse
-		// their commands (the surviving side has likely exhausted its replay
-		// move list, and parsing an empty line would deactivate it and skip
-		// PerformGameOver's remaining-pellets transfer). Mirror Java's
-		// gameTurn else-branch, which only drives the game forward.
+		// Skip polling and command parsing when the iteration is a no-input
+		// drain step: either fewer than two players are active (a side just
+		// got deactivated and the engine is wrapping up) or the engine has
+		// flagged its game-over frame (Spring 2020's post-end gameTurn that
+		// runs PerformGameOver and ends the match). In both cases the
+		// outcome is decided; re-polling would deactivate exhausted replay
+		// bots on a Timeout that doesn't exist in the recorded match.
 		liveTurn := referee.ActivePlayers(players) >= 2
+		if reporter, ok := referee.(GameOverFrameReporter); ok && reporter.InGameOverFrame() {
+			liveTurn = false
+		}
 
 		playerOutputs := [2]string{}
 		var turnInput []string
@@ -137,14 +141,6 @@ func RunReplay(
 			tt.Traces = ttp.TurnTraces(turn, players)
 		}
 		traceTurns = append(traceTurns, tt)
-
-		// CG's MultiplayerGameManager auto-ends the match when fewer than
-		// two players are active. Without this the surviving side keeps
-		// drifting on inertial Facing() moves until apples run out or a
-		// wall takes them, producing scores that don't match the replay.
-		if !referee.Ended() && referee.ActivePlayers(players) < 2 {
-			referee.EndGame()
-		}
 	}
 
 	if !referee.Ended() {

@@ -28,6 +28,12 @@ func (f *Factory) PuzzleTitle() string { return "Spring Challenge 2020" }
 
 func (f *Factory) MaxTurns() int { return MaxTurns }
 
+// EmitsPostEndFrame implements arena.PostEndFrameEmitter. Spring 2020's
+// referee emits a separate trace turn for its post-game-over frame
+// (mirroring Java's gameOverFrame branch), so replay verification must
+// always count the CG replay's trailing empty stdout as that frame.
+func (f *Factory) EmitsPostEndFrame() bool { return true }
+
 func (f *Factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []arena.Player) {
 	game := NewGame(seed, f.ResolveLeague(options))
 	players := []arena.Player{NewPlayer(0), NewPlayer(1)}

@@ -483,6 +483,14 @@ func (g *Game) IsGameOver() bool {
 	noApples := len(g.Grid.Apples) == 0
 	playerDead := false
 	for _, p := range g.Players {
+		// Mirrors Java's MultiplayerGameManager.abort() check on
+		// activePlayers<2: a deactivated player ends the match on the same
+		// turn. Without this the surviving snake would drift on inertial
+		// Facing() moves before any other end condition triggered.
+		if p.IsDeactivated() {
+			playerDead = true
+			break
+		}
 		hasLiveBird := false
 		for _, b := range p.Birds {
 			if b.Alive {
