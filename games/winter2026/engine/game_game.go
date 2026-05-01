@@ -208,8 +208,13 @@ private void doBeheadings() {
 }
 */
 
+type beheadCandidate struct {
+	bird  *Bird
+	cause string
+}
+
 func (g *Game) DoBeheadings() {
-	birdsToBehead := make([]*Bird, 0)
+	candidates := make([]beheadCandidate, 0)
 	for _, bird := range g.LiveBirds() {
 		isInWall := g.Grid.Get(bird.HeadPos()).IsWall()
 		intersectingBirds := make([]*Bird, 0)
@@ -228,29 +233,43 @@ func (g *Game) DoBeheadings() {
 			}
 		}
 
+		head := bird.HeadPos()
 		if isInWall {
-			g.trace(TraceHitWall, traceBirdCoordPayload(bird.ID, bird.HeadPos()))
+			g.trace(arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
 		}
 		if isInEnemy {
-			g.trace(TraceHitEnemy, traceBirdCoordPayload(bird.ID, bird.HeadPos()))
+			g.trace(arena.MakeTurnTrace(TraceHitEnemy, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
 		}
 		if isInSelf {
-			g.trace(TraceHitSelf, traceBirdCoordPayload(bird.ID, bird.HeadPos()))
+			g.trace(arena.MakeTurnTrace(TraceHitSelf, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
 		}
 
-		if isInWall || isInEnemy || isInSelf {
-			birdsToBehead = append(birdsToBehead, bird)
+		// Single-cause attribution by priority: WALL outranks the body
+		// intersections (which themselves can co-occur, with ENEMY winning
+		// over SELF). Picking one cause keeps DEAD_* metrics honest sums of
+		// distinct deaths instead of double-counting bird losses.
+		cause := ""
+		switch {
+		case isInWall:
+			cause = DeathCauseWall
+		case isInEnemy:
+			cause = DeathCauseEnemy
+		case isInSelf:
+			cause = DeathCauseSelf
+		}
+		if cause != "" {
+			candidates = append(candidates, beheadCandidate{bird: bird, cause: cause})
 		}
 	}
 
-	for _, b := range birdsToBehead {
-		if len(b.Body) <= 3 {
-			b.Alive = false
-			g.Losses[b.Owner.GetIndex()] += len(b.Body)
-			g.trace(TraceDead, traceBirdPayload(b.ID))
+	for _, c := range candidates {
+		if len(c.bird.Body) <= 3 {
+			c.bird.Alive = false
+			g.Losses[c.bird.Owner.GetIndex()] += len(c.bird.Body)
+			g.trace(arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: c.bird.ID, Cause: c.cause}))
 		} else {
-			b.Body = b.Body[1:]
-			g.Losses[b.Owner.GetIndex()]++
+			c.bird.Body = c.bird.Body[1:]
+			g.Losses[c.bird.Owner.GetIndex()]++
 		}
 	}
 }
@@ -276,7 +295,7 @@ func (g *Game) DoEats() {
 	for _, p := range g.Players {
 		for _, bird := range p.Birds {
 			if bird.Alive && coordSliceContains(g.Grid.Apples, bird.HeadPos()) {
-				g.trace(TraceEat, traceBirdCoordPayload(bird.ID, bird.HeadPos()))
+				g.trace(arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(bird.HeadPos())}))
 				eaten[bird.HeadPos()] = struct{}{}
 			}
 		}
@@ -414,7 +433,7 @@ func (g *Game) DoFalls() {
 			if allOut {
 				bird.Alive = false
 				outOfBounds = append(outOfBounds, bird)
-				g.trace(TraceFall, traceBirdPayload(bird.ID))
+				g.trace(arena.MakeTurnTrace(TraceDeadFall, BirdSegmentsMeta{Bird: bird.ID, Segments: len(bird.Body)}))
 			}
 		}
 		for _, bird := range outOfBounds {
@@ -464,6 +483,14 @@ func (g *Game) IsGameOver() bool {
 	noApples := len(g.Grid.Apples) == 0
 	playerDead := false
 	for _, p := range g.Players {
+		// Mirrors Java's MultiplayerGameManager.abort() check on
+		// activePlayers<2: a deactivated player ends the match on the same
+		// turn. Without this the surviving snake would drift on inertial
+		// Facing() moves before any other end condition triggered.
+		if p.IsDeactivated() {
+			playerDead = true
+			break
+		}
 		hasLiveBird := false
 		for _, b := range p.Birds {
 			if b.Alive {

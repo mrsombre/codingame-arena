@@ -11,8 +11,8 @@ import (
 // Each string is one turn's complete output (typically a single line with
 // semicolon-separated commands). Strings are 0-indexed by turn.
 type ReplayMoves struct {
-	P0 []string
-	P1 []string
+	Left  []string
+	Right []string
 }
 
 // RunReplay re-simulates a match by feeding pre-recorded player outputs into
@@ -48,7 +48,7 @@ func RunReplay(
 		maxTurns = factory.MaxTurns()
 	}
 
-	moveLists := [2][]string{moves.P0, moves.P1}
+	moveLists := [2][]string{moves.Left, moves.Right}
 	turnCounts := [2]int{0, 0}
 	for i, player := range players {
 		idx := i
@@ -84,13 +84,17 @@ func RunReplay(
 	for ; !referee.Ended() && turn < maxTurns; turn++ {
 		referee.ResetGameTurnData()
 
-		// When fewer than two players are active, the engine is running its
-		// game-over frame: don't poll players for outputs and don't re-parse
-		// their commands (the surviving side has likely exhausted its replay
-		// move list, and parsing an empty line would deactivate it and skip
-		// PerformGameOver's remaining-pellets transfer). Mirror Java's
-		// gameTurn else-branch, which only drives the game forward.
+		// Skip polling and command parsing when the iteration is a no-input
+		// drain step: either fewer than two players are active (a side just
+		// got deactivated and the engine is wrapping up) or the engine has
+		// flagged its game-over frame (Spring 2020's post-end gameTurn that
+		// runs PerformGameOver and ends the match). In both cases the
+		// outcome is decided; re-polling would deactivate exhausted replay
+		// bots on a Timeout that doesn't exist in the recorded match.
 		liveTurn := referee.ActivePlayers(players) >= 2
+		if reporter, ok := referee.(GameOverFrameReporter); ok && reporter.InGameOverFrame() {
+			liveTurn = false
+		}
 
 		playerOutputs := [2]string{}
 		var turnInput []string
@@ -137,14 +141,6 @@ func RunReplay(
 			tt.Traces = ttp.TurnTraces(turn, players)
 		}
 		traceTurns = append(traceTurns, tt)
-
-		// CG's MultiplayerGameManager auto-ends the match when fewer than
-		// two players are active. Without this the surviving side keeps
-		// drifting on inertial Facing() moves until apples run out or a
-		// wall takes them, producing scores that don't match the replay.
-		if !referee.Ended() && referee.ActivePlayers(players) < 2 {
-			referee.EndGame()
-		}
 	}
 
 	if !referee.Ended() {
@@ -162,44 +158,28 @@ func RunReplay(
 
 	finalScores := [2]int{players[0].GetScore(), players[1].GetScore()}
 	scores := finalScores
-	winner := -1
 	if haveRawScores {
 		scores = rawScores
 	}
-	switch {
-	case scores[0] > scores[1]:
-		winner = 0
-	case scores[1] > scores[0]:
-		winner = 1
-	}
-
-	var traceSummary *TraceSummary
-	if tsp, ok := referee.(TraceSummaryProvider); ok {
-		s := tsp.TraceSummary()
-		if !s.IsEmpty() {
-			traceSummary = &s
-		}
-	}
+	deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
+	winner := TraceWinnerFromScores(scores, deactivated)
 
 	var endReason string
 	if erp, ok := referee.(EndReasonProvider); ok {
 		endReason = erp.EndReason(turn, players, deactivationTurns)
 	}
 
-	deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
-
 	return TraceMatch{
-		MatchID:      0,
-		GameID:       factory.Name(),
-		PuzzleID:     factory.PuzzleID(),
-		Seed:         seed,
-		EndReason:    endReason,
-		Deactivated:  deactivated,
-		Scores:       [2]TraceScore{TraceScore(scores[0]), TraceScore(scores[1])},
-		Ranks:        RanksFromWinner(winner),
-		Players:      [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
-		Timing:       &TraceTiming{},
-		TraceSummary: traceSummary,
-		Turns:        traceTurns,
+		MatchID:     0,
+		GameID:      factory.Name(),
+		PuzzleID:    factory.PuzzleID(),
+		Seed:        seed,
+		EndReason:   endReason,
+		Deactivated: deactivated,
+		Scores:      [2]TraceScore{TraceScore(scores[0]), TraceScore(scores[1])},
+		Ranks:       RanksFromWinner(winner),
+		Players:     [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
+		Timing:      &TraceTiming{},
+		Turns:       traceTurns,
 	}, finalScores
 }

@@ -23,13 +23,11 @@ type Referee struct {
 	CommandManager *CommandManager
 	GameOverFrame  bool
 	MainTurns      int
-	summaryByPac   [2]map[string][][]int
 }
 
 func NewReferee(game *Game) *Referee {
 	r := &Referee{
-		Game:         game,
-		summaryByPac: [2]map[string][][]int{{}, {}},
+		Game: game,
 	}
 	r.CommandManager = NewCommandManager(&game.Summary, game)
 	return r
@@ -126,7 +124,6 @@ func (r *Referee) PerformGameUpdate(turn int) {
 	if r.GameOverFrame {
 		r.Game.ResetGameTurnData()
 		r.Game.PerformGameUpdate()
-		r.recordTraceSummary(turn)
 		r.Game.PerformGameOver()
 		r.Game.EndGame()
 		return
@@ -134,48 +131,10 @@ func (r *Referee) PerformGameUpdate(turn int) {
 
 	r.MainTurns++
 	r.Game.PerformGameUpdate()
-	r.recordTraceSummary(turn)
 
 	if r.Game.IsGameOver() || r.MainTurns >= MaxMainTurns {
 		r.GameOverFrame = true
 	}
-}
-
-// recordTraceSummary appends each trace fired this turn into the per-pac
-// summary, keyed by the pac listed first in the payload (the event subject).
-func (r *Referee) recordTraceSummary(turn int) {
-	for _, tr := range r.Game.traces {
-		pacID, ok := parseLeadingPacID(tr.Payload)
-		if !ok {
-			continue
-		}
-		pac := r.findPacByID(pacID)
-		if pac == nil {
-			continue
-		}
-		idx := pac.Owner.GetIndex()
-		if idx < 0 || idx >= 2 {
-			continue
-		}
-		m := r.summaryByPac[idx]
-		list := m[tr.Label]
-		for len(list) <= pac.Number {
-			list = append(list, nil)
-		}
-		list[pac.Number] = append(list[pac.Number], turn)
-		m[tr.Label] = list
-	}
-}
-
-func (r *Referee) findPacByID(id int) *Pacman {
-	for _, p := range r.Game.Players {
-		for _, pac := range p.Pacmen {
-			if pac.ID == id {
-				return pac
-			}
-		}
-	}
-	return nil
 }
 
 func (r *Referee) ResetGameTurnData() {
@@ -211,6 +170,15 @@ func (r *Referee) ShouldSkipPlayerTurn(player arena.Player) bool {
 	return false
 }
 
+// InGameOverFrame implements arena.GameOverFrameReporter. Once a main turn
+// detects IsGameOver, the next gameTurn runs the post-game branch that
+// performs PerformGameOver and ends the match. The runner uses this signal
+// to skip player polling on that final iteration so exhausted replay bots
+// aren't erroneously timed out.
+func (r *Referee) InGameOverFrame() bool {
+	return r.GameOverFrame
+}
+
 func (r *Referee) ActivePlayers(players []arena.Player) int {
 	active := 0
 	for _, player := range players {
@@ -221,10 +189,9 @@ func (r *Referee) ActivePlayers(players []arena.Player) int {
 	return active
 }
 
-// TurnTraces, TraceSummary, RawScores, and Metrics have no Java counterpart —
-// they wire optional arena interfaces for per-turn structured traces,
-// per-match aggregate trace counts, pre-adjustment scores, and per-match
-// metrics.
+// TurnTraces, RawScores, and Metrics have no Java counterpart — they wire
+// optional arena interfaces for per-turn opaque traces, pre-adjustment scores,
+// and per-match metrics.
 
 // TurnTraces returns a copy of this turn's accumulated game traces.
 func (r *Referee) TurnTraces(_ int, _ []arena.Player) []arena.TurnTrace {
@@ -233,16 +200,6 @@ func (r *Referee) TurnTraces(_ int, _ []arena.Player) []arena.TurnTrace {
 	}
 	out := make([]arena.TurnTrace, len(r.Game.traces))
 	copy(out, r.Game.traces)
-	return out
-}
-
-// TraceSummary returns the per-side aggregate of trace events seen so far,
-// keyed by label and pac number within each player.
-func (r *Referee) TraceSummary() arena.TraceSummary {
-	var out arena.TraceSummary
-	for i := 0; i < 2; i++ {
-		out[i] = r.summaryByPac[i]
-	}
 	return out
 }
 

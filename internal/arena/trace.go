@@ -35,19 +35,21 @@ func (s TraceScore) MarshalJSON() ([]byte, error) {
 // intentionally not recorded — the bot→side mapping here is ground truth for
 // downstream trace consumers (e.g. training).
 //
-// Blue is the bot/agent name analyze treats as "us": for self-play traces
-// it's the basename of the user's --p0 binary; for converted replays it's
-// copied from the saved replay's blue field. Analyzers locate our side by
-// scanning Players[i] == Blue (so swap-on-run still resolves correctly).
+// Blue is the bot/agent name analyze treats as "us". It is required on every
+// trace: self-play sets it to the basename of --blue (which always equals one
+// of Players); convert sets it to the saved replay's blue field (which is
+// the username supplied to `replay get` / `replay leaderboard`). Analyzers
+// locate our side by scanning Players[i] == Blue (so seed-driven side swaps
+// still resolve correctly).
 type TraceMatch struct {
-	TraceID   int64  `json:"trace_id,omitempty"`
-	MatchID   int    `json:"match_id"`
-	Type      string `json:"type,omitempty"`
-	GameID    string `json:"gameId,omitempty"`
-	PuzzleID  int    `json:"puzzleId,omitempty"`
-	Seed      int64  `json:"seed,string"`
-	Blue      string `json:"blue,omitempty"`
-	League    int    `json:"league,omitempty"`
+	TraceID  int64  `json:"trace_id,omitempty"`
+	MatchID  int    `json:"match_id"`
+	Type     string `json:"type,omitempty"`
+	GameID   string `json:"gameId,omitempty"`
+	PuzzleID int    `json:"puzzleId,omitempty"`
+	Seed     int64  `json:"seed,string"`
+	Blue     string `json:"blue,omitempty"`
+	League   int    `json:"league,omitempty"`
 	// CreatedAt is the RFC 3339 timestamp the trace was produced. For
 	// self-play traces it's stamped at match completion; for replay traces
 	// it's copied from the source replay's fetched_at so analyze can sort
@@ -60,13 +62,12 @@ type TraceMatch struct {
 	// Deactivated[i] is true when side i was deactivated (timeout / bad
 	// command) during the match. Used by analyzers to attribute fault end
 	// reasons to a specific side.
-	Deactivated  [2]bool       `json:"deactivated,omitzero"`
-	Scores       [2]TraceScore `json:"scores"`
-	Ranks        [2]int        `json:"ranks"`
-	Players      [2]string     `json:"players"`
-	Timing       *TraceTiming  `json:"timing,omitempty"`
-	TraceSummary *TraceSummary `json:"trace_summary,omitempty"`
-	Turns        []TraceTurn   `json:"turns"`
+	Deactivated [2]bool       `json:"deactivated,omitzero"`
+	Scores      [2]TraceScore `json:"scores"`
+	Ranks       [2]int        `json:"ranks"`
+	Players     [2]string     `json:"players"`
+	Timing      *TraceTiming  `json:"timing,omitempty"`
+	Turns       []TraceTurn   `json:"turns"`
 }
 
 // Shared EndReason values. Games may use these or add their own.
@@ -81,9 +82,11 @@ const (
 )
 
 // BlueSide returns the index (0 or 1) of the side identified by Blue in
-// Players, or -1 if Blue is unset or doesn't match a player. When both
-// Players entries equal Blue (e.g. self-play of identical binary names),
-// the lower index wins.
+// Players. Blue is an invariant on loaded traces — convert refuses to write
+// a trace without it and analyze refuses to load one — so callers can treat
+// the result as 0/1. When both Players entries equal Blue (e.g. self-play
+// of identical binary names), the lower index wins. Returns -1 only on
+// unloaded zero-value TraceMatch instances.
 func (t TraceMatch) BlueSide() int {
 	if t.Blue == "" {
 		return -1
@@ -110,6 +113,31 @@ func RanksFromWinner(winner int) [2]int {
 		return [2]int{1, 0}
 	default:
 		return [2]int{0, 0}
+	}
+}
+
+// TraceWinnerFromScores derives the winner shown in a trace. Deactivation
+// outranks raw scores: a deactivated side cannot win, while an active side
+// beats a deactivated opponent regardless of raw counts. When neither side is
+// deactivated (or both are), the higher score wins; equal scores → -1 (draw).
+//
+// Why deactivation takes precedence: a TIMEOUT_START/TIMEOUT/INVALID_INPUT
+// player never finishes the game, but their pre-existing pieces (e.g. winter
+// 2026 birds) keep contributing to the raw alive-segment count. Without this
+// override the trace would call a 12-vs-12 raw tie a draw even though CG
+// scores it as -1 vs 12.
+func TraceWinnerFromScores(scores [2]int, deactivated [2]bool) int {
+	switch {
+	case deactivated[0] && !deactivated[1]:
+		return 1
+	case deactivated[1] && !deactivated[0]:
+		return 0
+	case scores[0] > scores[1]:
+		return 0
+	case scores[1] > scores[0]:
+		return 1
+	default:
+		return -1
 	}
 }
 
@@ -153,9 +181,10 @@ type TraceTurnTiming struct {
 // a batch share traceID (typically the batch start timestamp); each file is
 // keyed by traceID + per-match MatchID so multiple batches can coexist.
 type TraceWriter struct {
-	mu      sync.Mutex
-	dir     string
-	traceID int64
+	mu        sync.Mutex
+	dir       string
+	traceID   int64
+	fixedName string
 }
 
 const (
@@ -172,6 +201,14 @@ func NewTraceWriter(dir string, traceID int64) *TraceWriter {
 		return nil
 	}
 	return &TraceWriter{dir: dir, traceID: traceID}
+}
+
+// NewFixedTraceWriter creates a TraceWriter that overwrites a single JSON file.
+func NewFixedTraceWriter(path string, traceID int64) *TraceWriter {
+	if path == "" {
+		return nil
+	}
+	return &TraceWriter{dir: filepath.Dir(path), traceID: traceID, fixedName: filepath.Base(path)}
 }
 
 // WriteMatch writes a single match trace as a JSON file:
@@ -191,7 +228,11 @@ func (w *TraceWriter) WriteMatch(match TraceMatch) error {
 	if match.Type == "" {
 		match.Type = TraceTypeTrace
 	}
-	path := filepath.Join(w.dir, TraceFileName(match.Type, w.traceID, match.MatchID))
+	name := TraceFileName(match.Type, w.traceID, match.MatchID)
+	if w.fixedName != "" {
+		name = w.fixedName
+	}
+	path := filepath.Join(w.dir, name)
 	data, err := json.MarshalIndent(match, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal trace: %w", err)

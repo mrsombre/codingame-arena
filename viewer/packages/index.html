@@ -5,27 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Arena Viewer</title>
   <link rel="stylesheet" href="./shared/base.css"/>
-  <script type="module">
-    (async () => {
-      const fallback = document.getElementById('fallback')
-      try {
-        const res = await fetch('/api/game')
-        if (res.ok) {
-          const info = await res.json()
-          if (info?.name) {
-            location.replace(`./${info.name}/`)
-            return
-          }
-        }
-      } catch {}
-      if (fallback) fallback.hidden = false
-    })()
-  </script>
 </head>
 <body class="min-h-screen bg-background text-foreground">
-<div class="mx-auto max-w-2xl px-6 py-12">
-  <h1 class="font-heading mb-8 text-2xl font-semibold tracking-wider uppercase">Arena Viewer</h1>
-  <p id="fallback" hidden class="text-sm text-muted-foreground">No active game configured. Start the arena server with `arena serve`.</p>
+<div class="mx-auto flex min-h-screen max-w-5xl flex-col gap-8 px-6 py-10 lg:px-10">
+  <header class="flex flex-col gap-2">
+    <p class="font-mono text-xs tracking-widest text-muted-foreground uppercase">CodinGame Arena</p>
+    <h1 class="font-heading text-3xl font-semibold tracking-wider uppercase">Arena Viewer</h1>
+  </header>
+
+  <main class="grid gap-4">
+    <a href="./winter2026/" class="group block border bg-card p-6 text-card-foreground shadow-sm ring-1 ring-foreground/5 transition-colors hover:bg-muted/60">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="flex flex-col gap-2">
+          <span class="font-mono text-xs tracking-widest text-primary uppercase">Latest game</span>
+          <h2 class="font-heading text-2xl font-semibold tracking-wider uppercase">Winter 2026</h2>
+        </div>
+        <span class="font-mono text-xs tracking-widest text-muted-foreground uppercase group-hover:text-foreground">Open</span>
+      </div>
+    </a>
+
+    <a href="./spring2020/" class="group block border bg-card p-6 text-card-foreground shadow-sm ring-1 ring-foreground/5 transition-colors hover:bg-muted/60">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="flex flex-col gap-2">
+          <span class="font-mono text-xs tracking-widest text-muted-foreground uppercase">Classic game</span>
+          <h2 class="font-heading text-2xl font-semibold tracking-wider uppercase">Spring 2020</h2>
+        </div>
+        <span class="font-mono text-xs tracking-widest text-muted-foreground uppercase group-hover:text-foreground">Open</span>
+      </div>
+    </a>
+  </main>
 </div>
 </body>
 </html>

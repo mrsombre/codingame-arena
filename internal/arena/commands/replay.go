@@ -15,6 +15,46 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena/db"
 )
 
+// replayFetcher is the minimal CodinGame client surface the download loop
+// needs. Defined here (not in the codingame package) to keep the dependency
+// arrow inward and let tests substitute a fake without spinning up HTTP.
+type replayFetcher interface {
+	FetchReplay(gameID int64) ([]byte, error)
+}
+
+type downloadOutcome int
+
+const (
+	downloadOutcomeSaved downloadOutcome = iota
+	downloadOutcomeSkippedExisting
+	downloadOutcomeFailed
+)
+
+type downloadResult struct {
+	ID      int64
+	Outcome downloadOutcome
+	Detail  string
+}
+
+type downloadSummary struct {
+	Total   int
+	Saved   int
+	Skipped int
+	Failed  int
+}
+
+// replayBatchConfig bundles the knobs the download loop needs. Built from
+// either ReplayGetOptions or ReplayLeaderboardOptions plus the per-command
+// annotations layered into every saved replay.
+type replayBatchConfig struct {
+	IDs         []int64
+	Annotations arena.ReplayAnnotations
+	OutDir      string
+	Limit       int
+	Delay       time.Duration
+	Force       bool
+}
+
 // ReplayUsage returns the help text shown for `arena replay` without a
 // recognized sub-subcommand.
 func ReplayUsage() string {
@@ -66,15 +106,21 @@ func ReplayGet(args []string, stdout io.Writer, factory arena.GameFactory, fs *p
 		return err
 	}
 
-	client := codingame.New()
-	ann := arena.ReplayAnnotations{
-		Blue:        opts.Username,
-		League:      opts.League,
-		Source:      arena.ReplaySourceGet,
-		PuzzleID:    factory.PuzzleID(),
-		PuzzleTitle: factory.PuzzleTitle(),
+	cfg := replayBatchConfig{
+		IDs:    opts.IDs,
+		OutDir: opts.OutDir,
+		Limit:  opts.Limit,
+		Delay:  opts.Delay,
+		Force:  opts.Force,
+		Annotations: arena.ReplayAnnotations{
+			Blue:        opts.Username,
+			League:      opts.League,
+			Source:      arena.ReplaySourceGet,
+			PuzzleID:    factory.PuzzleID(),
+			PuzzleTitle: factory.PuzzleTitle(),
+		},
 	}
-	return downloadReplays(client, opts.IDs, ann, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
+	return downloadReplays(codingame.New(), cfg, stdout)
 }
 
 // ReplayLeaderboard is the entry point for the "replay leaderboard"
@@ -113,72 +159,135 @@ func ReplayLeaderboard(args []string, stdout io.Writer, factory arena.GameFactor
 	}
 	_, _ = fmt.Fprintf(stdout, "battles: %d\n", len(gameIDs))
 
-	ann := arena.ReplayAnnotations{
-		Blue:   opts.Username,
-		League: opts.League,
-		Source: arena.ReplaySourceLeaderboard,
-		Leaderboard: &arena.ReplayLeaderboardInfo{
-			Rank:     info.Rank,
-			Division: info.Division,
-			Score:    info.Score,
+	cfg := replayBatchConfig{
+		IDs:    gameIDs,
+		OutDir: opts.OutDir,
+		Limit:  opts.Limit,
+		Delay:  opts.Delay,
+		Force:  opts.Force,
+		Annotations: arena.ReplayAnnotations{
+			Blue:   opts.Username,
+			League: opts.League,
+			Source: arena.ReplaySourceLeaderboard,
+			Leaderboard: &arena.ReplayLeaderboardInfo{
+				Rank:     info.Rank,
+				Division: info.Division,
+				Score:    info.Score,
+			},
+			PuzzleID:    factory.PuzzleID(),
+			PuzzleTitle: factory.PuzzleTitle(),
 		},
-		PuzzleID:    factory.PuzzleID(),
-		PuzzleTitle: factory.PuzzleTitle(),
 	}
-	return downloadReplays(client, gameIDs, ann, opts.OutDir, opts.Limit, opts.Delay, opts.Force, stdout)
+	return downloadReplays(client, cfg, stdout)
 }
 
-// downloadReplays runs the shared per-ID download loop: skip-if-exists (unless
-// force is set), inter-request delay, soft failure, and a final summary line.
-// ann is layered into every saved replay's top-level metadata; FetchedAt is
-// stamped per-replay at the moment FetchReplay returns successfully.
-func downloadReplays(client *codingame.Client, ids []int64, ann arena.ReplayAnnotations, outDir string, limit int, delay time.Duration, force bool, stdout io.Writer) error {
-	if limit > 0 && len(ids) > limit {
-		ids = ids[:limit]
+// downloadReplays is the shared per-ID download orchestrator. Skipped-existing
+// replays don't reset the inter-fetch delay; fetch errors are soft (counted
+// as failed); prepare/write errors abort the batch.
+func downloadReplays(fetcher replayFetcher, cfg replayBatchConfig, stdout io.Writer) error {
+	if err := os.MkdirAll(cfg.OutDir, 0o755); err != nil {
+		return fmt.Errorf("create %s: %w", cfg.OutDir, err)
+	}
+	results, err := runReplayDownloads(fetcher, cfg, stdout, time.Now)
+	if err != nil {
+		return err
+	}
+	return writeDownloadSummary(stdout, cfg.OutDir, results)
+}
+
+func runReplayDownloads(fetcher replayFetcher, cfg replayBatchConfig, stdout io.Writer, now func() time.Time) ([]downloadResult, error) {
+	ids := cfg.IDs
+	if cfg.Limit > 0 && len(ids) > cfg.Limit {
+		ids = ids[:cfg.Limit]
 	}
 
-	if err := os.MkdirAll(outDir, 0755); err != nil {
-		return fmt.Errorf("create %s: %w", outDir, err)
-	}
-
-	var saved, skipped, failed int
-	first := true
+	results := make([]downloadResult, 0, len(ids))
+	fetched := 0
 	for i, id := range ids {
-		path := filepath.Join(outDir, fmt.Sprintf("%d.json", id))
-		if !force {
-			if _, err := os.Stat(path); err == nil {
-				skipped++
-				_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (exists)\n", i+1, len(ids), id)
-				continue
-			}
-		}
-
-		if !first && delay > 0 {
-			time.Sleep(delay)
-		}
-		first = false
-
-		body, err := client.FetchReplay(id)
-		if err != nil {
-			failed++
-			_, _ = fmt.Fprintf(stdout, "[%d/%d] fail %d: %v\n", i+1, len(ids), id, err)
+		if !cfg.Force && replayFileExists(cfg.OutDir, id) {
+			result := downloadResult{ID: id, Outcome: downloadOutcomeSkippedExisting, Detail: "exists"}
+			writeDownloadProgress(stdout, i+1, len(ids), result)
+			results = append(results, result)
 			continue
 		}
-		annPerReplay := ann
-		annPerReplay.FetchedAt = time.Now()
-		body, err = arena.PrepareReplay(body, annPerReplay)
+
+		if fetched > 0 && cfg.Delay > 0 {
+			time.Sleep(cfg.Delay)
+		}
+
+		result, err := downloadReplay(fetcher, cfg, id, now())
 		if err != nil {
-			return fmt.Errorf("prepare replay %d: %w", id, err)
+			return nil, err
 		}
-		if err := os.WriteFile(path, body, 0644); err != nil {
-			return fmt.Errorf("write %s: %w", path, err)
-		}
-		saved++
-		_, _ = fmt.Fprintf(stdout, "[%d/%d] save %d (%d bytes)\n", i+1, len(ids), id, len(body))
+		fetched++
+		writeDownloadProgress(stdout, i+1, len(ids), result)
+		results = append(results, result)
+	}
+	return results, nil
+}
+
+// downloadReplay handles one target. Fetch errors map to a soft failed result
+// so the batch keeps going; prepare/write errors return an error to abort.
+func downloadReplay(fetcher replayFetcher, cfg replayBatchConfig, id int64, fetchedAt time.Time) (downloadResult, error) {
+	body, err := fetcher.FetchReplay(id)
+	if err != nil {
+		return downloadResult{ID: id, Outcome: downloadOutcomeFailed, Detail: err.Error()}, nil
 	}
 
-	_, _ = fmt.Fprintf(stdout, "done: %d saved, %d skipped, %d failed (out=%s)\n", saved, skipped, failed, outDir)
-	return nil
+	ann := cfg.Annotations
+	ann.FetchedAt = fetchedAt
+	body, err = arena.PrepareReplay(body, ann)
+	if err != nil {
+		return downloadResult{}, fmt.Errorf("prepare replay %d: %w", id, err)
+	}
+
+	path := replayFilePath(cfg.OutDir, id)
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		return downloadResult{}, fmt.Errorf("write %s: %w", path, err)
+	}
+	return downloadResult{ID: id, Outcome: downloadOutcomeSaved, Detail: fmt.Sprintf("%d bytes", len(body))}, nil
+}
+
+func replayFilePath(outDir string, id int64) string {
+	return filepath.Join(outDir, fmt.Sprintf("%d.json", id))
+}
+
+func replayFileExists(outDir string, id int64) bool {
+	_, err := os.Stat(replayFilePath(outDir, id))
+	return err == nil
+}
+
+func writeDownloadProgress(stdout io.Writer, current, total int, r downloadResult) {
+	switch r.Outcome {
+	case downloadOutcomeSaved:
+		_, _ = fmt.Fprintf(stdout, "[%d/%d] save %d (%s)\n", current, total, r.ID, r.Detail)
+	case downloadOutcomeSkippedExisting:
+		_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (%s)\n", current, total, r.ID, r.Detail)
+	case downloadOutcomeFailed:
+		_, _ = fmt.Fprintf(stdout, "[%d/%d] fail %d: %s\n", current, total, r.ID, r.Detail)
+	}
+}
+
+func writeDownloadSummary(stdout io.Writer, outDir string, results []downloadResult) error {
+	s := summarizeDownloadResults(results)
+	_, err := fmt.Fprintf(stdout, "done: %d saved, %d skipped, %d failed (out=%s)\n",
+		s.Saved, s.Skipped, s.Failed, outDir)
+	return err
+}
+
+func summarizeDownloadResults(results []downloadResult) downloadSummary {
+	s := downloadSummary{Total: len(results)}
+	for _, r := range results {
+		switch r.Outcome {
+		case downloadOutcomeSaved:
+			s.Saved++
+		case downloadOutcomeSkippedExisting:
+			s.Skipped++
+		case downloadOutcomeFailed:
+			s.Failed++
+		}
+	}
+	return s
 }
 
 // cacheTag returns a short " (cached)" suffix when hit is true.

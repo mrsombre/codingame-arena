@@ -23,13 +23,40 @@ var convertReplayFilePattern = regexp.MustCompile(`^\d+\.json$`)
 // instead of aborting the whole batch.
 var errReplayMismatch = errors.New("replay mismatch")
 
+type convertOutcome int
+
+const (
+	convertOutcomeSaved convertOutcome = iota
+	convertOutcomeSkippedExisting
+	convertOutcomeSkippedPuzzle
+	convertOutcomeSkippedMismatch
+)
+
+type convertReplayTarget struct {
+	ID   int64
+	Path string
+}
+
+type convertResult struct {
+	Target  convertReplayTarget
+	Outcome convertOutcome
+	Detail  string
+}
+
+type convertSummary struct {
+	Total           int
+	Saved           int
+	SkippedExisting int
+	SkippedPuzzle   int
+	SkippedMismatch int
+}
+
 // ConvertUsage returns the help text shown for `arena help convert`.
 func ConvertUsage(fs *pflag.FlagSet) string {
 	return arena.CommandUsage("convert", "Convert replay JSON files into arena trace files.", fs, "")
 }
 
-// Convert scans replay JSON files, re-simulates matching games, verifies the
-// results, and writes arena trace files keyed by replay id.
+// Convert is the entry point for the "convert" subcommand.
 func Convert(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
 	opts, err := parseConvertOptions(args, fs, v)
 	if err != nil {
@@ -41,66 +68,125 @@ func Convert(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfl
 		return err
 	}
 
-	var saved, skippedExisting, skippedPuzzle, skippedMismatch int
-	for i, target := range targets {
-		tracePath := filepath.Join(opts.TraceDir, arena.TraceFileName(arena.TraceTypeReplay, target.ID, 0))
-		if !opts.Force {
-			if _, err := os.Stat(tracePath); err == nil {
-				skippedExisting++
-				_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (trace exists)\n", i+1, len(targets), target.ID)
-				continue
-			} else if err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("stat %s: %w", tracePath, err)
-			}
-		}
-
-		data, err := os.ReadFile(target.Path)
-		if err != nil {
-			return fmt.Errorf("read %s: %w", target.Path, err)
-		}
-
-		var replay arena.CodinGameReplay[arena.CodinGameReplayFrame]
-		if err := json.Unmarshal(data, &replay); err != nil {
-			return fmt.Errorf("parse %s: %w", target.Path, err)
-		}
-		if replay.PuzzleID != factory.PuzzleID() {
-			skippedPuzzle++
-			_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (puzzleId %d != %d)\n", i+1, len(targets), target.ID, replay.PuzzleID, factory.PuzzleID())
-			continue
-		}
-
-		trace, league, err := convertReplayTrace(factory, replay, opts.League)
-		if err != nil {
-			if errors.Is(err, errReplayMismatch) {
-				skippedMismatch++
-				_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (%v)\n", i+1, len(targets), target.ID, err)
-				continue
-			}
-			return fmt.Errorf("convert replay %d: %w", target.ID, err)
-		}
-		trace.MatchID = 0
-		trace.Type = arena.TraceTypeReplay
-		trace.Blue = replay.Blue
-		trace.League = replay.League
-		trace.CreatedAt = replay.FetchedAt
-
-		if err := arena.NewTraceWriter(opts.TraceDir, target.ID).WriteMatch(trace); err != nil {
-			return fmt.Errorf("write trace for replay %d: %w", target.ID, err)
-		}
-
-		_, _ = fmt.Fprintf(stdout, "[%d/%d] save %d (league=%d turns=%d scores=%.1f:%.1f)\n",
-			i+1, len(targets), target.ID, league, len(trace.Turns), trace.Scores[0], trace.Scores[1])
-		saved++
+	results, err := convertReplays(stdout, factory, opts, targets)
+	if err != nil {
+		return err
 	}
-
-	_, _ = fmt.Fprintf(stdout, "done: %d saved, %d skipped-existing, %d skipped-puzzle, %d skipped-mismatch (replays=%d out=%s)\n",
-		saved, skippedExisting, skippedPuzzle, skippedMismatch, len(targets), opts.TraceDir)
-	return nil
+	return writeConvertSummary(stdout, opts, results)
 }
 
-type convertReplayTarget struct {
-	ID   int64
-	Path string
+func convertReplays(stdout io.Writer, factory arena.GameFactory, opts ConvertOptions, targets []convertReplayTarget) ([]convertResult, error) {
+	results := make([]convertResult, 0, len(targets))
+	for i, target := range targets {
+		result, err := convertReplay(factory, opts, target)
+		if err != nil {
+			return nil, err
+		}
+		writeConvertProgress(stdout, i+1, len(targets), result)
+		results = append(results, result)
+	}
+	return results, nil
+}
+
+// convertReplay processes a single target. Replay-content failures (existing
+// trace, wrong puzzle, engine mismatch) become a non-error result so the
+// batch keeps moving; only genuine I/O failures return an error and abort.
+func convertReplay(factory arena.GameFactory, opts ConvertOptions, target convertReplayTarget) (convertResult, error) {
+	res := convertResult{Target: target}
+
+	tracePath := filepath.Join(opts.TraceDir, arena.TraceFileName(arena.TraceTypeReplay, target.ID, 0))
+	if !opts.Force {
+		switch _, err := os.Stat(tracePath); {
+		case err == nil:
+			res.Outcome = convertOutcomeSkippedExisting
+			res.Detail = "trace exists"
+			return res, nil
+		case !os.IsNotExist(err):
+			return convertResult{}, fmt.Errorf("stat %s: %w", tracePath, err)
+		}
+	}
+
+	replay, err := readConvertReplay(target.Path)
+	if err != nil {
+		return convertResult{}, err
+	}
+	if replay.PuzzleID != factory.PuzzleID() {
+		res.Outcome = convertOutcomeSkippedPuzzle
+		res.Detail = fmt.Sprintf("puzzleId %d != %d", replay.PuzzleID, factory.PuzzleID())
+		return res, nil
+	}
+
+	trace, league, err := convertReplayTrace(factory, replay, opts.League)
+	if err != nil {
+		if errors.Is(err, errReplayMismatch) {
+			res.Outcome = convertOutcomeSkippedMismatch
+			res.Detail = err.Error()
+			return res, nil
+		}
+		return convertResult{}, fmt.Errorf("convert replay %d: %w", target.ID, err)
+	}
+	applyReplayMetadata(&trace, replay)
+
+	if err := arena.NewTraceWriter(opts.TraceDir, target.ID).WriteMatch(trace); err != nil {
+		return convertResult{}, fmt.Errorf("write trace for replay %d: %w", target.ID, err)
+	}
+
+	res.Outcome = convertOutcomeSaved
+	res.Detail = fmt.Sprintf("league=%d turns=%d scores=%.1f:%.1f", league, len(trace.Turns), trace.Scores[0], trace.Scores[1])
+	return res, nil
+}
+
+func readConvertReplay(path string) (arena.CodinGameReplay[arena.CodinGameReplayFrame], error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return arena.CodinGameReplay[arena.CodinGameReplayFrame]{}, fmt.Errorf("read %s: %w", path, err)
+	}
+
+	var replay arena.CodinGameReplay[arena.CodinGameReplayFrame]
+	if err := json.Unmarshal(data, &replay); err != nil {
+		return arena.CodinGameReplay[arena.CodinGameReplayFrame]{}, fmt.Errorf("parse %s: %w", path, err)
+	}
+	return replay, nil
+}
+
+func applyReplayMetadata(trace *arena.TraceMatch, replay arena.CodinGameReplay[arena.CodinGameReplayFrame]) {
+	trace.MatchID = 0
+	trace.Type = arena.TraceTypeReplay
+	trace.Blue = replay.Blue
+	trace.League = replay.League
+	trace.CreatedAt = replay.FetchedAt
+}
+
+func writeConvertProgress(stdout io.Writer, current, total int, result convertResult) {
+	verb := "skip"
+	if result.Outcome == convertOutcomeSaved {
+		verb = "save"
+	}
+	_, _ = fmt.Fprintf(stdout, "[%d/%d] %s %d (%s)\n", current, total, verb, result.Target.ID, result.Detail)
+}
+
+func writeConvertSummary(stdout io.Writer, opts ConvertOptions, results []convertResult) error {
+	s := summarizeConvertResults(results)
+	_, err := fmt.Fprintf(stdout, "done: %d saved, %d skipped-existing, %d skipped-puzzle, %d skipped-mismatch (replays=%d out=%s)\n",
+		s.Saved, s.SkippedExisting, s.SkippedPuzzle, s.SkippedMismatch, s.Total, opts.TraceDir)
+	return err
+}
+
+func summarizeConvertResults(results []convertResult) convertSummary {
+	s := convertSummary{Total: len(results)}
+	for _, r := range results {
+		switch r.Outcome {
+		case convertOutcomeSaved:
+			s.Saved++
+		case convertOutcomeSkippedExisting:
+			s.SkippedExisting++
+		case convertOutcomeSkippedPuzzle:
+			s.SkippedPuzzle++
+		case convertOutcomeSkippedMismatch:
+			s.SkippedMismatch++
+		}
+	}
+	return s
 }
 
 func convertReplayTargets(replayDir string, ids []int64) ([]convertReplayTarget, error) {
@@ -165,10 +251,19 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		gameOptions.Set("league", strconv.Itoa(league))
 	}
 
+	if replay.Blue == "" {
+		return arena.TraceMatch{}, league, fmt.Errorf("%w: replay missing blue (re-fetch with `replay get` so the username is recorded)", errReplayMismatch)
+	}
 	botNames := arena.ReplayPlayerNames(replay)
-	blueSide := 0
-	if replay.Blue != "" && botNames[1] == replay.Blue {
-		blueSide = 1
+	blueSide := -1
+	for i, name := range botNames {
+		if name == replay.Blue {
+			blueSide = i
+			break
+		}
+	}
+	if blueSide == -1 {
+		return arena.TraceMatch{}, league, fmt.Errorf("%w: blue %q not found in players %v", errReplayMismatch, replay.Blue, botNames)
 	}
 
 	trace, finalScores := arena.RunReplay(
@@ -181,7 +276,11 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		0,
 	)
 
-	if err := verifyReplayTrace(trace, finalScores, replay); err != nil {
+	emitsPostEndFrame := false
+	if e, ok := factory.(arena.PostEndFrameEmitter); ok {
+		emitsPostEndFrame = e.EmitsPostEndFrame()
+	}
+	if err := verifyReplayTrace(trace, finalScores, replay, emitsPostEndFrame); err != nil {
 		return arena.TraceMatch{}, league, err
 	}
 
@@ -191,10 +290,13 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 // verifyReplayTrace checks the engine reproduces the replay. finalScores are
 // the post-OnEnd values (Player.GetScore after tie-break and deactivation
 // adjustments) — the same shape the replay's gameResult.scores carries.
-// trace.Scores cannot be used for this comparison: it stores raw bird-segment
-// counts that diverge whenever OnEnd touched the value (ties in raw scores
-// trigger a losses subtraction, deactivated players become -1).
-func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame]) error {
+// trace.Scores cannot be used for this comparison: it stores the raw pre-OnEnd
+// score, which diverges whenever OnEnd touches it (e.g. ties trigger a losses
+// subtraction, deactivated players become -1).
+//
+// emitsPostEndFrame selects the trace-turn counting strategy: see
+// arena.ReplayTraceTurnCount for what it means.
+func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], emitsPostEndFrame bool) error {
 	if len(replay.GameResult.Scores) < 2 {
 		return fmt.Errorf("replay scores must contain two entries")
 	}
@@ -204,7 +306,7 @@ func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.
 			replay.GameResult.Scores[0], replay.GameResult.Scores[1], finalScores[0], finalScores[1])
 	}
 
-	expectedTurns := arena.ReplayTraceTurnCount(replay)
+	expectedTurns := arena.ReplayTraceTurnCount(replay, emitsPostEndFrame)
 	if len(trace.Turns) != expectedTurns {
 		return fmt.Errorf("%w: turn mismatch: replay=%d engine=%d", errReplayMismatch, expectedTurns, len(trace.Turns))
 	}

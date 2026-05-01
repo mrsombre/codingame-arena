@@ -143,9 +143,9 @@ func ReplayMovesFromFrames(replay CodinGameReplay[CodinGameReplayFrame]) ReplayM
 		}
 		switch f.AgentID {
 		case 0:
-			moves.P0 = append(moves.P0, f.Stdout)
+			moves.Left = append(moves.Left, f.Stdout)
 		case 1:
-			moves.P1 = append(moves.P1, f.Stdout)
+			moves.Right = append(moves.Right, f.Stdout)
 		}
 	}
 	return moves
@@ -154,22 +154,31 @@ func ReplayMovesFromFrames(replay CodinGameReplay[CodinGameReplayFrame]) ReplayM
 // ReplayTurnCount returns the number of recorded decision turns in the replay.
 func ReplayTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	moves := ReplayMovesFromFrames(replay)
-	if len(moves.P0) > len(moves.P1) {
-		return len(moves.P0)
+	if len(moves.Left) > len(moves.Right) {
+		return len(moves.Left)
 	}
-	return len(moves.P1)
+	return len(moves.Right)
 }
 
 // ReplayTraceTurnCount returns the number of engine frames represented by the
 // replay. CodinGame stores simultaneous player outputs as one frame per player.
 // Mid-replay empty-stdout frames are Spring 2020 speed sub-turns, which the
-// engine folds into the preceding main turn and emits no trace turn for. The
-// trailing empty-stdout frame is the game-over marker; the engine emits one
-// extra trace turn for it (mirroring Java's post-game-over gameTurn frame).
-// Exception: a trailing empty stdout that pairs with the other side's stdout
-// to close an in-progress turn is a deactivation/timeout indicator for that
-// last turn — not a separate marker — so it must not be double-counted.
-func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
+// engine folds into the preceding main turn and emits no trace turn for.
+//
+// emitsPostEndFrame separates two engine families:
+//
+//   - false: engine ends the match on the same turn game-over is detected
+//     (Winter 2026). A trailing empty stdout that pairs with the other
+//     side's stdout is the deactivation/timeout close of the in-progress
+//     turn — already counted by the regular flush — so it must not be
+//     double-counted.
+//   - true: engine emits a separate post-end trace turn after the last
+//     main turn (Java Spring 2020's gameOverFrame branch). The replay's
+//     trailing empty stdout always represents that frame and adds +1
+//     unconditionally, even when it appears to pair with another agent's
+//     stdout (in that case the pair is a polling-timeout close of the
+//     final main turn, with the gameOverFrame following separately).
+func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame], emitsPostEndFrame bool) int {
 	turns := 0
 	seenOutput := map[int]bool{}
 
@@ -207,8 +216,10 @@ func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	}
 	flushOutputTurn()
 
-	if hasTrailingEngineFrame(replay) && !trailingEmptyClosedTurn {
-		turns++
+	if hasTrailingEngineFrame(replay) {
+		if emitsPostEndFrame || !trailingEmptyClosedTurn {
+			turns++
+		}
 	}
 
 	return turns
@@ -229,7 +240,7 @@ func hasTrailingEngineFrame(replay CodinGameReplay[CodinGameReplayFrame]) bool {
 
 // ReplayPlayerNames extracts player display names from replay agent metadata.
 func ReplayPlayerNames(replay CodinGameReplay[CodinGameReplayFrame]) [2]string {
-	names := [2]string{"p0", "p1"}
+	names := [2]string{"left", "right"}
 	for _, a := range replay.GameResult.Agents {
 		switch a.Index {
 		case 0:

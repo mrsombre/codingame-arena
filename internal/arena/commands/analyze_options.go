@@ -22,11 +22,15 @@ func parseAnalyzeOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (Anal
 		return AnalyzeOptions{}, err
 	}
 
-	opts := AnalyzeOptions{
-		TraceDir: v.GetString("trace-dir"),
-	}
+	opts := analyzeOptionsFromConfig(v)
 	if opts.TraceDir == "" {
 		opts.TraceDir = "traces"
 	}
 	return opts, nil
+}
+
+func analyzeOptionsFromConfig(v *viper.Viper) AnalyzeOptions {
+	return AnalyzeOptions{
+		TraceDir: v.GetString("trace-dir"),
+	}
 }

@@ -34,7 +34,7 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 				Output:    [2]string{"UP 0 RIGHT 1", "DOWN 0 LEFT 1"},
 				Timing:    &TraceTurnTiming{Response: [2]float64{820, 910}},
 				Traces: []TurnTrace{
-					{Label: "eat", Payload: "bot0:14.5"},
+					MakeTurnTrace("eat", map[string]any{"bot": "bot0", "score": 14.5}),
 				},
 			},
 		},
@@ -62,7 +62,11 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 	require.NotNil(t, got.Turns[0].Timing)
 	assert.Equal(t, [2]float64{820, 910}, got.Turns[0].Timing.Response)
 	require.Len(t, got.Turns[0].Traces, 1)
-	assert.Equal(t, "eat", got.Turns[0].Traces[0].Label)
+	assert.Equal(t, "eat", got.Turns[0].Traces[0].Type)
+	decoded, err := DecodeMeta[map[string]any](got.Turns[0].Traces[0])
+	require.NoError(t, err)
+	assert.Equal(t, "bot0", decoded["bot"])
+	assert.InDelta(t, 14.5, decoded["score"], 0.0001)
 }
 
 func TestTraceWriterWritesReplayFile(t *testing.T) {
@@ -99,15 +103,13 @@ func TestTraceMatchBlueSide(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name  string
-		blue  string
-		ps    [2]string
-		want  int
+		name string
+		blue string
+		ps   [2]string
+		want int
 	}{
-		{name: "blue is p0", blue: "bot-cpp", ps: [2]string{"bot-cpp", "bot-py"}, want: 0},
-		{name: "blue is p1 (post-swap)", blue: "bot-cpp", ps: [2]string{"bot-py", "bot-cpp"}, want: 1},
-		{name: "blue not in players", blue: "bot-cpp", ps: [2]string{"bot-py", "bot-go"}, want: -1},
-		{name: "blue empty", blue: "", ps: [2]string{"a", "b"}, want: -1},
+		{name: "blue is left", blue: "bot-cpp", ps: [2]string{"bot-cpp", "bot-py"}, want: 0},
+		{name: "blue is right (post-swap)", blue: "bot-cpp", ps: [2]string{"bot-py", "bot-cpp"}, want: 1},
 	}
 	for _, tc := range cases {
 		tc := tc

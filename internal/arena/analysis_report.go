@@ -1,0 +1,738 @@
+package arena
+
+import (
+	"fmt"
+	"io"
+	"math"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+const TraceAnalysisNoSide = -1
+
+type TraceAnalysisEndReasonSpec struct {
+	Key      string
+	Label    string
+	ShowZero bool
+	ShowBlue bool
+}
+
+func StandardTraceEndReasons() []TraceAnalysisEndReasonSpec {
+	return []TraceAnalysisEndReasonSpec{
+		{Key: EndReasonTurnsOut, Label: EndReasonTurnsOut},
+		{Key: EndReasonScore, Label: EndReasonScore},
+		{Key: EndReasonScoreEarly, Label: EndReasonScoreEarly},
+		{Key: EndReasonEliminated, Label: EndReasonEliminated, ShowBlue: true},
+		{Key: EndReasonTimeoutStart, Label: EndReasonTimeoutStart, ShowZero: true, ShowBlue: true},
+		{Key: EndReasonTimeout, Label: EndReasonTimeout, ShowZero: true, ShowBlue: true},
+		{Key: EndReasonInvalid, Label: EndReasonInvalid, ShowZero: true, ShowBlue: true},
+	}
+}
+
+func AnalyzeTraceFiles(input TraceAnalysisInput, metricAnalyzer TraceMetricAnalyzer) (TraceAnalysis, error) {
+	specs, specByKey, err := normalizedTraceMetricSpecs(metricAnalyzer)
+	if err != nil {
+		return nil, err
+	}
+
+	report := &traceAnalysisReport{
+		traceDir:            input.TraceDir,
+		gameID:              input.GameID,
+		files:               len(input.Files),
+		endReasonSpecs:      StandardTraceEndReasons(),
+		endReasonCounts:     make(map[string]int),
+		endReasonBlueCounts: make(map[string]int),
+		metricSpecs:         specs,
+		winnerA:             make(map[string]traceAnalysisMetricAggregate),
+		winnerB:             make(map[string]traceAnalysisMetricAggregate),
+		blueA:               make(map[string]traceAnalysisMetricAggregate),
+		blueB:               make(map[string]traceAnalysisMetricAggregate),
+		blueWon:             make(map[string]traceAnalysisMetricAggregate),
+		blueLost:            make(map[string]traceAnalysisMetricAggregate),
+		worstBlue:           make(map[string]traceAnalysisMetricWorst),
+	}
+
+	for _, file := range input.Files {
+		var stats TraceMetricStats
+		if metricAnalyzer != nil {
+			stats, err = metricAnalyzer.AnalyzeTraceMetrics(file.Trace)
+			if err != nil {
+				return nil, fmt.Errorf("analyze %s: %w", file.Name, err)
+			}
+			if err := validateTraceMetricStats(file.Name, stats, specByKey, len(file.Trace.Turns)); err != nil {
+				return nil, err
+			}
+		}
+		report.add(file, stats)
+	}
+
+	return report, nil
+}
+
+func normalizedTraceMetricSpecs(metricAnalyzer TraceMetricAnalyzer) ([]TraceMetricSpec, map[string]TraceMetricSpec, error) {
+	if metricAnalyzer == nil {
+		return nil, nil, nil
+	}
+
+	specs := append([]TraceMetricSpec(nil), metricAnalyzer.TraceMetricSpecs()...)
+	byKey := make(map[string]TraceMetricSpec, len(specs))
+	for i := range specs {
+		spec := &specs[i]
+		if spec.Key == "" {
+			return nil, nil, fmt.Errorf("trace metric spec %d has empty key", i)
+		}
+		if spec.Label == "" {
+			spec.Label = spec.Key
+		}
+		switch spec.Kind {
+		case TraceMetricPerMatchCount, TraceMetricPerTurnRate:
+		default:
+			return nil, nil, fmt.Errorf("trace metric %q has unsupported kind %q", spec.Key, spec.Kind)
+		}
+		if _, exists := byKey[spec.Key]; exists {
+			return nil, nil, fmt.Errorf("duplicate trace metric spec %q", spec.Key)
+		}
+		byKey[spec.Key] = *spec
+	}
+	return specs, byKey, nil
+}
+
+func validateTraceMetricStats(file string, stats TraceMetricStats, specs map[string]TraceMetricSpec, turns int) error {
+	for key, values := range stats {
+		spec, ok := specs[key]
+		if !ok {
+			return fmt.Errorf("analyze %s: trace metric %q was returned without a spec", file, key)
+		}
+		for side, value := range values {
+			if value < 0 {
+				return fmt.Errorf("analyze %s: trace metric %q side %d is negative", file, key, side)
+			}
+			if spec.Kind == TraceMetricPerTurnRate && value > turns {
+				return fmt.Errorf("analyze %s: trace metric %q side %d count %d exceeds turns %d", file, key, side, value, turns)
+			}
+		}
+	}
+	return nil
+}
+
+// TraceWinner returns the winner side for a 2-player trace, or -1 for a draw.
+func TraceWinner(trace TraceMatch) int {
+	if trace.Ranks[0] == trace.Ranks[1] {
+		switch {
+		case trace.Scores[0] > trace.Scores[1]:
+			return 0
+		case trace.Scores[1] > trace.Scores[0]:
+			return 1
+		default:
+			return TraceAnalysisNoSide
+		}
+	}
+	if trace.Ranks[0] < trace.Ranks[1] {
+		return 0
+	}
+	return 1
+}
+
+// TraceEndReasonSide returns the side that a side-specific end reason applies
+// to, or -1 when the reason is not side-specific or cannot be attributed.
+func TraceEndReasonSide(trace TraceMatch, winner int) int {
+	switch {
+	case trace.Deactivated[0] && !trace.Deactivated[1]:
+		return 0
+	case trace.Deactivated[1] && !trace.Deactivated[0]:
+		return 1
+	case trace.Deactivated[0] && trace.Deactivated[1]:
+		return TraceAnalysisNoSide
+	}
+
+	switch trace.EndReason {
+	case EndReasonTimeoutStart, EndReasonTimeout, EndReasonInvalid, EndReasonEliminated:
+		if winner == 0 {
+			return 1
+		}
+		if winner == 1 {
+			return 0
+		}
+	}
+	return TraceAnalysisNoSide
+}
+
+type traceAnalysisReport struct {
+	traceDir string
+	gameID   string
+	files    int
+
+	decided int
+	draws   int
+
+	blueWins   int
+	blueLosses int
+
+	turnSum  int
+	turnMin  int
+	turnMax  int
+	turnSeen bool
+
+	blueScoreSum  float64
+	redScoreSum   float64
+	decidedMargin float64
+
+	timingMatches int
+	blueFirstResp float64
+	redFirstResp  float64
+	blueTurnResp  float64
+	redTurnResp   float64
+
+	endReasonSpecs []TraceAnalysisEndReasonSpec
+
+	endReasonCounts     map[string]int
+	endReasonBlueCounts map[string]int
+
+	metricSpecs []TraceMetricSpec
+	winnerA     map[string]traceAnalysisMetricAggregate
+	winnerB     map[string]traceAnalysisMetricAggregate
+	blueA       map[string]traceAnalysisMetricAggregate
+	blueB       map[string]traceAnalysisMetricAggregate
+	// blueWon / blueLost track blue's own metric values split by match
+	// outcome — so "blue wins vs blue losses" answers "what does our bot
+	// do differently when it wins vs when it loses?", which is the
+	// highest-leverage diagnostic axis for tuning the bot.
+	blueWon  map[string]traceAnalysisMetricAggregate
+	blueLost map[string]traceAnalysisMetricAggregate
+
+	// worstBlue tracks blue's single-match peak per hazard metric and the
+	// trace file where it happened, so the WORST section can point the
+	// reader at the exact replay to inspect.
+	worstBlue map[string]traceAnalysisMetricWorst
+}
+
+type traceAnalysisMetricAggregate struct {
+	Sum      float64
+	Samples  int
+	RawCount int
+}
+
+type traceAnalysisMetricWorst struct {
+	Value int
+	File  string
+}
+
+func (r *traceAnalysisReport) add(file TraceFile, stats TraceMetricStats) {
+	trace := file.Trace
+	winner := TraceWinner(trace)
+	if winner == 0 || winner == 1 {
+		r.decided++
+		r.decidedMargin += math.Abs(float64(trace.Scores[0] - trace.Scores[1]))
+	} else {
+		r.draws++
+	}
+
+	blueSide := trace.BlueSide()
+	switch winner {
+	case blueSide:
+		r.blueWins++
+	case 1 - blueSide:
+		r.blueLosses++
+	}
+	r.blueScoreSum += float64(trace.Scores[blueSide])
+	r.redScoreSum += float64(trace.Scores[1-blueSide])
+	if trace.Timing != nil {
+		r.timingMatches++
+		r.blueFirstResp += trace.Timing.FirstResponse[blueSide]
+		r.redFirstResp += trace.Timing.FirstResponse[1-blueSide]
+		r.blueTurnResp += trace.Timing.ResponseAverage[blueSide]
+		r.redTurnResp += trace.Timing.ResponseAverage[1-blueSide]
+	}
+
+	turns := len(trace.Turns)
+	r.turnSum += turns
+	if !r.turnSeen || turns < r.turnMin {
+		r.turnMin = turns
+		r.turnSeen = true
+	}
+	if turns > r.turnMax {
+		r.turnMax = turns
+	}
+
+	if trace.EndReason != "" {
+		r.endReasonCounts[trace.EndReason]++
+		if TraceEndReasonSide(trace, winner) == blueSide {
+			r.endReasonBlueCounts[trace.EndReason]++
+		}
+	}
+
+	for _, spec := range r.metricSpecs {
+		values := stats[spec.Key]
+		if winner == 0 || winner == 1 {
+			loser := 1 - winner
+			addTraceMetricSample(r.winnerA, spec, values[winner], turns)
+			addTraceMetricSample(r.winnerB, spec, values[loser], turns)
+		}
+		addTraceMetricSample(r.blueA, spec, values[blueSide], turns)
+		addTraceMetricSample(r.blueB, spec, values[1-blueSide], turns)
+		switch winner {
+		case blueSide:
+			addTraceMetricSample(r.blueWon, spec, values[blueSide], turns)
+		case 1 - blueSide:
+			addTraceMetricSample(r.blueLost, spec, values[blueSide], turns)
+		}
+
+		if !spec.HigherIsBetter && blueSide >= 0 {
+			blueValue := values[blueSide]
+			if w, seen := r.worstBlue[spec.Key]; !seen || blueValue > w.Value {
+				r.worstBlue[spec.Key] = traceAnalysisMetricWorst{Value: blueValue, File: file.Name}
+			}
+		}
+	}
+}
+
+func addTraceMetricSample(dst map[string]traceAnalysisMetricAggregate, spec TraceMetricSpec, value, turns int) {
+	sample, ok := traceMetricSample(spec.Kind, value, turns)
+	if !ok {
+		return
+	}
+	current := dst[spec.Key]
+	current.Sum += sample
+	current.Samples++
+	current.RawCount += value
+	dst[spec.Key] = current
+}
+
+func traceMetricSample(kind TraceMetricKind, value, turns int) (float64, bool) {
+	switch kind {
+	case TraceMetricPerMatchCount:
+		return float64(value), true
+	case TraceMetricPerTurnRate:
+		if turns == 0 {
+			return 0, false
+		}
+		return float64(value) / float64(turns) * 100, true
+	default:
+		return 0, false
+	}
+}
+
+func (r *traceAnalysisReport) Write(w io.Writer) error {
+	title := r.gameID
+	if title == "" {
+		title = "Trace"
+	}
+	if _, err := fmt.Fprintf(w, "%s — %d traces — %s\n\n",
+		title, r.files, analysisTraceDirLabel(r.traceDir)); err != nil {
+		return err
+	}
+
+	if err := r.writeOutcome(w); err != nil {
+		return err
+	}
+	if err := r.writeMatchStats(w); err != nil {
+		return err
+	}
+	if err := r.writeEndReasons(w); err != nil {
+		return err
+	}
+	if len(r.metricSpecs) > 0 {
+		if err := r.writeMetricLegend(w); err != nil {
+			return err
+		}
+		if err := r.writeMetricComparison(w, "METRICS — winner vs loser", r.winnerA, r.winnerB, "winner", "loser"); err != nil {
+			return err
+		}
+		if err := r.writeMetricComparison(w, "METRICS — blue vs red", r.blueA, r.blueB, "blue", "red"); err != nil {
+			return err
+		}
+		if err := r.writeMetricComparison(w, "METRICS — blue wins vs blue losses", r.blueWon, r.blueLost, "won", "lost"); err != nil {
+			return err
+		}
+		if err := r.writeWorstCases(w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeWorstCases prints blue's single-match peak per hazard metric, naming
+// the trace file so the reader can open the replay and see what went wrong.
+// Only specs with HigherIsBetter=false are listed; rows with a peak of 0
+// are skipped (no incidents → no replay worth opening). The whole section
+// is suppressed when no spec qualifies, keeping the report compact for
+// games whose metrics are all score-style.
+func (r *traceAnalysisReport) writeWorstCases(w io.Writer) error {
+	type worstRow struct {
+		Label string
+		Value int
+		ID    string
+	}
+	rows := make([]worstRow, 0, len(r.metricSpecs))
+	for _, spec := range r.metricSpecs {
+		if spec.HigherIsBetter {
+			continue
+		}
+		worst, ok := r.worstBlue[spec.Key]
+		if !ok || worst.Value == 0 {
+			continue
+		}
+		rows = append(rows, worstRow{
+			Label: spec.Label,
+			Value: worst.Value,
+			ID:    worstTraceID(worst.File),
+		})
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+
+	if _, err := fmt.Fprintln(w, "WORST"); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if _, err := fmt.Fprintf(w, "  %-11s %4d   %s\n", row.Label, row.Value, row.ID); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintln(w)
+	return err
+}
+
+// worstTraceID extracts the readable identifier from a trace filename,
+// stripping the .json extension and the conventional `replay-`/`trace-`
+// prefix so the WORST listing reads as a bare match ID (882464252) rather
+// than a redundant `replay-882464252.json`. Unknown shapes pass through
+// extension-only stripping.
+func worstTraceID(name string) string {
+	s := strings.TrimSuffix(name, ".json")
+	for _, prefix := range []string{"replay-", "trace-"} {
+		if strings.HasPrefix(s, prefix) {
+			return strings.TrimPrefix(s, prefix)
+		}
+	}
+	return s
+}
+
+// writeMetricLegend prints a `Metrics:` block listing each spec's description.
+// Lower-cased title with `- key: text` bullets intentionally diverges from the
+// uppercase data sections below it, so the reader can tell at a glance that
+// this is documentation rather than measured values. Skipped entirely when no
+// spec carries a Description.
+func (r *traceAnalysisReport) writeMetricLegend(w io.Writer) error {
+	rows := make([]TraceMetricSpec, 0, len(r.metricSpecs))
+	for _, spec := range r.metricSpecs {
+		if spec.Description == "" {
+			continue
+		}
+		rows = append(rows, spec)
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+
+	if _, err := fmt.Fprintln(w, "Metrics:"); err != nil {
+		return err
+	}
+	for _, spec := range rows {
+		if _, err := fmt.Fprintf(w, "- %s: %s\n", spec.Label, spec.Description); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintln(w)
+	return err
+}
+
+func (r *traceAnalysisReport) writeOutcome(w io.Writer) error {
+	if _, err := fmt.Fprintln(w, "OUTCOME"); err != nil {
+		return err
+	}
+	if r.files > 0 {
+		if _, err := fmt.Fprintf(w, "  %-8s Wins: %2.0f%% / Loses: %2.0f%% / Draws: %2.0f%%\n",
+			"Blue",
+			percent(r.blueWins, r.files),
+			percent(r.blueLosses, r.files),
+			percent(r.files-r.blueWins-r.blueLosses, r.files)); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintln(w)
+	return err
+}
+
+func (r *traceAnalysisReport) writeMatchStats(w io.Writer) error {
+	if _, err := fmt.Fprintln(w, "MATCH"); err != nil {
+		return err
+	}
+
+	if r.files == 0 {
+		if _, err := fmt.Fprintln(w, "  Turns    none"); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(w)
+		return err
+	}
+
+	if _, err := fmt.Fprintf(w, "  Turns    avg %.1f   min %d   max %d\n",
+		float64(r.turnSum)/float64(r.files), r.turnMin, r.turnMax); err != nil {
+		return err
+	}
+
+	if r.files > 0 {
+		line := fmt.Sprintf("  Scores   blue %.1f   red %.1f",
+			r.blueScoreSum/float64(r.files), r.redScoreSum/float64(r.files))
+		if _, err := fmt.Fprintln(w, line); err != nil {
+			return err
+		}
+	}
+
+	if r.timingMatches > 0 {
+		if _, err := fmt.Fprintf(w, "  Timing   first  blue %.0fms / red %.0fms\n",
+			r.blueFirstResp/float64(r.timingMatches),
+			r.redFirstResp/float64(r.timingMatches)); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "           turn   blue %.0fms / red %.0fms\n",
+			r.blueTurnResp/float64(r.timingMatches),
+			r.redTurnResp/float64(r.timingMatches)); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintln(w)
+	return err
+}
+
+func (r *traceAnalysisReport) writeEndReasons(w io.Writer) error {
+	if _, err := fmt.Fprintln(w, "END REASONS"); err != nil {
+		return err
+	}
+	if len(r.endReasonCounts) == 0 {
+		if _, err := fmt.Fprintln(w, "  none recorded"); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(w)
+		return err
+	}
+
+	rows := r.endReasonRows()
+	for _, row := range rows {
+		if row.count == 0 && !row.spec.ShowZero {
+			continue
+		}
+		line := fmt.Sprintf("  %-14s %5.1f%%", row.label(), percent(row.count, r.files))
+		if row.count > 0 && row.spec.ShowBlue && r.files > 0 {
+			line += fmt.Sprintf("  (blue %.1f%%)", percent(row.blueCount, row.count))
+		}
+		if _, err := fmt.Fprintln(w, line); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintln(w)
+	return err
+}
+
+type traceAnalysisEndReasonRow struct {
+	key       string
+	count     int
+	blueCount int
+	spec      TraceAnalysisEndReasonSpec
+	order     int
+}
+
+func (r *traceAnalysisReport) endReasonRows() []traceAnalysisEndReasonRow {
+	specs := make(map[string]TraceAnalysisEndReasonSpec, len(r.endReasonSpecs))
+	orders := make(map[string]int, len(r.endReasonSpecs))
+	for i, spec := range r.endReasonSpecs {
+		specs[spec.Key] = spec
+		orders[spec.Key] = i
+	}
+
+	seen := make(map[string]struct{}, len(r.endReasonCounts)+len(specs))
+	rows := make([]traceAnalysisEndReasonRow, 0, len(r.endReasonCounts)+len(specs))
+	add := func(key string) {
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		spec := specs[key]
+		if spec.Key == "" {
+			spec = TraceAnalysisEndReasonSpec{Key: key, Label: key}
+		}
+		order, ok := orders[key]
+		if !ok {
+			order = len(orders) + len(rows)
+		}
+		rows = append(rows, traceAnalysisEndReasonRow{
+			key:       key,
+			count:     r.endReasonCounts[key],
+			blueCount: r.endReasonBlueCounts[key],
+			spec:      spec,
+			order:     order,
+		})
+	}
+
+	for _, spec := range r.endReasonSpecs {
+		add(spec.Key)
+	}
+	for key := range r.endReasonCounts {
+		add(key)
+	}
+
+	sortTraceAnalysisEndReasons(rows)
+	return rows
+}
+
+func sortTraceAnalysisEndReasons(rows []traceAnalysisEndReasonRow) {
+	for i := 1; i < len(rows); i++ {
+		row := rows[i]
+		j := i - 1
+		for ; j >= 0 && traceAnalysisEndReasonLess(row, rows[j]); j-- {
+			rows[j+1] = rows[j]
+		}
+		rows[j+1] = row
+	}
+}
+
+func traceAnalysisEndReasonLess(a, b traceAnalysisEndReasonRow) bool {
+	if a.count != b.count {
+		return a.count > b.count
+	}
+	if a.order != b.order {
+		return a.order < b.order
+	}
+	return a.label() < b.label()
+}
+
+func (r traceAnalysisEndReasonRow) label() string {
+	if r.spec.Label != "" {
+		return r.spec.Label
+	}
+	return r.key
+}
+
+// traceMetricLowRateThreshold is the per-turn-rate cutoff (in percent) below
+// which both sides switch to raw event counts. Tiny averages like 0.0% vs 0.1%
+// produce inflated multipliers (5x) from a 0-vs-1 incident split — raw totals
+// keep the reader anchored on actual frequency.
+const traceMetricLowRateThreshold = 1.0
+
+func (r *traceAnalysisReport) writeMetricComparison(w io.Writer, title string,
+	a, b map[string]traceAnalysisMetricAggregate, aLabel, bLabel string,
+) error {
+	if _, err := fmt.Fprintf(w, "%s\n", title); err != nil {
+		return err
+	}
+
+	wrote := false
+	for _, spec := range r.metricSpecs {
+		aAgg := a[spec.Key]
+		bAgg := b[spec.Key]
+		av := averageTraceMetric(aAgg)
+		bv := averageTraceMetric(bAgg)
+		if !av.ok && !bv.ok {
+			continue
+		}
+		if !spec.ShowZero && av.value == 0 && bv.value == 0 {
+			continue
+		}
+		wrote = true
+
+		aDisplay, bDisplay := av.value, bv.value
+		aText := formatTraceMetricValue(spec.Kind, av.value)
+		bText := formatTraceMetricValue(spec.Kind, bv.value)
+		if spec.Kind == TraceMetricPerTurnRate &&
+			av.value < traceMetricLowRateThreshold && bv.value < traceMetricLowRateThreshold {
+			aDisplay = float64(aAgg.RawCount)
+			bDisplay = float64(bAgg.RawCount)
+			aText = formatTraceMetricRawCount(aAgg.RawCount)
+			bText = formatTraceMetricRawCount(bAgg.RawCount)
+		}
+
+		if _, err := fmt.Fprintf(w, "  %-11s %-6s %s   %-5s %s   (%s)\n",
+			spec.Label,
+			aLabel, aText,
+			bLabel, bText,
+			traceAnalysisValueExplanation(aDisplay, bDisplay, aLabel, bLabel)); err != nil {
+			return err
+		}
+	}
+	if !wrote {
+		if _, err := fmt.Fprintln(w, "  none"); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintln(w)
+	return err
+}
+
+type traceAnalysisMetricAverage struct {
+	value float64
+	ok    bool
+}
+
+func averageTraceMetric(agg traceAnalysisMetricAggregate) traceAnalysisMetricAverage {
+	if agg.Samples == 0 {
+		return traceAnalysisMetricAverage{}
+	}
+	return traceAnalysisMetricAverage{value: agg.Sum / float64(agg.Samples), ok: true}
+}
+
+func formatTraceMetricValue(kind TraceMetricKind, value float64) string {
+	switch kind {
+	case TraceMetricPerMatchCount:
+		return fmt.Sprintf("%6.2f/m", value)
+	case TraceMetricPerTurnRate:
+		return fmt.Sprintf("%7.1f%%", value)
+	default:
+		return fmt.Sprintf("%8.1f", value)
+	}
+}
+
+// formatTraceMetricRawCount renders a cumulative event count for a sub-1%
+// per-turn metric. Width matches formatTraceMetricValue (8 chars) so columns
+// line up with rate-formatted rows in the same comparison block.
+func formatTraceMetricRawCount(count int) string {
+	return fmt.Sprintf("%8d", count)
+}
+
+func percent(num, denom int) float64 {
+	if denom == 0 {
+		return 0
+	}
+	return float64(num) / float64(denom) * 100
+}
+
+func analysisTraceDirLabel(dir string) string {
+	if dir == "" {
+		return "."
+	}
+	label := filepath.Clean(dir)
+	if cwd, err := os.Getwd(); err == nil {
+		if abs, err := filepath.Abs(label); err == nil {
+			if rel, err := filepath.Rel(cwd, abs); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				label = rel
+			}
+		}
+	}
+	if label == "." || filepath.IsAbs(label) || strings.HasPrefix(label, ".") {
+		return label
+	}
+	return "." + string(filepath.Separator) + label
+}
+
+// traceAnalysisValueExplanation summarizes the gap between two metric values
+// as a single ratio in the form "<bigger> N.NNx <smaller>". Edge cases:
+// equal values render as "equal"; a zero on one side renders as "<other> only".
+func traceAnalysisValueExplanation(a, b float64, aLabel, bLabel string) string {
+	a = math.Round(a*100) / 100
+	b = math.Round(b*100) / 100
+	const epsilon = 0.0000001
+	switch {
+	case math.Abs(a-b) < epsilon:
+		return "equal"
+	case a == 0:
+		return fmt.Sprintf("%s only", bLabel)
+	case b == 0:
+		return fmt.Sprintf("%s only", aLabel)
+	case a > b:
+		return fmt.Sprintf("%s %.2fx %s", aLabel, a/b, bLabel)
+	default:
+		return fmt.Sprintf("%s %.2fx %s", bLabel, b/a, aLabel)
+	}
+}

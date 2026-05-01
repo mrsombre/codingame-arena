@@ -297,8 +297,8 @@ func TestReplayMovesFromFramesAndTurnCount(t *testing.T) {
 
 	moves := ReplayMovesFromFrames(replay)
 	wantMoves := ReplayMoves{
-		P0: []string{"MOVE A\n"},
-		P1: []string{"MOVE B\n", "MOVE C\n"},
+		Left:  []string{"MOVE A\n"},
+		Right: []string{"MOVE B\n", "MOVE C\n"},
 	}
 	if !reflect.DeepEqual(moves, wantMoves) {
 		t.Fatalf("ReplayMovesFromFrames() = %#v, want %#v", moves, wantMoves)
@@ -327,8 +327,9 @@ func TestReplayTraceTurnCount(t *testing.T) {
 
 	// 2 main decision turns (SPEED, MOVE) + 1 trailing game-over frame.
 	// The mid-replay speed sub-turn frame is folded into the SPEED main turn
-	// by the engine and does not count.
-	if got := ReplayTraceTurnCount(replay); got != 3 {
+	// by the engine and does not count. emitsPostEndFrame=true (Spring 2020):
+	// the trailing empty stdout always counts as the gameOverFrame.
+	if got := ReplayTraceTurnCount(replay, true); got != 3 {
 		t.Fatalf("ReplayTraceTurnCount() = %d, want 3", got)
 	}
 }
@@ -339,6 +340,7 @@ func TestReplayTraceTurnCount_DeactivationPairFrame(t *testing.T) {
 	// Last turn pairs P0's normal stdout with P1's empty stdout (timeout). The
 	// empty frame closes turn 2 — it is NOT a separate game-over marker, so
 	// the count must stay at 2 instead of being incremented to 3.
+	// emitsPostEndFrame=false (Winter 2026 family): no separate gameOverFrame.
 	replay := CodinGameReplay[CodinGameReplayFrame]{
 		GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
 			Frames: []CodinGameReplayFrame{
@@ -351,8 +353,40 @@ func TestReplayTraceTurnCount_DeactivationPairFrame(t *testing.T) {
 		},
 	}
 
-	if got := ReplayTraceTurnCount(replay); got != 2 {
+	if got := ReplayTraceTurnCount(replay, false); got != 2 {
 		t.Fatalf("ReplayTraceTurnCount() = %d, want 2", got)
+	}
+}
+
+// TestReplayTraceTurnCount_PostEndDeactivationPair covers the spring2020
+// scenario where the timing-out player's empty stdout opens the final main
+// turn (paired with the surviving side's stdout to close it), and the
+// engine then emits a separate post-end gameOverFrame trace turn — observed
+// in replay 875143793 before the emitsPostEndFrame flag existed. With the
+// flag, the trailing empty must count as the gameOverFrame even though it
+// looks like a deactivation pair close.
+func TestReplayTraceTurnCount_PostEndDeactivationPair(t *testing.T) {
+	t.Parallel()
+
+	replay := CodinGameReplay[CodinGameReplayFrame]{
+		GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+			Frames: []CodinGameReplayFrame{
+				{AgentID: -1, Summary: "init"},
+				{AgentID: 0, Stdout: "SPEED 0\n"},
+				{AgentID: 1, Stdout: "SPEED 0\n"},
+				{AgentID: 0, Stdout: "MOVE 0 1 1\n"},
+				{AgentID: 1, Stdout: "MOVE 0 2 2\n"},
+				{AgentID: 0, Summary: "speed sub-turn"},
+				{AgentID: 0, Summary: "P0 polled, timeout"},
+				{AgentID: 1, Stdout: "MOVE 0 3 3\n"},
+				{AgentID: 0, Summary: "game over"},
+			},
+		},
+	}
+
+	// 3 main turns (SPEED, MOVE, deactivation MOVE) + 1 gameOverFrame.
+	if got := ReplayTraceTurnCount(replay, true); got != 4 {
+		t.Fatalf("ReplayTraceTurnCount() = %d, want 4", got)
 	}
 }
 

@@ -472,11 +472,11 @@ func TestEatEmitsTraceWithBirdAndCoord(t *testing.T) {
 
 	advance(g, 0)
 
-	labels := make([]string, 0, len(g.traces))
+	types := make([]string, 0, len(g.traces))
 	for _, e := range g.traces {
-		labels = append(labels, e.Label)
+		types = append(types, e.Type)
 	}
-	assert.Contains(t, labels, TraceEat)
+	assert.Contains(t, types, TraceEat)
 }
 
 // ——— serialization smoke ————————————————————————————————————————————————

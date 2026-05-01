@@ -65,7 +65,7 @@ func SummarizeMatches(results []MatchResult) MatchSummary {
 	}
 }
 
-// FindWorstLosses returns indices of the worst P0 losses sorted by margin.
+// FindWorstLosses returns indices of the worst blue-bot losses sorted by margin.
 func FindWorstLosses(results []MatchResult, limit int) []int {
 	type lossEntry struct {
 		idx    int
@@ -74,20 +74,20 @@ func FindWorstLosses(results []MatchResult, limit int) []int {
 
 	var losses []lossEntry
 	for idx, result := range results {
-		var wonByP1 bool
-		var scoreP0, scoreP1 float64
+		var blueLost bool
+		var blueScore, redScore float64
 		for _, metric := range result.Metrics {
 			switch metric.Label {
-			case "loses_p0":
-				wonByP1 = metric.Value == 1
-			case "score_p0":
-				scoreP0 = metric.Value
-			case "score_p1":
-				scoreP1 = metric.Value
+			case "loses_blue":
+				blueLost = metric.Value == 1
+			case "score_blue":
+				blueScore = metric.Value
+			case "score_red":
+				redScore = metric.Value
 			}
 		}
-		if wonByP1 {
-			losses = append(losses, lossEntry{idx: idx, margin: scoreP0 - scoreP1})
+		if blueLost {
+			losses = append(losses, lossEntry{idx: idx, margin: blueScore - redScore})
 		}
 	}
 
@@ -106,9 +106,9 @@ func FindWorstLosses(results []MatchResult, limit int) []int {
 }
 
 // RenderMatch serializes a MatchResult to JSON for verbose output.
-// Scores and Winner prefer raw alive-segment sums when the engine provides
-// them, so the viewer's single-match status never shows the negative values
-// that referees like winter2026 emit after tie-break adjustments.
+// Scores and Winner prefer raw scores when the engine provides them, so the
+// viewer's single-match status can show intrinsic game scores instead of
+// referee-specific tie-break adjustments.
 func (r MatchResult) RenderMatch() string {
 	scores := r.Scores
 	winner := r.Winner
@@ -124,31 +124,31 @@ func (r MatchResult) RenderMatch() string {
 		}
 	}
 	payload := struct {
-		ID           int        `json:"id"`
-		Seed         int64      `json:"seed,string"`
-		Turns        int        `json:"turns"`
-		Winner       int        `json:"winner"`
-		LossReasonP0 LossReason `json:"loss_reason_p0"`
-		LossReasonP1 LossReason `json:"loss_reason_p1"`
-		ScoreP0      int        `json:"score_p0"`
-		ScoreP1      int        `json:"score_p1"`
-		TTFO         [2]float64 `json:"ttfo_ms"`
-		AOT          [2]float64 `json:"aot_ms"`
-		Metrics      []Metric   `json:"metrics,omitempty"`
-		Swapped      bool       `json:"swapped,omitempty"`
+		ID        int        `json:"id"`
+		Seed      int64      `json:"seed,string"`
+		Turns     int        `json:"turns"`
+		Winner    int        `json:"winner"`
+		BlueLoss  LossReason `json:"loss_reason_blue"`
+		RedLoss   LossReason `json:"loss_reason_red"`
+		BlueScore int        `json:"score_blue"`
+		RedScore  int        `json:"score_red"`
+		TTFO      [2]float64 `json:"ttfo_ms"`
+		AOT       [2]float64 `json:"aot_ms"`
+		Metrics   []Metric   `json:"metrics,omitempty"`
+		Swapped   bool       `json:"swapped,omitempty"`
 	}{
-		ID:           r.ID,
-		Seed:         r.Seed,
-		Turns:        r.Turns,
-		Winner:       winner,
-		LossReasonP0: r.LossReasons[0],
-		LossReasonP1: r.LossReasons[1],
-		ScoreP0:      scores[0],
-		ScoreP1:      scores[1],
-		TTFO:         r.TTFO(),
-		AOT:          r.AOT(),
-		Metrics:      r.Metrics,
-		Swapped:      r.Swapped,
+		ID:        r.ID,
+		Seed:      r.Seed,
+		Turns:     r.Turns,
+		Winner:    winner,
+		BlueLoss:  r.LossReasons[0],
+		RedLoss:   r.LossReasons[1],
+		BlueScore: scores[0],
+		RedScore:  scores[1],
+		TTFO:      r.TTFO(),
+		AOT:       r.AOT(),
+		Metrics:   r.Metrics,
+		Swapped:   r.Swapped,
 	}
 
 	data, err := json.Marshal(payload)
@@ -170,21 +170,21 @@ func WriteShortSummary(w io.Writer, s MatchSummary, elapsed time.Duration) error
 		return err
 	}
 	_, err = fmt.Fprintf(w, "Stats: wins=%.0f%% losses=%.0f%% draws=%.0f%% avg_score=%.1fx%.1f avg_turns=%.0f\n",
-		get("wins_p0")*100,
-		get("loses_p0")*100,
+		get("wins_blue")*100,
+		get("loses_blue")*100,
 		get("draws")*100,
-		get("score_p0"),
-		get("score_p1"),
+		get("score_blue"),
+		get("score_red"),
 		get("turns"),
 	)
 	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(w, "Timing: avg_first_response=%.0fmsx%.0fms avg_turn_response=%.0fmsx%.0fms\n",
-		get("ttfo_p0"),
-		get("ttfo_p1"),
-		get("aot_p0"),
-		get("aot_p1"),
+		get("ttfo_blue"),
+		get("ttfo_red"),
+		get("aot_blue"),
+		get("aot_red"),
 	)
 	return err
 }

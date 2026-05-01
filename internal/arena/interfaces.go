@@ -66,17 +66,10 @@ type TurnTraceProvider interface {
 	TurnTraces(turn int, players []Player) []TurnTrace
 }
 
-// TraceSummaryProvider returns the per-match aggregate of trace events.
-// Optional — if Referee also implements this, match writes the summary into
-// the trace JSON root under "trace_summary".
-type TraceSummaryProvider interface {
-	TraceSummary() TraceSummary
-}
-
 // RawScoresProvider returns per-player raw scores before any end-of-game
 // tiebreaker adjustments run. Used by the trace writer so match traces record
-// the intrinsic game state (e.g. sum of alive bird segments) rather than the
-// adjusted value the referee reports via Player.GetScore after OnEnd.
+// the engine's intrinsic scoring state rather than the adjusted value the
+// referee reports via Player.GetScore after OnEnd.
 // Optional — if Referee also implements this, match captures raw scores.
 type RawScoresProvider interface {
 	RawScores() [2]int
@@ -96,4 +89,26 @@ type LeagueResolver interface {
 // stamps the value onto the trace as "end_reason".
 type EndReasonProvider interface {
 	EndReason(turn int, players []Player, deactivationTurns [2]int) string
+}
+
+// GameOverFrameReporter signals that the engine has detected game-over and
+// is about to run its post-end "game over frame" (Java spring2020's
+// gameOverFrame branch — one extra gameTurn that calls performGameOver and
+// endGame). The runner skips player polling and command parsing on that
+// iteration: the outcome is decided, and re-polling exhausted replay bots
+// would interpret an empty stdout as a Timeout and erroneously deactivate
+// the surviving side. Engines that end the match on the same turn game-over
+// is detected (winter2026) don't need to implement this.
+type GameOverFrameReporter interface {
+	InGameOverFrame() bool
+}
+
+// PostEndFrameEmitter is the static factory-level companion to
+// GameOverFrameReporter: GameFactories whose engines always emit a separate
+// post-end trace turn for their game-over frame implement this so replay
+// verification can pre-compute the expected trace turn count without
+// instantiating a referee. Spring 2020 implements this; Winter 2026 does
+// not.
+type PostEndFrameEmitter interface {
+	EmitsPostEndFrame() bool
 }

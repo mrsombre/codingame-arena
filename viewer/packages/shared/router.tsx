@@ -1,6 +1,7 @@
 import { type BotEntry, fetchBots } from "@shared/api.ts"
 import { Button } from "@shared/components/ui/button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "@shared/components/ui/card.tsx"
+import { TooltipProvider } from "@shared/components/ui/tooltip.tsx"
 import { createHashHistory, createRootRoute, createRoute, createRouter, Link, Outlet, redirect, useParams, useRouterState } from "@tanstack/react-router"
 import { LoaderIcon } from "lucide-react"
 import { type ComponentType, createContext, useContext, useEffect, useState } from "react"
@@ -28,15 +29,7 @@ function AppShell({ title }: { title: string }) {
       .catch(() => setBotsError(true))
   }, [])
 
-  if (bots === null) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <LoaderIcon className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (botsError || bots.length === 0) {
+  if (botsError || bots?.length === 0) {
     return (
       <div className="p-10">
         <Card size="sm">
@@ -45,6 +38,14 @@ function AppShell({ title }: { title: string }) {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">{botsError ? "Failed to load bots" : "No bots available. Add binaries to --bin-dir."}</CardContent>
         </Card>
+      </div>
+    )
+  }
+
+  if (bots === null) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <LoaderIcon className="size-6 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -60,17 +61,19 @@ function AppShell({ title }: { title: string }) {
 
   return (
     <BotsContext.Provider value={bots}>
-      <div className="flex flex-col gap-6 p-10">
-        <div className="flex items-center gap-4">
-          <h1 className="font-mono text-sm uppercase tracking-wider text-muted-foreground">{title}</h1>
-          <div className="flex gap-1 rounded-md border p-1">
-            {tabLink("/single", "Single")}
-            {tabLink("/batch", "Batch")}
-            {tabLink("/replays", "Replays")}
+      <TooltipProvider>
+        <div className="flex flex-col gap-6 p-6 lg:p-10">
+          <div className="flex flex-wrap items-center gap-4">
+            <h1 className="font-mono text-sm tracking-wider text-muted-foreground uppercase">{title}</h1>
+            <div className="flex gap-1 border p-1">
+              {tabLink("/single", "Single")}
+              {tabLink("/batch", "Batch")}
+              {tabLink("/replays", "Replays")}
+            </div>
           </div>
+          <Outlet />
         </div>
-        <Outlet />
-      </div>
+      </TooltipProvider>
     </BotsContext.Provider>
   )
 }

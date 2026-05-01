@@ -1,48 +1,52 @@
 package engine
 
 import (
-	"strconv"
-	"strings"
-
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-// Trace labels emitted per turn, attached to trace output for replay viewers.
+// Trace types emitted per turn, attached to trace output for replay viewers
+// and analyzers. Each type has a typed meta payload defined below; the wire
+// shape is `{"type": <const>, "meta": {...}}`.
 const (
-	TraceEat     = "EAT"
-	TraceKilled  = "KILLED"
-	TraceSpeed   = "SPEED"
-	TraceSwitch  = "SWITCH"
+	TraceEat          = "EAT"
+	TraceKilled       = "KILLED"
+	TraceSpeed        = "SPEED"
+	TraceSwitch       = "SWITCH"
+	TraceCollideSelf  = "COLLIDE_SELF"
+	TraceCollideEnemy = "COLLIDE_ENEMY"
 )
 
-func tracePacPayload(pacID int) string {
-	return strconv.Itoa(pacID)
+// PacMeta is the meta for trace events whose only subject is one pac (SPEED,
+// COLLIDE_SELF, COLLIDE_ENEMY).
+type PacMeta struct {
+	Pac int `json:"pac"`
 }
 
-func traceEatPayload(pacID int, c Coord, value int) string {
-	return strconv.Itoa(pacID) + " " + strconv.Itoa(c.X) + "," + strconv.Itoa(c.Y) + " " + strconv.Itoa(value)
+// EatMeta is the meta for the EAT trace. Cost > 1 marks a super pellet.
+type EatMeta struct {
+	Pac   int    `json:"pac"`
+	Coord [2]int `json:"coord"`
+	Cost  int    `json:"cost"`
 }
 
-func traceKilledPayload(deadID int, c Coord, killerID int) string {
-	return strconv.Itoa(deadID) + " " + strconv.Itoa(c.X) + "," + strconv.Itoa(c.Y) + " " + strconv.Itoa(killerID)
+// KilledMeta is the meta for the KILLED trace. Pac is the dead pac (subject);
+// Killer is the global pac ID that caused the kill.
+type KilledMeta struct {
+	Pac    int    `json:"pac"`
+	Coord  [2]int `json:"coord"`
+	Killer int    `json:"killer"`
 }
 
-func traceSwitchPayload(pacID int, t PacmanType) string {
-	return strconv.Itoa(pacID) + " " + t.Name()
+// SwitchMeta is the meta for the SWITCH trace.
+type SwitchMeta struct {
+	Pac  int    `json:"pac"`
+	Type string `json:"type"`
 }
 
-func (g *Game) trace(label, payload string) {
-	g.traces = append(g.traces, arena.TurnTrace{Label: label, Payload: payload})
+func coordPair(c Coord) [2]int {
+	return [2]int{c.X, c.Y}
 }
 
-// parseLeadingPacID extracts the first whitespace-delimited integer from a
-// trace payload. Every Spring 2020 trace payload starts with the subject pac's
-// global ID so the runner can bucket events per pac in the match summary.
-func parseLeadingPacID(payload string) (int, bool) {
-	head, _, _ := strings.Cut(payload, " ")
-	n, err := strconv.Atoi(head)
-	if err != nil {
-		return 0, false
-	}
-	return n, true
+func (g *Game) trace(t arena.TurnTrace) {
+	g.traces = append(g.traces, t)
 }

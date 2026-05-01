@@ -1,16 +1,19 @@
 BIN_DIR := bin
 
 # utility
-.PHONY: clean
+.PHONY: clean reset
 
 clean:
 	rm -rf bin/* tmp/* replays/* traces/*
+
+reset:
+	rm -rf replays/* traces/*
 
 # backend
 .PHONY: test-arena test-games lint-arena build-arena build-viewer clean
 
 test-arena:
-	go test ./internal/...
+	go test ./cmd/arena ./internal/...
 
 test-games:
 	go test ./games/...
@@ -35,30 +38,11 @@ lint-viewer:
 build-viewer:
 	cd $(VIEWER_DIR) && pnpm run build
 
-# spring-2020
-
-SPRING2020_AGENTS := games/spring2020/agents
-SPRING2020_CPPBOT := $(BIN_DIR)/bot-spring2020-cpp
-SPRING2020_PYBOT  := $(BIN_DIR)/bot-spring2020-py
-
-.PHONY: build-spring2020-agents match-spring2020
-
-build-spring2020-agents:
-	rm -f $(BIN_DIR)/bot-*
-	g++ -std=c++17 -O2 -o $(SPRING2020_CPPBOT) $(SPRING2020_AGENTS)/bot.cpp
-	cp -f $(SPRING2020_AGENTS)/bot.py $(SPRING2020_PYBOT)
-
-match-spring2020:
-	./$(BIN_DIR)/arena --game=spring2020 --p0=./$(SPRING2020_CPPBOT) --p1=./$(SPRING2020_PYBOT) \
-		--seed=100030005000 --simulations 100
-
-# winter-2026
-
+# match runner
+.PHONY: build-winter2026-agents match-winter2026
 WINTER2026_AGENTS := games/winter2026/agents
 WINTER2026_CPPBOT := $(BIN_DIR)/bot-winter2026-cpp
 WINTER2026_PYBOT  := $(BIN_DIR)/bot-winter2026-py
-
-.PHONY: build-winter2026-agents match-winter2026
 
 build-winter2026-agents:
 	rm -f $(BIN_DIR)/bot-*
@@ -66,5 +50,19 @@ build-winter2026-agents:
 	cp -f $(WINTER2026_AGENTS)/bot.py $(WINTER2026_PYBOT)
 
 match-winter2026:
-	./$(BIN_DIR)/arena --game=winter2026 --p0=./$(WINTER2026_CPPBOT) --p1=./$(WINTER2026_PYBOT) \
-		--seed=100030005000 --simulations 100
+	./$(BIN_DIR)/arena --game=winter2026 --blue=./$(WINTER2026_CPPBOT) --red=./$(WINTER2026_PYBOT) \
+		--seed=100030005000700089 --simulations 50 --trace
+
+# analytics
+.PHONY: leaderboard convert analyze
+
+leaderboard:
+	./$(BIN_DIR)/arena replay leaderboard \
+		mrsombre https://www.codingame.com/multiplayer/bot-programming/winter-challenge-2026-snakebyte/leaderboard \
+		--game winter2026
+
+convert:
+	./$(BIN_DIR)/arena convert --game winter2026
+
+analyze:
+	./$(BIN_DIR)/arena analyze --game winter2026

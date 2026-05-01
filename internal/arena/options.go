@@ -57,7 +57,7 @@ Commands:
   run          Run one or more match simulations against a player binary
   replay       Download replay JSON (sub: get <url|id>..., leaderboard <url> <nick>)
   convert      Convert replay JSON files into arena trace files
-  analyze      Analyze winner-side strengths from trace files
+  analyze      Analyze trace outcomes and game-owned metrics
   serialize    Print initial game input for first turn for a given seed
   serve        Serve the embedded web viewer
 

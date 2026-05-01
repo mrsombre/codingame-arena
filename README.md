@@ -15,8 +15,8 @@ Local game engine runner for [CodinGame](https://www.codingame.com/) bot program
 
 ```shell
 $ bin/arena --game=winter2026 \
-    --p0=bin/bot-winter2026-cpp \
-    --p1=bin/bot-winter2026-py \
+    --blue=bin/bot-winter2026-cpp \
+    --red=bin/bot-winter2026-py \
     --seed=100030005000 --simulations 100
 
 Summary: 100 matches played (3.15s)
@@ -40,7 +40,7 @@ Timing: avg_first_response=29msx198ms avg_turn_response=0msx0ms
 | `run`       | Run one or more match simulations against a player      |
 | `replay`    | Download replay JSON (`get`, `leaderboard` subcommands) |
 | `convert`   | Convert replay JSON files into arena trace files        |
-| `analyze`   | Analyze winner-side strengths from trace files          |
+| `analyze`   | Analyze trace outcomes and game-owned metrics           |
 | `serialize` | Print initial game input for first turn for a seed      |
 | `serve`     | Serve the embedded web viewer                           |
 

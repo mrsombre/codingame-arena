@@ -99,7 +99,7 @@ func TestDebug_InspectReplay(t *testing.T) {
 	for i, tt := range trace.Turns {
 		var events []string
 		for _, ev := range tt.Traces {
-			events = append(events, ev.Label+"("+ev.Payload+")")
+			events = append(events, ev.Type+"("+string(ev.Meta)+")")
 		}
 		evstr := ""
 		if len(events) > 0 {

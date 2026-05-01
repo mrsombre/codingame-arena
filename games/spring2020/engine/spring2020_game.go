@@ -505,11 +505,11 @@ func (g *Game) ExecutePacmenAbilities() {
 		switch ability {
 		case AbilitySetRock, AbilitySetPaper, AbilitySetScissors:
 			pac.Type = PacTypeFromAbility(ability)
-			g.trace(TraceSwitch, traceSwitchPayload(pac.ID, pac.Type))
+			g.trace(arena.MakeTurnTrace(TraceSwitch, SwitchMeta{Pac: pac.ID, Type: pac.Type.Name()}))
 		case AbilitySpeed:
 			pac.Speed = g.Config.SPEED_BOOST
 			pac.AbilityDuration = g.Config.ABILITY_DURATION
-			g.trace(TraceSpeed, tracePacPayload(pac.ID))
+			g.trace(arena.MakeTurnTrace(TraceSpeed, PacMeta{Pac: pac.ID}))
 		}
 		pac.AbilityCooldown = g.Config.ABILITY_COOLDOWN
 	}
@@ -648,6 +648,18 @@ func (g *Game) ResolveMovement() {
 
 	resolution := g.ResolvePacmenMovement()
 
+	for _, pac := range resolution.BlockedPacmen {
+		blocker := resolution.BlockerOf(pac)
+		if blocker == nil {
+			continue
+		}
+		label := TraceCollideEnemy
+		if blocker.Owner == pac.Owner {
+			label = TraceCollideSelf
+		}
+		g.trace(arena.MakeTurnTrace(label, PacMeta{Pac: pac.ID}))
+	}
+
 	for _, pac := range g.Pacmen {
 		for _, other := range g.Pacmen {
 			if pac == other {
@@ -665,7 +677,11 @@ func (g *Game) ResolveMovement() {
 	pacmenToKill := make([]*Pacman, len(kills))
 	for i, k := range kills {
 		pacmenToKill[i] = k.victim
-		g.trace(TraceKilled, traceKilledPayload(k.victim.ID, k.victim.Position, k.killer.ID))
+		g.trace(arena.MakeTurnTrace(TraceKilled, KilledMeta{
+			Pac:    k.victim.ID,
+			Coord:  coordPair(k.victim.Position),
+			Killer: k.killer.ID,
+		}))
 	}
 
 	g.KillPacmen(pacmenToKill)
@@ -673,7 +689,6 @@ func (g *Game) ResolveMovement() {
 	g.EatPellets()
 	g.EatCherries()
 
-	_ = resolution
 	g.CurrentStep++
 }
 
@@ -1050,7 +1065,11 @@ func (g *Game) EatItem(hasItem func(*Cell) bool, pelletValue int) {
 			}
 			credited[pac.Owner] = struct{}{}
 			pac.Owner.Pellets += pelletValue
-			g.trace(TraceEat, traceEatPayload(pac.ID, coord, pelletValue))
+			g.trace(arena.MakeTurnTrace(TraceEat, EatMeta{
+				Pac:   pac.ID,
+				Coord: coordPair(coord),
+				Cost:  pelletValue,
+			}))
 		}
 		cell := g.Grid.Get(coord)
 		cell.HasPellet = false

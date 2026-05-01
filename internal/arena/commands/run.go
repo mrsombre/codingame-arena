@@ -11,9 +11,11 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
+const worstLossLimit = 5
+
 type runnerOutput struct {
-	P0Bin       string                 `json:"p0_bin"`
-	P1Bin       string                 `json:"p1_bin"`
+	BlueBotBin  string                 `json:"blue_bin"`
+	RedBotBin   string                 `json:"red_bin"`
 	Runner      runnerMetadata         `json:"runner"`
 	Summary     arena.MatchSummary     `json:"summary"`
 	BadCommands []arena.BadCommandInfo `json:"bad_commands,omitempty"`
@@ -30,8 +32,8 @@ type runnerMetadata struct {
 	TraceDir      string `json:"trace_dir,omitempty"`
 	MaxTurns      int    `json:"max_turns"`
 	NoSwap        bool   `json:"no_swap"`
-	P0Left        int    `json:"p0_left"`
-	P0Right       int    `json:"p0_right"`
+	BlueLeft      int    `json:"blue_left"`
+	BlueRight     int    `json:"blue_right"`
 }
 
 // RunUsage returns the help text shown for `arena help run`.
@@ -41,69 +43,76 @@ func RunUsage(fs *pflag.FlagSet) string {
 
 // Run is the entry point for the "run" subcommand.
 func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	parsed, err := parseRunOptions(args, fs, v)
+	opts, err := parseRunOptions(args, fs, v)
 	if err != nil {
 		return err
 	}
 
 	startedAt := time.Now()
+	results := runMatches(factory, opts, v, startedAt)
+	elapsed := time.Since(startedAt)
 
+	return writeRunOutput(stdout, opts, results, elapsed)
+}
+
+func runMatches(factory arena.GameFactory, opts RunOptions, v *viper.Viper, startedAt time.Time) []arena.MatchResult {
 	traceDir := ""
-	if parsed.Trace {
-		traceDir = parsed.TraceDir
+	if opts.Trace {
+		traceDir = opts.TraceDir
 	}
 	traceWriter := arena.NewTraceWriter(traceDir, startedAt.Unix())
 
 	runner := arena.NewRunner(factory, arena.MatchOptions{
-		MaxTurns:    parsed.MaxTurns,
-		P0Bin:       parsed.P0Bin,
-		P1Bin:       parsed.P1Bin,
-		Debug:       parsed.Debug,
-		NoSwap:      parsed.NoSwap,
+		MaxTurns:    opts.MaxTurns,
+		BlueBotBin:  opts.BlueBotBin,
+		RedBotBin:   opts.RedBotBin,
+		Debug:       opts.Debug,
+		NoSwap:      opts.NoSwap,
 		TraceWriter: traceWriter,
 		GameOptions: v,
 	})
 
-	results := arena.RunMatches(parsed.BatchOptions, runner.RunMatch)
-	elapsed := time.Since(startedAt)
+	return arena.RunMatches(opts.BatchOptions, runner.RunMatch)
+}
 
-	if parsed.Debug {
+func writeRunOutput(stdout io.Writer, opts RunOptions, results []arena.MatchResult, elapsed time.Duration) error {
+	if opts.Debug {
 		_, err := io.WriteString(stdout, results[0].RenderMatch())
 		return err
 	}
 
-	p0Left := 0
-	for _, r := range results {
-		if !r.Swapped {
-			p0Left++
-		}
+	out := buildRunnerOutput(opts, results)
+	if !opts.Verbose {
+		return arena.WriteShortSummary(stdout, out.Summary, elapsed)
 	}
 
-	var allBadCommands []arena.BadCommandInfo
-	for _, r := range results {
-		allBadCommands = append(allBadCommands, r.BadCommands...)
-	}
+	enc := json.NewEncoder(stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(out)
+}
 
+func buildRunnerOutput(opts RunOptions, results []arena.MatchResult) runnerOutput {
+	blueLeft := countBlueLeft(results)
 	out := runnerOutput{
-		P0Bin: parsed.P0Bin,
-		P1Bin: parsed.P1Bin,
+		BlueBotBin: opts.BlueBotBin,
+		RedBotBin:  opts.RedBotBin,
 		Runner: runnerMetadata{
-			Simulations:   parsed.Simulations,
-			Parallel:      parsed.Parallel,
-			Seed:          parsed.Seed,
-			SeedIncrement: parsed.SeedIncrement,
-			OutputMatches: parsed.OutputMatches,
-			TraceDir:      traceDir,
-			MaxTurns:      parsed.MaxTurns,
-			NoSwap:        parsed.NoSwap,
-			P0Left:        p0Left,
-			P0Right:       len(results) - p0Left,
+			Simulations:   opts.Simulations,
+			Parallel:      opts.Parallel,
+			Seed:          opts.Seed,
+			SeedIncrement: opts.SeedIncrement,
+			OutputMatches: opts.OutputMatches,
+			TraceDir:      traceDir(opts),
+			MaxTurns:      opts.MaxTurns,
+			NoSwap:        opts.NoSwap,
+			BlueLeft:      blueLeft,
+			BlueRight:     len(results) - blueLeft,
 		},
 		Summary:     arena.SummarizeMatches(results),
-		BadCommands: allBadCommands,
+		BadCommands: collectBadCommands(results),
 	}
 
-	worstIndices := arena.FindWorstLosses(results, 5)
+	worstIndices := arena.FindWorstLosses(results, worstLossLimit)
 	if len(worstIndices) > 0 {
 		out.WorstLosses = make([]json.RawMessage, 0, len(worstIndices))
 		for _, idx := range worstIndices {
@@ -111,18 +120,37 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 		}
 	}
 
-	if parsed.OutputMatches {
+	if opts.OutputMatches {
 		out.Matches = make([]json.RawMessage, 0, len(results))
 		for _, result := range results {
 			out.Matches = append(out.Matches, json.RawMessage(result.RenderMatch()))
 		}
 	}
 
-	if !parsed.Verbose {
-		return arena.WriteShortSummary(stdout, out.Summary, elapsed)
-	}
+	return out
+}
 
-	enc := json.NewEncoder(stdout)
-	enc.SetIndent("", "  ")
-	return enc.Encode(out)
+func traceDir(opts RunOptions) string {
+	if !opts.Trace {
+		return ""
+	}
+	return opts.TraceDir
+}
+
+func countBlueLeft(results []arena.MatchResult) int {
+	count := 0
+	for _, result := range results {
+		if !result.Swapped {
+			count++
+		}
+	}
+	return count
+}
+
+func collectBadCommands(results []arena.MatchResult) []arena.BadCommandInfo {
+	var all []arena.BadCommandInfo
+	for _, result := range results {
+		all = append(all, result.BadCommands...)
+	}
+	return all
 }

@@ -17,161 +17,188 @@ import (
 
 type handlerFunc func(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error
 
+type commandSpec struct {
+	addFlags     func(*pflag.FlagSet)
+	handler      handlerFunc
+	needsFactory bool
+	usage        func(*pflag.FlagSet) string
+	subcommands  map[string]commandSpec
+	subUsage     func() string
+}
+
 func main() {
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func run(args []string, stdout, stderr io.Writer) int {
+	if err := execute(args, stdout); err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	return 0
+}
+
+func execute(args []string, stdout io.Writer) error {
 	games := arena.Games()
 	if len(games) == 0 {
-		fmt.Fprintln(os.Stderr, "no engines registered")
-		os.Exit(1)
+		return errors.New("no engines registered")
 	}
 
-	args := os.Args[1:]
 	if len(args) == 0 {
-		fmt.Println(arena.Usage(games))
-		return
+		return writeLine(stdout, arena.Usage(games))
 	}
 
-	command, rest := args[0], args[1:]
-	// If the first token isn't a subcommand name, assume implicit "run"
-	// and feed every arg as a flag (preserves `arena --p0 …` ergonomics).
-	if strings.HasPrefix(command, "-") {
-		if command == "--help" || command == "-h" {
-			fmt.Println(arena.Usage(games))
-			return
-		}
-		command, rest = "run", args
-	}
-
+	command, rest := normalizeCommand(args)
 	if command == "help" {
-		if err := printHelp(rest, games); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		return
+		return printHelp(stdout, rest, games)
+	}
+
+	spec, rest, err := selectCommand(command, rest)
+	if err != nil {
+		return err
+	}
+	if spec.handler == nil {
+		return writeLine(stdout, spec.subUsage())
 	}
 
 	fs := arena.NewBaseFlagSet("arena")
-
-	var handler handlerFunc
-	var needsFactory bool
-	switch command {
-	case "run":
-		commands.AddRunFlags(fs)
-		handler = commands.Run
-		needsFactory = true
-	case "analyze":
-		commands.AddAnalyzeFlags(fs)
-		handler = commands.Analyze
-	case "convert":
-		commands.AddConvertFlags(fs)
-		handler = commands.Convert
-		needsFactory = true
-	case "serve":
-		commands.AddServeFlags(fs)
-		handler = commands.Serve
-		needsFactory = true
-	case "serialize":
-		commands.AddSerializeFlags(fs)
-		handler = commands.Serialize
-		needsFactory = true
-	case "replay":
-		if len(rest) == 0 {
-			fmt.Println(commands.ReplayUsage())
-			return
-		}
-		sub := rest[0]
-		rest = rest[1:]
-		switch sub {
-		case "get":
-			commands.AddReplayGetFlags(fs)
-			handler = commands.ReplayGet
-			needsFactory = true
-		case "leaderboard":
-			commands.AddReplayLeaderboardFlags(fs)
-			handler = commands.ReplayLeaderboard
-			needsFactory = true
-		default:
-			fmt.Fprintf(os.Stderr, "unknown replay subcommand %q; run `arena help replay` for usage\n", sub)
-			os.Exit(1)
-		}
-	default:
-		fmt.Fprintf(os.Stderr, "unknown command %q; run `arena help` for usage\n", command)
-		os.Exit(1)
-	}
-
+	spec.addFlags(fs)
 	if err := fs.Parse(rest); err != nil {
 		if errors.Is(err, pflag.ErrHelp) {
-			fmt.Fprintln(os.Stderr, `run "arena help" for usage`)
-			os.Exit(1)
+			return fmt.Errorf(`run "arena help %s" for usage`, command)
 		}
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 
 	v, err := arena.NewViper(fs)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "config error:", err)
-		os.Exit(1)
+		return fmt.Errorf("config error: %w", err)
 	}
 
 	var factory arena.GameFactory
-	if needsFactory {
+	if spec.needsFactory {
 		factory, err = resolveFactory(v, games)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+			return err
 		}
 	}
 
-	if err := handler(rest, os.Stdout, factory, fs, v); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	return spec.handler(rest, stdout, factory, fs, v)
+}
+
+func commandSet() map[string]commandSpec {
+	return map[string]commandSpec{
+		"run": {
+			addFlags:     commands.AddRunFlags,
+			handler:      commands.Run,
+			needsFactory: true,
+			usage:        commands.RunUsage,
+		},
+		"analyze": {
+			addFlags: commands.AddAnalyzeFlags,
+			handler:  commands.Analyze,
+			usage:    commands.AnalyzeUsage,
+		},
+		"convert": {
+			addFlags:     commands.AddConvertFlags,
+			handler:      commands.Convert,
+			needsFactory: true,
+			usage:        commands.ConvertUsage,
+		},
+		"serve": {
+			addFlags: commands.AddServeFlags,
+			handler:  commands.Serve,
+			usage:    commands.ServeUsage,
+		},
+		"serialize": {
+			addFlags:     commands.AddSerializeFlags,
+			handler:      commands.Serialize,
+			needsFactory: true,
+			usage:        commands.SerializeUsage,
+		},
+		"replay": {
+			subUsage: commands.ReplayUsage,
+			subcommands: map[string]commandSpec{
+				"get": {
+					addFlags:     commands.AddReplayGetFlags,
+					handler:      commands.ReplayGet,
+					needsFactory: true,
+					usage:        commands.ReplayGetUsage,
+				},
+				"leaderboard": {
+					addFlags:     commands.AddReplayLeaderboardFlags,
+					handler:      commands.ReplayLeaderboard,
+					needsFactory: true,
+					usage:        commands.ReplayLeaderboardUsage,
+				},
+			},
+		},
 	}
+}
+
+func normalizeCommand(args []string) (string, []string) {
+	command, rest := args[0], args[1:]
+	if command == "--help" || command == "-h" {
+		return "help", nil
+	}
+	// If the first token isn't a subcommand name, assume implicit "run"
+	// and feed every arg as a flag (preserves `arena --blue ...` ergonomics).
+	if strings.HasPrefix(command, "-") {
+		return "run", args
+	}
+	return command, rest
+}
+
+func selectCommand(command string, args []string) (commandSpec, []string, error) {
+	spec, ok := commandSet()[command]
+	if !ok {
+		return commandSpec{}, nil, fmt.Errorf("unknown command %q; run `arena help` for usage", command)
+	}
+	if len(spec.subcommands) == 0 {
+		return spec, args, nil
+	}
+	if len(args) == 0 {
+		return spec, args, nil
+	}
+
+	subcommand := args[0]
+	sub, ok := spec.subcommands[subcommand]
+	if !ok {
+		return commandSpec{}, nil, fmt.Errorf("unknown %s subcommand %q; run `arena help %s` for usage", command, subcommand, command)
+	}
+	return sub, args[1:], nil
 }
 
 // printHelp dispatches `arena help [command [subcommand]]` and prints the
 // matching usage text to stdout.
-func printHelp(args []string, games []string) error {
+func printHelp(stdout io.Writer, args []string, games []string) error {
 	if len(args) == 0 {
-		fmt.Println(arena.Usage(games))
-		return nil
+		return writeLine(stdout, arena.Usage(games))
+	}
+
+	spec, ok := commandSet()[args[0]]
+	if !ok {
+		return fmt.Errorf("unknown command %q; run `arena help` for usage", args[0])
+	}
+	if len(spec.subcommands) > 0 {
+		if len(args) < 2 {
+			return writeLine(stdout, spec.subUsage())
+		}
+		sub, ok := spec.subcommands[args[1]]
+		if !ok {
+			return fmt.Errorf("unknown %s subcommand %q; run `arena help %s` for usage", args[0], args[1], args[0])
+		}
+		spec = sub
 	}
 
 	fs := arena.NewBaseFlagSet("arena")
-	switch args[0] {
-	case "run":
-		commands.AddRunFlags(fs)
-		fmt.Println(commands.RunUsage(fs))
-	case "analyze":
-		commands.AddAnalyzeFlags(fs)
-		fmt.Println(commands.AnalyzeUsage(fs))
-	case "convert":
-		commands.AddConvertFlags(fs)
-		fmt.Println(commands.ConvertUsage(fs))
-	case "serve":
-		commands.AddServeFlags(fs)
-		fmt.Println(commands.ServeUsage(fs))
-	case "serialize":
-		commands.AddSerializeFlags(fs)
-		fmt.Println(commands.SerializeUsage(fs))
-	case "replay":
-		if len(args) < 2 {
-			fmt.Println(commands.ReplayUsage())
-			return nil
-		}
-		switch args[1] {
-		case "get":
-			commands.AddReplayGetFlags(fs)
-			fmt.Println(commands.ReplayGetUsage(fs))
-		case "leaderboard":
-			commands.AddReplayLeaderboardFlags(fs)
-			fmt.Println(commands.ReplayLeaderboardUsage(fs))
-		default:
-			return fmt.Errorf("unknown replay subcommand %q; run `arena help replay` for usage", args[1])
-		}
-	default:
-		return fmt.Errorf("unknown command %q; run `arena help` for usage", args[0])
-	}
-	return nil
+	spec.addFlags(fs)
+	return writeLine(stdout, spec.usage(fs))
+}
+
+func writeLine(w io.Writer, line string) error {
+	_, err := fmt.Fprintln(w, line)
+	return err
 }
 
 // resolveFactory picks the active game factory from config or auto-selects
