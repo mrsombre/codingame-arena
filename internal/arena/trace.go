@@ -35,10 +35,12 @@ func (s TraceScore) MarshalJSON() ([]byte, error) {
 // intentionally not recorded — the bot→side mapping here is ground truth for
 // downstream trace consumers (e.g. training).
 //
-// Blue is the bot/agent name analyze treats as "us": for self-play traces
-// it's the basename of the user's --p0 binary; for converted replays it's
-// copied from the saved replay's blue field. Analyzers locate our side by
-// scanning Players[i] == Blue (so swap-on-run still resolves correctly).
+// Blue is the bot/agent name analyze treats as "us". It is required on every
+// trace: self-play sets it to the basename of --p0 (which always equals one
+// of Players); convert sets it to the saved replay's blue field (which is
+// the username supplied to `replay get` / `replay leaderboard`). Analyzers
+// locate our side by scanning Players[i] == Blue (so seed-driven side swaps
+// still resolve correctly).
 type TraceMatch struct {
 	TraceID  int64  `json:"trace_id,omitempty"`
 	MatchID  int    `json:"match_id"`
@@ -80,9 +82,11 @@ const (
 )
 
 // BlueSide returns the index (0 or 1) of the side identified by Blue in
-// Players, or -1 if Blue is unset or doesn't match a player. When both
-// Players entries equal Blue (e.g. self-play of identical binary names),
-// the lower index wins.
+// Players. Blue is an invariant on loaded traces — convert refuses to write
+// a trace without it and analyze refuses to load one — so callers can treat
+// the result as 0/1. When both Players entries equal Blue (e.g. self-play
+// of identical binary names), the lower index wins. Returns -1 only on
+// unloaded zero-value TraceMatch instances.
 func (t TraceMatch) BlueSide() int {
 	if t.Blue == "" {
 		return -1

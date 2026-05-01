@@ -21,6 +21,8 @@ func TestLoadAnalyzeTraceFilesSkipsNonTraceJSON(t *testing.T) {
 	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{
   "gameId": "spring2020",
   "seed": "1",
+  "blue": "us",
+  "players": ["us", "rival"],
   "scores": [1.0, 0.0],
   "ranks": [0, 1],
   "turns": [{"turn": 0, "output": ["WAIT", "WAIT"]}]
@@ -38,6 +40,8 @@ func TestResolveAnalyzeGameInfersSingleGame(t *testing.T) {
 	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{
   "gameId": "spring2020",
   "seed": "1",
+  "blue": "us",
+  "players": ["us", "rival"],
   "scores": [1.0, 0.0],
   "ranks": [0, 1],
   "turns": [{"turn": 0}]
@@ -53,8 +57,8 @@ func TestResolveAnalyzeGameInfersSingleGame(t *testing.T) {
 
 func TestResolveAnalyzeGameRequiresExplicitGameForMixedTraces(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
-	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{"gameId": "spring2020", "turns": [{"turn": 0}]}`)
-	writeAnalyzeTestFile(t, traceDir, "trace-2-0.json", `{"gameId": "winter2026", "turns": [{"turn": 0}]}`)
+	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{"gameId": "spring2020", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+	writeAnalyzeTestFile(t, traceDir, "trace-2-0.json", `{"gameId": "winter2026", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
 
 	files, err := loadAnalyzeTraceFiles(traceDir)
 	require.NoError(t, err)
@@ -72,8 +76,8 @@ func TestAnalyzeUsesGameFlagToFilterTraceFiles(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
 	gameA := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_a"
 	gameB := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_b"
-	writeAnalyzeTestFile(t, traceDir, "trace-a.json", fmt.Sprintf(`{"type": "trace-a", "gameId": %q, "turns": [{"turn": 0}]}`, gameA))
-	writeAnalyzeTestFile(t, traceDir, "trace-b.json", fmt.Sprintf(`{"type": "trace-b", "gameId": %q, "turns": [{"turn": 0}]}`, gameB))
+	writeAnalyzeTestFile(t, traceDir, "trace-a.json", fmt.Sprintf(`{"type": "trace-a", "gameId": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameA))
+	writeAnalyzeTestFile(t, traceDir, "trace-b.json", fmt.Sprintf(`{"type": "trace-b", "gameId": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameB))
 
 	factory := &recordingAnalyzeFactory{name: gameA}
 	arena.Register(factory)

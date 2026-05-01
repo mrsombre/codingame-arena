@@ -90,6 +90,12 @@ func loadAnalyzeTraceFiles(traceDir string) ([]arena.TraceFile, error) {
 		if !looksLikeArenaTrace(trace) {
 			continue
 		}
+		if trace.Blue == "" {
+			return nil, fmt.Errorf("%s: trace missing blue (re-run or re-convert; analyze requires every trace to identify the user side)", entry.Name())
+		}
+		if trace.BlueSide() == -1 {
+			return nil, fmt.Errorf("%s: blue %q not found in players %v", entry.Name(), trace.Blue, trace.Players)
+		}
 
 		files = append(files, arena.TraceFile{
 			Name:  entry.Name(),

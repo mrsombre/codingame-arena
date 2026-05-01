@@ -163,9 +163,8 @@ type traceAnalysisReport struct {
 	decided int
 	draws   int
 
-	blueMatches int
-	blueWins    int
-	blueLosses  int
+	blueWins   int
+	blueLosses int
 
 	turnSum  int
 	turnMin  int
@@ -209,23 +208,20 @@ func (r *traceAnalysisReport) add(trace TraceMatch, stats TraceMetricStats) {
 	}
 
 	blueSide := trace.BlueSide()
-	if blueSide == 0 || blueSide == 1 {
-		r.blueMatches++
-		switch winner {
-		case blueSide:
-			r.blueWins++
-		case 1 - blueSide:
-			r.blueLosses++
-		}
-		r.blueScoreSum += float64(trace.Scores[blueSide])
-		r.redScoreSum += float64(trace.Scores[1-blueSide])
-		if trace.Timing != nil {
-			r.timingMatches++
-			r.blueFirstResp += trace.Timing.FirstResponse[blueSide]
-			r.redFirstResp += trace.Timing.FirstResponse[1-blueSide]
-			r.blueTurnResp += trace.Timing.ResponseAverage[blueSide]
-			r.redTurnResp += trace.Timing.ResponseAverage[1-blueSide]
-		}
+	switch winner {
+	case blueSide:
+		r.blueWins++
+	case 1 - blueSide:
+		r.blueLosses++
+	}
+	r.blueScoreSum += float64(trace.Scores[blueSide])
+	r.redScoreSum += float64(trace.Scores[1-blueSide])
+	if trace.Timing != nil {
+		r.timingMatches++
+		r.blueFirstResp += trace.Timing.FirstResponse[blueSide]
+		r.redFirstResp += trace.Timing.FirstResponse[1-blueSide]
+		r.blueTurnResp += trace.Timing.ResponseAverage[blueSide]
+		r.redTurnResp += trace.Timing.ResponseAverage[1-blueSide]
 	}
 
 	turns := len(trace.Turns)
@@ -240,7 +236,7 @@ func (r *traceAnalysisReport) add(trace TraceMatch, stats TraceMetricStats) {
 
 	if trace.EndReason != "" {
 		r.endReasonCounts[trace.EndReason]++
-		if blueSide >= 0 && TraceEndReasonSide(trace, winner) == blueSide {
+		if TraceEndReasonSide(trace, winner) == blueSide {
 			r.endReasonBlueCounts[trace.EndReason]++
 		}
 	}
@@ -252,10 +248,8 @@ func (r *traceAnalysisReport) add(trace TraceMatch, stats TraceMetricStats) {
 			addTraceMetricSample(r.winnerA, spec, values[winner], turns)
 			addTraceMetricSample(r.winnerB, spec, values[loser], turns)
 		}
-		if blueSide == 0 || blueSide == 1 {
-			addTraceMetricSample(r.blueA, spec, values[blueSide], turns)
-			addTraceMetricSample(r.blueB, spec, values[1-blueSide], turns)
-		}
+		addTraceMetricSample(r.blueA, spec, values[blueSide], turns)
+		addTraceMetricSample(r.blueB, spec, values[1-blueSide], turns)
 	}
 }
 
@@ -322,15 +316,11 @@ func (r *traceAnalysisReport) writeOutcome(w io.Writer) error {
 		percent(r.decided, r.files), percent(r.draws, r.files)); err != nil {
 		return err
 	}
-	if r.blueMatches > 0 {
+	if r.files > 0 {
 		if _, err := fmt.Fprintf(w, "  Blue     W %5.1f%%   L %5.1f%%   D %5.1f%%\n",
-			percent(r.blueWins, r.blueMatches),
-			percent(r.blueLosses, r.blueMatches),
-			percent(r.blueMatches-r.blueWins-r.blueLosses, r.blueMatches)); err != nil {
-			return err
-		}
-	} else {
-		if _, err := fmt.Fprintln(w, "  Blue     not identified"); err != nil {
+			percent(r.blueWins, r.files),
+			percent(r.blueLosses, r.files),
+			percent(r.files-r.blueWins-r.blueLosses, r.files)); err != nil {
 			return err
 		}
 	}
@@ -356,9 +346,9 @@ func (r *traceAnalysisReport) writeMatchStats(w io.Writer) error {
 		return err
 	}
 
-	if r.blueMatches > 0 {
+	if r.files > 0 {
 		line := fmt.Sprintf("  Scores   blue %.1f   red %.1f",
-			r.blueScoreSum/float64(r.blueMatches), r.redScoreSum/float64(r.blueMatches))
+			r.blueScoreSum/float64(r.files), r.redScoreSum/float64(r.files))
 		if r.decided > 0 {
 			line += fmt.Sprintf("   margin %.1f", r.decidedMargin/float64(r.decided))
 		}
@@ -401,8 +391,8 @@ func (r *traceAnalysisReport) writeEndReasons(w io.Writer) error {
 			continue
 		}
 		line := fmt.Sprintf("  %-14s %5.1f%%", row.label(), percent(row.count, r.files))
-		if row.count > 0 && row.spec.ShowBlue && r.blueMatches > 0 {
-			line += fmt.Sprintf("  (blue %.1f%%)", percent(row.blueCount, r.blueMatches))
+		if row.count > 0 && row.spec.ShowBlue && r.files > 0 {
+			line += fmt.Sprintf("  (blue %.1f%%)", percent(row.blueCount, r.files))
 		}
 		if _, err := fmt.Fprintln(w, line); err != nil {
 			return err

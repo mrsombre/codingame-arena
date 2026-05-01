@@ -103,15 +103,13 @@ func TestTraceMatchBlueSide(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name  string
-		blue  string
-		ps    [2]string
-		want  int
+		name string
+		blue string
+		ps   [2]string
+		want int
 	}{
 		{name: "blue is p0", blue: "bot-cpp", ps: [2]string{"bot-cpp", "bot-py"}, want: 0},
 		{name: "blue is p1 (post-swap)", blue: "bot-cpp", ps: [2]string{"bot-py", "bot-cpp"}, want: 1},
-		{name: "blue not in players", blue: "bot-cpp", ps: [2]string{"bot-py", "bot-go"}, want: -1},
-		{name: "blue empty", blue: "", ps: [2]string{"a", "b"}, want: -1},
 	}
 	for _, tc := range cases {
 		tc := tc

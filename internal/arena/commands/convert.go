@@ -165,10 +165,19 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		gameOptions.Set("league", strconv.Itoa(league))
 	}
 
+	if replay.Blue == "" {
+		return arena.TraceMatch{}, league, fmt.Errorf("%w: replay missing blue (re-fetch with `replay get` so the username is recorded)", errReplayMismatch)
+	}
 	botNames := arena.ReplayPlayerNames(replay)
-	blueSide := 0
-	if replay.Blue != "" && botNames[1] == replay.Blue {
-		blueSide = 1
+	blueSide := -1
+	for i, name := range botNames {
+		if name == replay.Blue {
+			blueSide = i
+			break
+		}
+	}
+	if blueSide == -1 {
+		return arena.TraceMatch{}, league, fmt.Errorf("%w: blue %q not found in players %v", errReplayMismatch, replay.Blue, botNames)
 	}
 
 	trace, finalScores := arena.RunReplay(

@@ -164,6 +164,7 @@ func TestAnalysisReportAggregatesMetricKinds(t *testing.T) {
 func TestAnalysisReportRejectsPerTurnMetricAboveTurnCount(t *testing.T) {
 	files := []TraceFile{{Name: "trace.json", Trace: TraceMatch{
 		Type:  "bad",
+		Blue:  "us", Players: [2]string{"us", "rival"},
 		Turns: testTurns(2),
 	}}}
 	analyzer := testMetricAnalyzer{
@@ -181,6 +182,7 @@ func TestAnalysisReportRejectsPerTurnMetricAboveTurnCount(t *testing.T) {
 func TestAnalysisReportSkipsPerTurnMetricsForZeroTurnMatches(t *testing.T) {
 	files := []TraceFile{{Trace: TraceMatch{
 		Type:   "zero",
+		Blue:   "us", Players: [2]string{"us", "rival"},
 		Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1},
 	}}}
 	analyzer := testMetricAnalyzer{
