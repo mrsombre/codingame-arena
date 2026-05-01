@@ -31,7 +31,7 @@ Below are improvements grouped by impact. P0 = blocking the goal, P1 = high leve
 | 12 | Mortality heatmap                     | NOT DONE    |
 | 13 | Apple-contention metric               | NOT DONE    |
 | 14 | Auto-rerun replay seeds               | NOT DONE    |
-| 15 | Leaderboard rank at fetch             | NOT DONE    |
+| 15 | Leaderboard rank at fetch             | PARTIAL     |
 | 16 | Move legality / wasted-action         | NOT DONE    |
 | 17 | Replay viewer integration             | NOT DONE    |
 
@@ -166,9 +166,12 @@ After `convert` saves `replay-<id>.json`, optionally also run `arena run --seed 
 
 CLI: `arena convert --rerun --p0 bin/bot-winter2026-cpp` writes both files; analyze reports the delta.
 
-### 15. Track leaderboard rank at replay-fetch time — NOT DONE
+### 15. Track leaderboard rank at replay-fetch time — PARTIAL
 
-`replay leaderboard` doesn't record the player's elo/rank when downloading. Save it alongside the replay (e.g., `replays/<id>.meta.json`) so analyze can group by elo bands ("losses against top-100" vs "losses against ladder peers").
+`replay leaderboard` already records the player's `Rank` / `Division` / `Score` inline on the replay JSON (`CodinGameReplay.Leaderboard`, populated at `commands/replay.go:120`); re-fetching with `--force` refreshes the snapshot. No separate `replays/<id>.meta.json` file is needed. Remaining gaps:
+
+- `replay get` doesn't capture rank (it skips the leaderboard lookup) — should call `resolveAgent` once per invocation when a username is supplied.
+- `convert` drops `Leaderboard`; `TraceMatch` has no rank field. Until that's propagated, `analyze` can't group losses by elo band as the original brief intended.
 
 ### 16. Move legality / wasted-action analysis — NOT DONE
 
