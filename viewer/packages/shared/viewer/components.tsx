@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/components/ui/tooltip.tsx"
 import { cn } from "@shared/lib/utils.ts"
 import { Link } from "@tanstack/react-router"
-import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon, LoaderIcon, PauseIcon, PlayIcon } from "lucide-react"
+import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon, LoaderIcon, PlayIcon } from "lucide-react"
 import type { FormEvent, ReactNode, RefObject } from "react"
 import type { BatchMatch, BatchResponse, LeagueOption, ReplayEntry } from "./types.ts"
 
@@ -261,24 +261,18 @@ export function TurnLogPanel({ turnLabel, score, marker, children, emptyLabel }:
 }
 
 export function PlaybackControls({
-  playing,
-  pauseRequested,
   sliderMax,
   sliderValue,
   turnLabel,
-  onTogglePlay,
   onFirst,
   onPrevious,
   onNext,
   onLast,
   onSliderChange,
 }: {
-  playing: boolean
-  pauseRequested: boolean
   sliderMax: number
   sliderValue: number
   turnLabel: ReactNode
-  onTogglePlay: () => void
   onFirst: () => void
   onPrevious: () => void
   onNext: () => void
@@ -298,14 +292,6 @@ export function PlaybackControls({
 
   return (
     <div className="mt-3 flex max-w-3xl items-center gap-3">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="default" size="icon-lg" onClick={onTogglePlay} aria-label={playing && !pauseRequested ? "pause" : "play"}>
-            {playing && !pauseRequested ? <PauseIcon /> : <PlayIcon />}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{playing && !pauseRequested ? "Pause after current step" : "Play"}</TooltipContent>
-      </Tooltip>
       {iconButton("first turn", onFirst, <ChevronsLeftIcon />)}
       {iconButton("previous turn", onPrevious, <ChevronLeftIcon />)}
       <Slider

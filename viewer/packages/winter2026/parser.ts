@@ -28,53 +28,6 @@ export interface FrameData {
   birds: Bird[]
 }
 
-/**
- * Produce an in-between FrameData for smooth playback.
- *
- * Body segments are interpolated index by index — each `to` segment slides
- * from its counterpart in `from`; new segments that extended past the old
- * body anchor at the old tail so they stay put until the snake catches up.
- * Birds present in `from` but missing from `to` (died this turn) keep their
- * last body for the whole transition — the commit step will remove them.
- * Apples are held at the `from` state so an eaten tile stays visible under
- * the snake's head until the turn commits.
- */
-export function lerpFrame(from: FrameData, to: FrameData, t: number): FrameData {
-  if (t <= 0) return from
-  if (t >= 1) return to
-
-  const fromMap = new Map(from.birds.map((b) => [b.id, b]))
-  const toMap = new Map(to.birds.map((b) => [b.id, b]))
-
-  const birds: Bird[] = []
-  for (const toBird of to.birds) {
-    const fromBird = fromMap.get(toBird.id)
-    if (!fromBird) {
-      birds.push(toBird)
-      continue
-    }
-    const fromBody = fromBird.body
-    const tailFallback = fromBody[fromBody.length - 1]
-    const body: Coord[] = new Array(toBird.body.length)
-    for (let i = 0; i < toBird.body.length; i++) {
-      const toSeg = toBird.body[i] as Coord
-      const fromSeg = fromBody[i] ?? tailFallback ?? toSeg
-      body[i] = {
-        x: fromSeg.x + (toSeg.x - fromSeg.x) * t,
-        y: fromSeg.y + (toSeg.y - fromSeg.y) * t,
-      }
-    }
-    birds.push({ id: toBird.id, body })
-  }
-  for (const fromBird of from.birds) {
-    if (!toMap.has(fromBird.id)) {
-      birds.push(fromBird)
-    }
-  }
-
-  return { apples: from.apples, birds }
-}
-
 /** Trace JSON from GET /api/matches/{id}. */
 export interface TraceMatch {
   match_id: number

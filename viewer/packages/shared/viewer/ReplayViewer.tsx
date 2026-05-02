@@ -17,7 +17,6 @@ export function ReplayViewer<TMapData, TFrame, TTurn extends TraceTurnBase, TMet
   const turnsRef = useRef<(TTurn | null)[]>([])
   const metaRef = useRef<(TMeta | undefined)[]>([])
   const turnRef = useRef(0)
-  const pauseRequestedRef = useRef(false)
 
   const [turnLabel, setTurnLabel] = useState<ReactNode>("")
   const [turnLog, setTurnLog] = useState<ReactNode>(null)
@@ -28,12 +27,6 @@ export function ReplayViewer<TMapData, TFrame, TTurn extends TraceTurnBase, TMet
   const [sliderValue, setSliderValue] = useState(0)
   const [ready, setReady] = useState(false)
   const [currentScores, setCurrentScores] = useState<[number, number]>([0, 0])
-  const [playing, setPlaying] = useState(false)
-  const [pauseRequested, setPauseRequested] = useState(false)
-
-  useEffect(() => {
-    pauseRequestedRef.current = pauseRequested
-  }, [pauseRequested])
 
   const contextFor = useCallback(
     (frameIndex: number): FrameContext<TMapData, TFrame, TTurn, TMeta> | null => {
@@ -56,7 +49,7 @@ export function ReplayViewer<TMapData, TFrame, TTurn extends TraceTurnBase, TMet
     (frameIndex: number) => {
       const context = contextFor(frameIndex)
       if (!context) return
-      adapter.updateFrame(context.frame, { mapData, phase: "commit" })
+      adapter.updateFrame(context.frame, { mapData })
       setCurrentScores(adapter.getScore(context.frame, mapData))
       setTurnLabel(adapter.formatTurnLabel(context))
       setTurnLog(adapter.renderTurnLog(context))
@@ -78,84 +71,12 @@ export function ReplayViewer<TMapData, TFrame, TTurn extends TraceTurnBase, TMet
     [commitFrameState],
   )
 
-  const togglePlay = useCallback(() => {
-    if (playing) {
-      setPauseRequested((previous) => !previous)
-      return
-    }
-    setPauseRequested(false)
-    if (framesRef.current.length > 0 && turnRef.current >= framesRef.current.length - 1) {
-      goToTurn(0)
-    }
-    setPlaying(true)
-  }, [playing, goToTurn])
-
-  useEffect(() => {
-    if (!playing) return
-    const duration = adapter.playbackDurationMs ?? 800
-    const minRenderIntervalMs = adapter.minRenderIntervalMs ?? 50
-    let rafId: number | null = null
-    let currentTurn = turnRef.current
-    let segmentStart = performance.now()
-    let lastRender = 0
-
-    const tick = (now: number) => {
-      if (turnRef.current !== currentTurn) {
-        currentTurn = turnRef.current
-        segmentStart = now
-        lastRender = 0
-      }
-
-      const frames = framesRef.current
-      if (currentTurn >= frames.length - 1) {
-        setPlaying(false)
-        return
-      }
-
-      const fromFrame = frames[currentTurn]
-      const toFrame = frames[currentTurn + 1]
-      if (!fromFrame || !toFrame) {
-        setPlaying(false)
-        return
-      }
-
-      const elapsed = now - segmentStart
-      if (elapsed >= duration) {
-        goToTurn(currentTurn + 1)
-        currentTurn += 1
-        segmentStart = now
-        lastRender = now
-        if (pauseRequestedRef.current || currentTurn >= frames.length - 1) {
-          setPlaying(false)
-          setPauseRequested(false)
-          return
-        }
-        rafId = requestAnimationFrame(tick)
-        return
-      }
-
-      if (now - lastRender >= minRenderIntervalMs) {
-        const t = elapsed / duration
-        adapter.updateFrame(adapter.lerpFrame(fromFrame, toFrame, t), { mapData, phase: "interpolate" })
-        lastRender = now
-      }
-      rafId = requestAnimationFrame(tick)
-    }
-
-    rafId = requestAnimationFrame(tick)
-    return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId)
-    }
-  }, [adapter, goToTurn, mapData, playing])
-
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
     let cancelled = false
 
     setReady(false)
-    setPlaying(false)
-    setPauseRequested(false)
 
     const timeline = adapter.buildTimeline(mapData, trace)
     framesRef.current = timeline.frames
@@ -198,12 +119,9 @@ export function ReplayViewer<TMapData, TFrame, TTurn extends TraceTurnBase, TMet
   const controls = useMemo(
     () => (
       <PlaybackControls
-        playing={playing}
-        pauseRequested={pauseRequested}
         sliderMax={sliderMax}
         sliderValue={sliderValue}
         turnLabel={turnLabel}
-        onTogglePlay={togglePlay}
         onFirst={() => goToTurn(0)}
         onPrevious={() => goToTurn(turnRef.current - 1)}
         onNext={() => goToTurn(turnRef.current + 1)}
@@ -211,7 +129,7 @@ export function ReplayViewer<TMapData, TFrame, TTurn extends TraceTurnBase, TMet
         onSliderChange={goToTurn}
       />
     ),
-    [goToTurn, pauseRequested, playing, sliderMax, sliderValue, togglePlay, turnLabel],
+    [goToTurn, sliderMax, sliderValue, turnLabel],
   )
 
   return (
