@@ -2,7 +2,7 @@ import {readdirSync, statSync} from 'node:fs'
 import {resolve} from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import {defineConfig} from 'vite'
+import {defineConfig} from 'vitest/config'
 
 const packagesDir = resolve(__dirname, 'packages')
 const input = {main: resolve(packagesDir, 'index.html')}
@@ -37,5 +37,12 @@ export default defineConfig({
       '/api': {target: apiTarget, changeOrigin: true},
       '/healthz': {target: apiTarget, changeOrigin: true}
     }
+  },
+  test: {
+    root: __dirname,
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: [resolve(packagesDir, 'test-setup.ts')],
+    include: ['packages/**/*.{test,spec}.{ts,tsx}']
   }
 })

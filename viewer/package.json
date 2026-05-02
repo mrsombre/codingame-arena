@@ -9,9 +9,12 @@
   "scripts": {
     "check": "pnpm exec biome check --write .",
     "build": "pnpm exec vite build",
-    "bundle": "pnpm run build && pnpm run check && pnpm run type-check",
+    "bundle": "pnpm run build && pnpm run check && pnpm run type-check && pnpm run test",
     "dev": "pnpm exec vite",
     "format": "pnpm exec biome format --write .",
+    "test": "pnpm exec vitest run",
+    "test:watch": "pnpm exec vitest",
+    "test:ui": "pnpm exec vitest --ui",
     "type-check": "pnpm exec tsc --noEmit"
   },
   "dependencies": {
@@ -34,8 +37,14 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.14",
     "@tailwindcss/vite": "^4.2.4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@vitest/ui": "^4.1.5",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.2.4",
     "typescript": "^6.0.3",
-    "vite": "^7.3.2"
+    "vite": "^7.3.2",
+    "vitest": "^4.1.5"
   }
 }

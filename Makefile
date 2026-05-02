@@ -32,7 +32,7 @@ VIEWER_DIR := viewer
 type-check-viewer:
 	cd $(VIEWER_DIR) && pnpm run type-check
 
-lint-viewer:
+bundle-viewer:
 	cd $(VIEWER_DIR) && pnpm run bundle
 
 build-viewer:
