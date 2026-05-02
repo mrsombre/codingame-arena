@@ -71,7 +71,6 @@ pnpm run type-check              # TypeScript type check
 pnpm run bundle                  # Biome check + type-check + build
 
 # Make viewer targets
-make build-viewer                # Build viewer (pnpm run build)
-make lint-viewer                 # Lint viewer (pnpm run bundle)
 make type-check-viewer           # Type-check viewer (pnpm run type-check)
+make bundle-viewer               # Lint and test viewer (pnpm run bundle)
 ```

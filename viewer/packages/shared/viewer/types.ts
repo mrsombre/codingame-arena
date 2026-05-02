@@ -88,13 +88,18 @@ export interface BatchResponse {
 }
 
 export interface RunResponse {
+  id: number
   seed: string
   winner: number
   score_blue: number
   score_red: number
   turns: number
+  loss_reason_blue?: string
+  loss_reason_red?: string
   ttfo_ms?: [number, number]
   aot_ms?: [number, number]
+  swapped?: boolean
+  trace: TraceMatchBase
 }
 
 export interface FrameTimeline<TFrame, TTurn extends TraceTurnBase, TMeta = unknown> {
@@ -121,9 +126,8 @@ export interface GameViewerAdapter<TMapData, TFrame, TTurn extends TraceTurnBase
   parseSerializeResponse: (source: string) => TMapData
   buildTimeline: (mapData: TMapData, trace: TraceMatchBase<TTurn>) => FrameTimeline<TFrame, TTurn, TMeta>
   initRenderer: (container: HTMLElement, mapData: TMapData) => Promise<{ width?: number; height?: number } | undefined>
-  updateFrame: (frame: TFrame, context: { mapData: TMapData; phase: "commit" | "interpolate" }) => void
+  updateFrame: (frame: TFrame, context: { mapData: TMapData }) => void
   destroyRenderer: () => void
-  lerpFrame: (from: TFrame, to: TFrame, t: number) => TFrame
   getScore: (frame: TFrame, mapData: TMapData) => [number, number]
   formatTurnLabel: (context: FrameContext<TMapData, TFrame, TTurn, TMeta>) => ReactNode
   renderTurnLog: (context: FrameContext<TMapData, TFrame, TTurn, TMeta>) => ReactNode
@@ -132,8 +136,6 @@ export interface GameViewerAdapter<TMapData, TFrame, TTurn extends TraceTurnBase
   formatRunStatus: (context: { actualSeed: string; mapData: TMapData; trace: TraceMatchBase<TTurn>; run: RunResponse }) => ReactNode
   formatReplayStatus: (context: { replayId: string; mapData: TMapData; trace: TraceMatchBase<TTurn>; replay: ReplayResponse<TTurn> }) => ReactNode
   formatBatchMatchStatus: (context: { match: BatchMatch; mapData: TMapData; trace: TraceMatchBase<TTurn> }) => ReactNode
-  playbackDurationMs?: number
-  minRenderIntervalMs?: number
 }
 
 export function winnerFromRanks(ranks: [number, number]): number {

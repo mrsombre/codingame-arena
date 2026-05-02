@@ -189,11 +189,6 @@ export async function initRenderer(container: HTMLElement, data: MapData): Promi
   return { width: cw, height: ch }
 }
 
-export interface UpdateFrameOptions {
-  /** Skip rebuilding the pellet layer. Use during interpolation. */
-  skipPellets?: boolean
-}
-
 function typeGlyph(type: Pac["type"]): string {
   switch (type) {
     case "ROCK":
@@ -209,7 +204,7 @@ function typeGlyph(type: Pac["type"]): string {
   }
 }
 
-export function updateFrame(frame: FrameData, options?: UpdateFrameOptions): void {
+export function updateFrame(frame: FrameData): void {
   if (!pelletLayer || !pacLayer || !labelLayer) return
 
   const step = CELL + GAP
@@ -217,25 +212,23 @@ export function updateFrame(frame: FrameData, options?: UpdateFrameOptions): voi
   pacLayer.removeChildren()
   labelLayer.removeChildren()
 
-  if (!options?.skipPellets) {
-    pelletLayer.removeChildren()
-    for (const p of frame.pellets) {
-      if (p.x < 0 || p.x >= gridWidth || p.y < 0 || p.y >= gridHeight) continue
-      const cx = p.x * step + GAP + CELL / 2
-      const cy = p.y * step + GAP + CELL / 2
-      if (p.value >= 10) {
-        const glow = new Graphics()
-        glow.circle(cx, cy, CELL * 0.5).fill({ color: COLOR_CHERRY_GLOW, alpha: 0.2 })
-        pelletLayer.addChild(glow)
-        const dot = new Graphics()
-        dot.circle(cx, cy, CELL * 0.32).fill({ color: COLOR_CHERRY })
-        dot.circle(cx - CELL * 0.09, cy - CELL * 0.09, CELL * 0.12).fill({ color: 0xffffff, alpha: 0.5 })
-        pelletLayer.addChild(dot)
-      } else {
-        const dot = new Graphics()
-        dot.circle(cx, cy, CELL * 0.12).fill({ color: COLOR_PELLET })
-        pelletLayer.addChild(dot)
-      }
+  pelletLayer.removeChildren()
+  for (const p of frame.pellets) {
+    if (p.x < 0 || p.x >= gridWidth || p.y < 0 || p.y >= gridHeight) continue
+    const cx = p.x * step + GAP + CELL / 2
+    const cy = p.y * step + GAP + CELL / 2
+    if (p.value >= 10) {
+      const glow = new Graphics()
+      glow.circle(cx, cy, CELL * 0.5).fill({ color: COLOR_CHERRY_GLOW, alpha: 0.2 })
+      pelletLayer.addChild(glow)
+      const dot = new Graphics()
+      dot.circle(cx, cy, CELL * 0.32).fill({ color: COLOR_CHERRY })
+      dot.circle(cx - CELL * 0.09, cy - CELL * 0.09, CELL * 0.12).fill({ color: 0xffffff, alpha: 0.5 })
+      pelletLayer.addChild(dot)
+    } else {
+      const dot = new Graphics()
+      dot.circle(cx, cy, CELL * 0.12).fill({ color: COLOR_PELLET })
+      pelletLayer.addChild(dot)
     }
   }
 

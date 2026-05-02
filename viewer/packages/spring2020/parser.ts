@@ -43,42 +43,6 @@ export interface FrameData {
   pellets: Pellet[]
 }
 
-/**
- * Produce an in-between FrameData for smooth playback. Pacs slide from their
- * previous coord to their new coord; pellets stay frozen on the `from` frame
- * so an eaten pellet remains visible under the pac until the turn commits.
- * Pacs present in `from` but absent in `to` (hidden by fog or dead) keep
- * their last coord for the whole transition.
- */
-export function lerpFrame(from: FrameData, to: FrameData, t: number): FrameData {
-  if (t <= 0) return from
-  if (t >= 1) return to
-
-  const fromMap = new Map(from.pacs.map((p) => [pacKey(p), p]))
-  const toMap = new Map(to.pacs.map((p) => [pacKey(p), p]))
-
-  const pacs: Pac[] = []
-  for (const toPac of to.pacs) {
-    const fromPac = fromMap.get(pacKey(toPac))
-    if (!fromPac) {
-      pacs.push(toPac)
-      continue
-    }
-    pacs.push({
-      ...toPac,
-      x: fromPac.x + (toPac.x - fromPac.x) * t,
-      y: fromPac.y + (toPac.y - fromPac.y) * t,
-    })
-  }
-  for (const fromPac of from.pacs) {
-    if (!toMap.has(pacKey(fromPac))) {
-      pacs.push(fromPac)
-    }
-  }
-
-  return { myScore: from.myScore, oppScore: from.oppScore, pacs, pellets: from.pellets }
-}
-
 /** Trace JSON from GET /api/matches/{id}. */
 export interface TraceMatch {
   match_id: number
@@ -144,10 +108,6 @@ export interface KilledMeta {
 export interface SwitchMeta {
   pac: number
   type: string
-}
-
-function pacKey(pac: Pac): string {
-  return `${pac.mine ? 0 : 1}:${pac.id}`
 }
 
 /**

@@ -1,7 +1,7 @@
 import { type FrameContext, type GameViewerAdapter, winnerFromRanks } from "@shared/viewer/types.ts"
 import { createGameViewerViews } from "@shared/viewer/views.tsx"
 import { AppleIcon, ArrowDownIcon, BrickWallIcon, RotateCcwIcon, SkullIcon, SwordsIcon } from "lucide-react"
-import { type BirdCoordMeta, type BirdMeta, type FrameData, lerpFrame, type MapData, parseFrameLines, parseSerializeResponse, type TraceTurn } from "./parser.ts"
+import { type BirdCoordMeta, type BirdMeta, type FrameData, type MapData, parseFrameLines, parseSerializeResponse, type TraceTurn } from "./parser.ts"
 import { destroyRenderer, initRenderer, updateFrame } from "./renderer.ts"
 
 type TraceKind = "EAT" | "HIT_SELF" | "HIT_WALL" | "HIT_ENEMY" | "DEAD" | "DEAD_FALL"
@@ -166,9 +166,8 @@ export const winter2026Adapter: GameViewerAdapter<MapData, FrameData, TraceTurn>
     await initRenderer(container, mapData)
     return undefined
   },
-  updateFrame: (frame, context) => updateFrame(frame, context.mapData.myBirdIds, context.phase === "interpolate" ? { skipApples: true } : undefined),
+  updateFrame: (frame, context) => updateFrame(frame, context.mapData.myBirdIds),
   destroyRenderer,
-  lerpFrame,
   getScore: scoreFromFrame,
   formatTurnLabel: (context) => `turn ${context.frameIndex} / ${Math.max(0, context.frameCount - 1)}`,
   renderTurnLog: renderRows,
@@ -201,8 +200,6 @@ export const winter2026Adapter: GameViewerAdapter<MapData, FrameData, TraceTurn>
     const winnerLabel = match.winner === -1 ? "draw" : match.winner === 0 ? match.left_bot : match.right_bot
     return `match #${match.id} seed=${match.seed} ${match.left_bot} vs ${match.right_bot} winner=${winnerLabel} score=${match.score_left}:${match.score_right} turns=${match.turns} left ttfo=${match.ttfo_left_ms.toFixed(0)}ms aot=${match.aot_left_ms.toFixed(0)}ms right ttfo=${match.ttfo_right_ms.toFixed(0)}ms aot=${match.aot_right_ms.toFixed(0)}ms`
   },
-  playbackDurationMs: 1000,
-  minRenderIntervalMs: 50,
 }
 
 export const winter2026Views = createGameViewerViews(winter2026Adapter)

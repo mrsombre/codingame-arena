@@ -1,7 +1,7 @@
 import { type FrameContext, type GameViewerAdapter, winnerFromRanks } from "@shared/viewer/types.ts"
 import { createGameViewerViews } from "@shared/viewer/views.tsx"
 import { ZapIcon } from "lucide-react"
-import { type FrameData, lerpFrame, type MapData, parseFrameLines, parseSerializeResponse, type TraceTurn } from "./parser.ts"
+import { type FrameData, type MapData, parseFrameLines, parseSerializeResponse, type TraceTurn } from "./parser.ts"
 import { destroyRenderer, initRenderer, updateFrame } from "./renderer.ts"
 
 interface SpringTurnMeta {
@@ -89,9 +89,8 @@ export const spring2020Adapter: GameViewerAdapter<MapData, FrameData, TraceTurn,
     return { frames, turns, meta }
   },
   initRenderer,
-  updateFrame: (frame, context) => updateFrame(frame, context.phase === "interpolate" ? { skipPellets: true } : undefined),
+  updateFrame,
   destroyRenderer,
-  lerpFrame,
   getScore: (frame) => [frame.myScore, frame.oppScore],
   formatTurnLabel: (context) => {
     const meta = turnContext(context)
@@ -145,8 +144,6 @@ export const spring2020Adapter: GameViewerAdapter<MapData, FrameData, TraceTurn,
     const winnerLabel = match.winner === -1 ? "draw" : match.winner === 0 ? match.left_bot : match.right_bot
     return `match #${match.id} seed=${match.seed} ${match.left_bot} vs ${match.right_bot} winner=${winnerLabel} score=${match.score_left}:${match.score_right} turns=${match.turns} left ttfo=${match.ttfo_left_ms.toFixed(0)}ms aot=${match.aot_left_ms.toFixed(0)}ms right ttfo=${match.ttfo_right_ms.toFixed(0)}ms aot=${match.aot_right_ms.toFixed(0)}ms`
   },
-  playbackDurationMs: 600,
-  minRenderIntervalMs: 50,
 }
 
 export const spring2020Views = createGameViewerViews(spring2020Adapter)

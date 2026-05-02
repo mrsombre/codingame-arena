@@ -195,18 +195,11 @@ export async function initRenderer(container: HTMLElement, data: MapData): Promi
   })
 }
 
-export interface UpdateFrameOptions {
-  /** Skip rebuilding the apple layer. Use during interpolation when the
-   *  apple set is frozen and rebuilding ~100 Graphics per frame is the
-   *  main cost. */
-  skipApples?: boolean
-}
-
 /**
  * Redraw dynamic content (apples + birds) for a specific turn.
  * Requires initRenderer to have been called first.
  */
-export function updateFrame(frame: FrameData, myBirdIds: number[], options?: UpdateFrameOptions): void {
+export function updateFrame(frame: FrameData, myBirdIds: number[]): void {
   if (!appleLayer || !birdLayer || !labelLayer) return
 
   const step = CELL + GAP
@@ -215,22 +208,19 @@ export function updateFrame(frame: FrameData, myBirdIds: number[], options?: Upd
   birdLayer.removeChildren()
   labelLayer.removeChildren()
 
-  if (!options?.skipApples) {
-    appleLayer.removeChildren()
-    // Apples
-    for (const a of frame.apples) {
-      const cx = a.x * step + GAP + CELL / 2
-      const cy = a.y * step + GAP + CELL / 2
+  appleLayer.removeChildren()
+  for (const a of frame.apples) {
+    const cx = a.x * step + GAP + CELL / 2
+    const cy = a.y * step + GAP + CELL / 2
 
-      const glow = new Graphics()
-      glow.circle(cx, cy, CELL * 0.45).fill({ color: COLOR_APPLE_GLOW, alpha: 0.15 })
-      appleLayer.addChild(glow)
+    const glow = new Graphics()
+    glow.circle(cx, cy, CELL * 0.45).fill({ color: COLOR_APPLE_GLOW, alpha: 0.15 })
+    appleLayer.addChild(glow)
 
-      const dot = new Graphics()
-      dot.circle(cx, cy, CELL * 0.3).fill({ color: COLOR_APPLE })
-      dot.circle(cx - CELL * 0.08, cy - CELL * 0.08, CELL * 0.12).fill({ color: 0xffffff, alpha: 0.4 })
-      appleLayer.addChild(dot)
-    }
+    const dot = new Graphics()
+    dot.circle(cx, cy, CELL * 0.3).fill({ color: COLOR_APPLE })
+    dot.circle(cx - CELL * 0.08, cy - CELL * 0.08, CELL * 0.12).fill({ color: 0xffffff, alpha: 0.4 })
+    appleLayer.addChild(dot)
   }
 
   // Birds

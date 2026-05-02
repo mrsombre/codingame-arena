@@ -21,16 +21,6 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-const (
-	singleMatchID       = "cg-match"
-	singleMatchFileName = singleMatchID + ".json"
-	singleMatchTraceID  = int64(0)
-)
-
-func singleMatchTracePath() string {
-	return filepath.Join(os.TempDir(), singleMatchFileName)
-}
-
 // gameOptionsViper builds a viper instance carrying the per-request
 // gameOptions map so it can be passed to GameFactory.NewGame.
 func gameOptionsViper(opts map[string]string) *viper.Viper {
@@ -70,7 +60,7 @@ func New(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/matches/{id}", handleMatchGet(opts.TraceDir))
 	mux.HandleFunc("GET /api/replays", handleReplayList(opts.ReplayDir))
 	mux.HandleFunc("GET /api/replays/{id}", handleReplayGet(opts.ReplayDir, resolver))
-	mux.HandleFunc("POST /api/run", handleRun(resolver, opts.TraceDir))
+	mux.HandleFunc("POST /api/run", handleRun(resolver))
 	mux.HandleFunc("POST /api/batch", handleBatch(resolver, opts.TraceDir))
 
 	mux.Handle("/", http.FileServer(http.FS(opts.Assets)))
@@ -293,13 +283,11 @@ func handleMatchGet(traceDir string) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "invalid match id")
 			return
 		}
-		path := filepath.Join(traceDir, id+".json")
-		if id == singleMatchID {
-			path = singleMatchTracePath()
-		} else if traceDir == "" {
+		if traceDir == "" {
 			writeError(w, http.StatusNotFound, "no trace-dir configured; start arena serve with --trace-dir <path>")
 			return
 		}
+		path := filepath.Join(traceDir, id+".json")
 		data, err := os.ReadFile(path)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
@@ -325,7 +313,7 @@ type runRequest struct {
 	GameOptions map[string]string `json:"gameOptions,omitempty"`
 }
 
-func handleRun(resolver factoryResolver, traceDir string) http.HandlerFunc {
+func handleRun(resolver factoryResolver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() { _ = r.Body.Close() }()
 		var req runRequest
@@ -346,19 +334,44 @@ func handleRun(resolver factoryResolver, traceDir string) http.HandlerFunc {
 		if req.Seed != nil {
 			seed = *req.Seed
 		}
+		capture := &traceCapture{}
 		runner := arena.NewRunner(factory, arena.MatchOptions{
 			MaxTurns:    req.MaxTurns,
 			BlueBotBin:  req.BlueBotBin,
 			RedBotBin:   req.RedBotBin,
 			NoSwap:      req.NoSwap,
-			TraceWriter: arena.NewFixedTraceWriter(singleMatchTracePath(), singleMatchTraceID),
+			TraceSink:   capture,
 			GameOptions: gameOptionsViper(req.GameOptions),
 		})
 		result := runner.RunMatch(0, seed)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(result.RenderMatch()))
+
+		// Merge RenderMatch's existing JSON object with a `trace` field so
+		// the viewer can render the replay from one round-trip.
+		payload := map[string]json.RawMessage{}
+		if err := json.Unmarshal([]byte(result.RenderMatch()), &payload); err != nil {
+			writeError(w, http.StatusInternalServerError, "encode match: "+err.Error())
+			return
+		}
+		traceJSON, err := json.Marshal(capture.match)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "encode trace: "+err.Error())
+			return
+		}
+		payload["trace"] = traceJSON
+		writeJSON(w, http.StatusOK, payload)
 	}
+}
+
+// traceCapture stashes the runner's emitted trace for the current request.
+// Single-threaded: RunMatch invokes WriteMatch exactly once per call.
+type traceCapture struct{ match arena.TraceMatch }
+
+func (c *traceCapture) WriteMatch(m arena.TraceMatch) error {
+	if m.Type == "" {
+		m.Type = arena.TraceTypeTrace
+	}
+	c.match = m
+	return nil
 }
 
 type batchRequest struct {
@@ -451,7 +464,7 @@ func handleBatch(resolver factoryResolver, traceDir string) http.HandlerFunc {
 			BlueBotBin:  req.BlueBotBin,
 			RedBotBin:   req.RedBotBin,
 			NoSwap:      req.NoSwap,
-			TraceWriter: arena.NewTraceWriter(traceDir, time.Now().Unix()),
+			TraceSink:   arena.NewTraceWriter(traceDir, time.Now().Unix()),
 			GameOptions: gameOptionsViper(req.GameOptions),
 		})
 		parallel := runtime.NumCPU()
