@@ -82,18 +82,14 @@ export function createGameViewerViews<TMapData, TFrame, TTurn extends TraceTurnB
         const runData = (await runRes.json()) as RunResponse
         setStatus("loading replay...")
 
-        const [serRes, traceRes] = await Promise.all([fetch(serializeUrl(adapter.game, runData.seed, league)), fetch("/api/matches/cg-match")])
+        const serRes = await fetch(serializeUrl(adapter.game, runData.seed, league))
         if (!serRes.ok) {
           setStatus(`serialize error ${serRes.status}: ${await serRes.text()}`)
           return
         }
-        if (!traceRes.ok) {
-          setStatus(`trace error ${traceRes.status}: ${await traceRes.text()} - is --trace-dir set?`)
-          return
-        }
 
         const map = adapter.parseSerializeResponse(await serRes.text())
-        const traceJson = (await traceRes.json()) as TraceMatchBase<TTurn>
+        const traceJson = runData.trace as TraceMatchBase<TTurn>
         if (traceJson.turns.length === 0) {
           setStatus("no turns in trace")
           return

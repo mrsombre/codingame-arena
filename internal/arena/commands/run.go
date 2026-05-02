@@ -60,17 +60,19 @@ func runMatches(factory arena.GameFactory, opts RunOptions, v *viper.Viper, star
 	if opts.Trace {
 		traceDir = opts.TraceDir
 	}
-	traceWriter := arena.NewTraceWriter(traceDir, startedAt.Unix())
-
-	runner := arena.NewRunner(factory, arena.MatchOptions{
+	matchOpts := arena.MatchOptions{
 		MaxTurns:    opts.MaxTurns,
 		BlueBotBin:  opts.BlueBotBin,
 		RedBotBin:   opts.RedBotBin,
 		Debug:       opts.Debug,
 		NoSwap:      opts.NoSwap,
-		TraceWriter: traceWriter,
 		GameOptions: v,
-	})
+	}
+	if traceWriter := arena.NewTraceWriter(traceDir, startedAt.Unix()); traceWriter != nil {
+		matchOpts.TraceSink = traceWriter
+	}
+
+	runner := arena.NewRunner(factory, matchOpts)
 
 	return arena.RunMatches(opts.BatchOptions, runner.RunMatch)
 }

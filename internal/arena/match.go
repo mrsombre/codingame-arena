@@ -18,7 +18,7 @@ type MatchOptions struct {
 	RedBotBin   string
 	Debug       bool
 	NoSwap      bool
-	TraceWriter *TraceWriter
+	TraceSink   TraceSink
 	GameOptions *viper.Viper
 }
 
@@ -81,7 +81,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	turn := 0
 	var badCommands []BadCommandInfo
 	deactivationTurns := [2]int{-1, -1}
-	tracing := runner.Options.TraceWriter != nil
+	tracing := runner.Options.TraceSink != nil
 	var traceTurns []TraceTurn
 
 	for turn = 0; !referee.Ended() && turn < maxTurns; turn++ {
@@ -299,7 +299,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			Timing:      traceTiming,
 			Turns:       traceTurns,
 		}
-		if err := runner.Options.TraceWriter.WriteMatch(traceMatch); err != nil {
+		if err := runner.Options.TraceSink.WriteMatch(traceMatch); err != nil {
 			panic(err)
 		}
 	}

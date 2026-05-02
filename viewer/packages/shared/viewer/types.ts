@@ -88,13 +88,18 @@ export interface BatchResponse {
 }
 
 export interface RunResponse {
+  id: number
   seed: string
   winner: number
   score_blue: number
   score_red: number
   turns: number
+  loss_reason_blue?: string
+  loss_reason_red?: string
   ttfo_ms?: [number, number]
   aot_ms?: [number, number]
+  swapped?: boolean
+  trace: TraceMatchBase
 }
 
 export interface FrameTimeline<TFrame, TTurn extends TraceTurnBase, TMeta = unknown> {

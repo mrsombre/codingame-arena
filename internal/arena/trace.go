@@ -177,6 +177,13 @@ type TraceTurnTiming struct {
 	Response [2]float64 `json:"response"`
 }
 
+// TraceSink receives a completed TraceMatch from the match runner. Implemented
+// by *TraceWriter (file-backed) and by ad-hoc capture sinks (e.g. the HTTP
+// single-match handler that returns the trace inline).
+type TraceSink interface {
+	WriteMatch(TraceMatch) error
+}
+
 // TraceWriter writes per-match JSON trace files to a directory. All matches in
 // a batch share traceID (typically the batch start timestamp); each file is
 // keyed by traceID + per-match MatchID so multiple batches can coexist.
