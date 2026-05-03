@@ -50,6 +50,11 @@ type GameFactory interface {
 	// recover replays where the API returned puzzleId=0 but did include
 	// a puzzleTitle entry.
 	PuzzleTitle() string
+	// LeaderboardSlug returns the puzzle pretty-id used in the CodinGame
+	// leaderboard URL (e.g. "winter-challenge-2026-snakebyte"), so the
+	// replay command can resolve a player's last battles without the
+	// caller passing the URL on each invocation.
+	LeaderboardSlug() string
 	NewGame(seed int64, options *viper.Viper) (Referee, []Player)
 	MaxTurns() int
 }

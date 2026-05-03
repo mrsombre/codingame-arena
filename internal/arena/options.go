@@ -55,7 +55,7 @@ Usage: arena <command> [OPTIONS]
 
 Commands:
   run          Run one or more match simulations against a player binary
-  replay       Download replay JSON (sub: get <url|id>..., leaderboard <url> <nick>)
+  replay       Download replay JSON for a player (leaderboard or by id/url)
   convert      Convert replay JSON files into arena trace files
   analyze      Analyze trace outcomes and game-owned metrics
   serialize    Print initial game input for first turn for a given seed

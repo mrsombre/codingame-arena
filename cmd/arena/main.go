@@ -117,21 +117,10 @@ func commandSet() map[string]commandSpec {
 			usage:        commands.SerializeUsage,
 		},
 		"replay": {
-			subUsage: commands.ReplayUsage,
-			subcommands: map[string]commandSpec{
-				"get": {
-					addFlags:     commands.AddReplayGetFlags,
-					handler:      commands.ReplayGet,
-					needsFactory: true,
-					usage:        commands.ReplayGetUsage,
-				},
-				"leaderboard": {
-					addFlags:     commands.AddReplayLeaderboardFlags,
-					handler:      commands.ReplayLeaderboard,
-					needsFactory: true,
-					usage:        commands.ReplayLeaderboardUsage,
-				},
-			},
+			addFlags:     commands.AddReplayFlags,
+			handler:      commands.Replay,
+			needsFactory: true,
+			usage:        commands.ReplayUsage,
 		},
 	}
 }

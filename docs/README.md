@@ -19,7 +19,7 @@ For a project overview, see the [top-level README](../README.md).
 
 ```
 arena run --trace             ─▶ traces/trace-<id>-<n>.json    (self-play)
-arena replay get | leaderboard ─▶ replays/<id>.json            (real CG matches)
+arena replay <user> [ids]     ─▶ replays/<id>.json            (real CG matches)
 arena convert                 ─▶ traces/replay-<id>.json       (verified)
 arena analyze                 ─▶ outcome and game-metric report
 arena serve                   ─▶ web viewer over both dirs

@@ -26,6 +26,8 @@ func (f *Factory) PuzzleID() int { return 592 }
 
 func (f *Factory) PuzzleTitle() string { return "Spring Challenge 2020" }
 
+func (f *Factory) LeaderboardSlug() string { return "spring-challenge-2020" }
+
 func (f *Factory) MaxTurns() int { return MaxTurns }
 
 // EmitsPostEndFrame implements arena.PostEndFrameEmitter. Spring 2020's

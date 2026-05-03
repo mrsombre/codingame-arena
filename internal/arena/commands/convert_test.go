@@ -186,6 +186,8 @@ func (f *fakeConvertFactory) PuzzleID() int { return f.puzzleID }
 
 func (f *fakeConvertFactory) PuzzleTitle() string { return "" }
 
+func (f *fakeConvertFactory) LeaderboardSlug() string { return "" }
+
 func (f *fakeConvertFactory) NewGame(_ int64, _ *viper.Viper) (arena.Referee, []arena.Player) {
 	panic(fmt.Sprintf("fakeConvertFactory.NewGame called for %s", f.Name()))
 }

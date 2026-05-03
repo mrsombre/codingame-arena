@@ -44,8 +44,7 @@ type downloadSummary struct {
 }
 
 // replayBatchConfig bundles the knobs the download loop needs. Built from
-// either ReplayGetOptions or ReplayLeaderboardOptions plus the per-command
-// annotations layered into every saved replay.
+// ReplayOptions plus the per-mode annotations layered into every saved replay.
 type replayBatchConfig struct {
 	IDs         []int64
 	Annotations arena.ReplayAnnotations
@@ -55,57 +54,37 @@ type replayBatchConfig struct {
 	Force       bool
 }
 
-// ReplayUsage returns the help text shown for `arena replay` without a
-// recognized sub-subcommand.
-func ReplayUsage() string {
-	return `arena replay - Download raw replay JSON from codingame.com.
-
-Usage: arena replay <subcommand> [OPTIONS]
-
-Subcommands:
-  get          Download one or more replays by ID/URL
-  leaderboard  Download every replay from a player's last battles list
-
-Use "arena help replay <subcommand>" for more information about a subcommand.
-
-Env vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_GAME, ARENA_SEED).
-Config: arena.yml in current directory (e.g. game: winter2026).`
-}
-
-// ReplayGetUsage returns the help text shown for `arena help replay get`.
-func ReplayGetUsage(fs *pflag.FlagSet) string {
+// ReplayUsage returns the help text shown for `arena help replay`.
+func ReplayUsage(fs *pflag.FlagSet) string {
 	return arena.CommandUsage(
-		"replay get <username> <id|url>[,<id|url>...]",
-		"Download raw replay JSON for one or more CodinGame games. <username> is "+
-			"the player we are playing for; it is recorded as the top-level "+
-			"\"blue\" field in every saved replay.",
+		"replay <username> [<id|url>[,<id|url>...]]",
+		"Download raw replay JSON from codingame.com. With no IDs, downloads "+
+			"every replay from <username>'s last battles list on the active "+
+			"game's leaderboard. With one or more IDs (or replay URLs), "+
+			"downloads only those games. <username> is the player we are "+
+			"playing for; it is recorded as the top-level \"blue\" field in "+
+			"every saved replay.",
 		fs,
 		"",
 	)
 }
 
-// ReplayLeaderboardUsage returns the help text shown for
-// `arena help replay leaderboard`.
-func ReplayLeaderboardUsage(fs *pflag.FlagSet) string {
-	return arena.CommandUsage(
-		"replay leaderboard <username> <puzzle-url|slug>",
-		"Download every replay from a player's last battles list. <username> is "+
-			"the player we are playing for; it is recorded as the top-level "+
-			"\"blue\" field in every saved replay.",
-		fs,
-		"",
-	)
-}
-
-// ReplayGet is the entry point for the "replay get" subcommand. It downloads
-// the raw replay JSON for one or more CodinGame games, strips the unused
-// top-level viewer payload, and writes each replay back as pretty-printed JSON.
-func ReplayGet(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	opts, err := parseReplayGetOptions(args, fs, v)
+// Replay is the entry point for the "replay" command. With no IDs it
+// downloads every replay from the player's last battles list on the active
+// game's leaderboard; with one or more IDs/URLs it downloads only those games.
+func Replay(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
+	opts, err := parseReplayOptions(args, fs, v)
 	if err != nil {
 		return err
 	}
 
+	if len(opts.IDs) > 0 {
+		return replayByIDs(opts, factory, stdout)
+	}
+	return replayFromLeaderboard(opts, factory, stdout)
+}
+
+func replayByIDs(opts ReplayOptions, factory arena.GameFactory, stdout io.Writer) error {
 	cfg := replayBatchConfig{
 		IDs:    opts.IDs,
 		OutDir: opts.OutDir,
@@ -123,13 +102,10 @@ func ReplayGet(args []string, stdout io.Writer, factory arena.GameFactory, fs *p
 	return downloadReplays(codingame.New(), cfg, stdout)
 }
 
-// ReplayLeaderboard is the entry point for the "replay leaderboard"
-// subcommand. It resolves a CodinGame leaderboard URL plus nickname into the
-// player's last battles and downloads each replay as pretty-printed JSON.
-func ReplayLeaderboard(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	opts, err := parseReplayLeaderboardOptions(args, fs, v)
-	if err != nil {
-		return err
+func replayFromLeaderboard(opts ReplayOptions, factory arena.GameFactory, stdout io.Writer) error {
+	slug := factory.LeaderboardSlug()
+	if slug == "" {
+		return fmt.Errorf("game %q has no leaderboard slug configured", factory.Name())
 	}
 
 	store, err := db.Open("")
@@ -140,11 +116,11 @@ func ReplayLeaderboard(args []string, stdout io.Writer, factory arena.GameFactor
 
 	client := codingame.New()
 
-	apiSlug, puzzleHit, err := resolvePuzzle(client, store, opts.Slug)
+	apiSlug, puzzleHit, err := resolvePuzzle(client, store, slug)
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(stdout, "puzzle: %s -> %s%s\n", opts.Slug, apiSlug, cacheTag(puzzleHit))
+	_, _ = fmt.Fprintf(stdout, "puzzle: %s -> %s%s\n", slug, apiSlug, cacheTag(puzzleHit))
 
 	info, err := resolveAgent(client, store, apiSlug, opts.Username)
 	if err != nil {

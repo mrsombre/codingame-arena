@@ -2,49 +2,43 @@
 
 Download raw replay JSON from codingame.com for offline viewing and conversion.
 
-Two subcommands:
+`arena replay <username> [<id|url>[,<id|url>...]]`
 
-- `replay get` — download specific replays by ID or URL
-- `replay leaderboard` — download every replay from a player's "last battles" list
+- With **no IDs**, downloads every replay from `<username>`'s last-battles list on the active game's leaderboard.
+- With **one or more IDs/URLs**, downloads only those games.
+
+The leaderboard slug is baked into each game engine (e.g. `winter-challenge-2026-snakebyte`, `spring-challenge-2020`), so you no longer pass the puzzle URL on the command line — the active game is selected via `--game` (or `arena.yml`).
 
 `<username>` is the player you are playing for. It is recorded as the top-level `blue` field in each saved replay so the viewer and `convert` know which side is "yours".
 
 ## Quick start
 
 ```shell
-# Download specific replays
-bin/arena replay get mrsombre 875142454,875142455
+# Download every replay from a player's leaderboard last-battles list
+bin/arena replay mrsombre --game winter2026
 
-# Download every replay listed for a player on a leaderboard
-bin/arena replay leaderboard mrsombre \
-  https://www.codingame.com/multiplayer/bot-programming/winter-challenge-2026/leaderboard
+# Download specific replays (comma- or space-separated)
+bin/arena replay mrsombre --game winter2026 875142454,875142455
+bin/arena replay mrsombre --game winter2026 875142454 875142455
 ```
 
 Files are saved as `<gameId>.json` under `--out` (default `./replays/`).
 
-## `replay get`
+## Argument forms
 
-```
-arena replay get <username> <id|url>[,<id|url>...]
-```
+IDs may be passed as multiple args, or as a comma-separated list within a single arg, or both. Each token is one of:
 
-Accepts any mix of:
-- numeric IDs: `875142454`
-- comma-separated lists: `875142454,875142455,875142456`
-- full replay URLs ending in an ID
+- numeric ID: `875142454`
+- full replay URL ending in an ID
 
-## `replay leaderboard`
+## Leaderboard mode
 
-```
-arena replay leaderboard <username> <puzzle-url|slug>
-```
+When invoked with no IDs, the command:
 
-Resolves the puzzle slug, looks up the player's `agentId`, and downloads each game from their last-battles list.
-
-Accepted slug forms:
-- bare slug: `winter-challenge-2026`
-- multiplayer URL: `https://www.codingame.com/multiplayer/bot-programming/winter-challenge-2026/leaderboard`
-- contest URL: `https://www.codingame.com/contests/winter-challenge-2026/leaderboard/global`
+1. Reads the active game's `LeaderboardSlug()` (e.g. `winter-challenge-2026-snakebyte`).
+2. Resolves the slug → puzzle leaderboard ID via the CodinGame API.
+3. Looks up the player's `agentId` on that leaderboard.
+4. Downloads every game from their last-battles list.
 
 Puzzle slug and agent ID lookups are cached in `db.sqlite3` to avoid repeated API calls.
 
@@ -69,10 +63,10 @@ Per-replay status lines, then a final summary:
 done: 1 saved, 1 skipped, 1 failed (out=./replays)
 ```
 
-`leaderboard` also prints resolution steps before downloading:
+Leaderboard mode also prints resolution steps before downloading:
 
 ```
-puzzle: winter-challenge-2026 -> winter-challenge-2026 (cached)
+puzzle: winter-challenge-2026-snakebyte -> winter-challenge-2026-snakebyte (cached)
 player: mrsombre -> agentId 12345 (rank 210, division 3)
 battles: 50
 ```
@@ -88,9 +82,9 @@ Each saved replay is the upstream CodinGame `gameResult` body with viewer-only p
 | `seed`        | extracted from `gameResult.refereeInput`         | Match RNG seed; JSON-string-encoded int64. Replaces `refereeInput`.    |
 | `blue`        | `<username>` argument                            | Player we are playing for (the analyze "us" side)                      |
 | `league`      | parsed from `questionTitle` (e.g. `level3` → 3)  | League level the match was played at                                   |
-| `source`      | `get` or `leaderboard`                           | Which subcommand produced this file                                    |
+| `source`      | `get` or `leaderboard`                           | Which mode produced this file (no IDs → `leaderboard`, IDs → `get`)    |
 | `fetched_at`  | RFC 3339 timestamp at download time              | Lets `analyze` filter cohorts chronologically                          |
-| `leaderboard` | `replay leaderboard` only                        | `{rank, division, score}` of the player at fetch time                  |
+| `leaderboard` | leaderboard mode only                            | `{rank, division, score}` of the player at fetch time                  |
 
 `league` and `leaderboard.division` are deliberately separate: the former is the level a given match was played at, the latter is where the player currently sits on the ladder (Wood / Bronze / Silver / Gold / Legend, indexed from 0).
 

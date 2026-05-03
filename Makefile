@@ -57,9 +57,7 @@ match-winter2026:
 .PHONY: leaderboard convert analyze
 
 leaderboard:
-	./$(BIN_DIR)/arena replay leaderboard \
-		mrsombre https://www.codingame.com/multiplayer/bot-programming/winter-challenge-2026-snakebyte/leaderboard \
-		--game winter2026
+	./$(BIN_DIR)/arena replay mrsombre --game winter2026
 
 convert:
 	./$(BIN_DIR)/arena convert --game winter2026

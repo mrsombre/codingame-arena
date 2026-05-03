@@ -6,7 +6,7 @@ The current flow:
 
 ```
 arena run --trace             ─▶ trace-<id>-<n>.json   (self-play)
-arena replay get/leaderboard  ─▶ replays/<id>.json
+arena replay <user> [ids]     ─▶ replays/<id>.json
 arena convert                 ─▶ replay-<id>.json     (real CG matches)
 arena analyze                 ─▶ winner-vs-loser report
 ```
@@ -43,7 +43,7 @@ P0 milestone (#1+#2+#3) is done. Suggested next move: #4 + #5 to make the report
 
 ### 1. Identify "us" in every trace — DONE
 
-`TraceMatch.Blue` is required on every loaded trace. Self-play sets it to `filepath.Base(--blue)` (blue is always "us" — `--blue` is required by the CLI). Replays carry blue from `replay get`/`leaderboard` (username is required there too); `convert` errors out on a replay without blue or where blue doesn't match either player. `analyze` rejects any on-disk trace that lacks blue, so `BlueSide()` is treated as 0/1 throughout the report and the "Blue not identified" branch is gone. A `--trace-blue` flag on `arena run` was deemed unnecessary while P0 == us.
+`TraceMatch.Blue` is required on every loaded trace. Self-play sets it to `filepath.Base(--blue)` (blue is always "us" — `--blue` is required by the CLI). Replays carry blue from `arena replay` (username is required there too); `convert` errors out on a replay without blue or where blue doesn't match either player. `analyze` rejects any on-disk trace that lacks blue, so `BlueSide()` is treated as 0/1 throughout the report and the "Blue not identified" branch is gone. A `--trace-blue` flag on `arena run` was deemed unnecessary while P0 == us.
 
 ### 2. Winter 2026 has no analyzer — DONE
 
@@ -122,7 +122,7 @@ Surface a `last-decisions` section in `analyze --worst N`.
 
 ### 8. Pairwise matchup table — NOT DONE
 
-`replay leaderboard` pulls real CG matches against many opponents. Tabulate winrate vs each opponent (group by `Players[non-us]` after #1). Lets us spot a single opponent we keep losing to and study just those traces.
+`arena replay` (leaderboard mode) pulls real CG matches against many opponents. Tabulate winrate vs each opponent (group by `Players[non-us]` after #1). Lets us spot a single opponent we keep losing to and study just those traces.
 
 Output in JSON or text; add `--by opponent` flag.
 
@@ -168,9 +168,9 @@ CLI: `arena convert --rerun --blue bin/bot-winter2026-cpp` writes both files; an
 
 ### 15. Track leaderboard rank at replay-fetch time — PARTIAL
 
-`replay leaderboard` already records the player's `Rank` / `Division` / `Score` inline on the replay JSON (`CodinGameReplay.Leaderboard`, populated at `commands/replay.go:120`); re-fetching with `--force` refreshes the snapshot. No separate `replays/<id>.meta.json` file is needed. Remaining gaps:
+`arena replay` in leaderboard mode (no IDs given) already records the player's `Rank` / `Division` / `Score` inline on the replay JSON (`CodinGameReplay.Leaderboard`, populated in `commands/replay.go`); re-fetching with `--force` refreshes the snapshot. No separate `replays/<id>.meta.json` file is needed. Remaining gaps:
 
-- `replay get` doesn't capture rank (it skips the leaderboard lookup) — should call `resolveAgent` once per invocation when a username is supplied.
+- ID-list mode (`arena replay <user> <ids>`) doesn't capture rank (it skips the leaderboard lookup) — should call `resolveAgent` once per invocation when a username is supplied.
 - `convert` drops `Leaderboard`; `TraceMatch` has no rank field. Until that's propagated, `analyze` can't group losses by elo band as the original brief intended.
 
 ### 16. Move legality / wasted-action analysis — NOT DONE

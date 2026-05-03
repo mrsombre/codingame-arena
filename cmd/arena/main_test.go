@@ -61,8 +61,8 @@ func TestNormalizeCommandSupportsTopLevelHelpFlags(t *testing.T) {
 	}
 }
 
-func TestSelectCommandRoutesReplaySubcommands(t *testing.T) {
-	spec, rest, err := selectCommand("replay", []string{"get", "mrsombre", "123"})
+func TestSelectCommandRoutesReplay(t *testing.T) {
+	spec, rest, err := selectCommand("replay", []string{"mrsombre", "123"})
 	if err != nil {
 		t.Fatalf("selectCommand returned error: %v", err)
 	}
@@ -77,15 +77,15 @@ func TestSelectCommandRoutesReplaySubcommands(t *testing.T) {
 	}
 }
 
-func TestPrintHelpRoutesReplaySubcommands(t *testing.T) {
+func TestPrintHelpRoutesReplay(t *testing.T) {
 	var stdout bytes.Buffer
 
-	err := printHelp(&stdout, []string{"replay", "leaderboard"}, []string{"winter2026"})
+	err := printHelp(&stdout, []string{"replay"}, []string{"winter2026"})
 
 	if err != nil {
 		t.Fatalf("printHelp returned error: %v", err)
 	}
-	if !strings.Contains(stdout.String(), "arena replay leaderboard") {
-		t.Fatalf("stdout missing replay leaderboard usage:\n%s", stdout.String())
+	if !strings.Contains(stdout.String(), "arena replay <username>") {
+		t.Fatalf("stdout missing replay usage:\n%s", stdout.String())
 	}
 }
