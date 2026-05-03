@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -79,26 +78,6 @@ func TestConvertReplayPropagatesReadError(t *testing.T) {
 	assert.Contains(t, err.Error(), "read")
 }
 
-func TestConvertReplaysWritesProgressAndAggregates(t *testing.T) {
-	dir := makeConvertTestDir(t)
-	replayPath := writeConvertReplayFile(t, dir, "42.json", `{
-  "puzzleId": 999,
-  "gameResult": {"scores": [1.0, 0.0], "frames": []}
-}`)
-
-	var stdout bytes.Buffer
-	results, err := convertReplays(
-		&stdout,
-		&fakeConvertFactory{puzzleID: 1},
-		ConvertOptions{TraceDir: filepath.Join(dir, "traces"), Force: true},
-		[]convertReplayTarget{{ID: 42, Path: replayPath}},
-	)
-	require.NoError(t, err)
-	require.Len(t, results, 1)
-	assert.Equal(t, convertOutcomeSkippedPuzzle, results[0].Outcome)
-	assert.Contains(t, stdout.String(), "[1/1] skip 42 (puzzleId 999 != 1)")
-}
-
 func TestSummarizeConvertResultsAggregatesOutcomes(t *testing.T) {
 	results := []convertResult{
 		{Outcome: convertOutcomeSaved},
@@ -107,47 +86,17 @@ func TestSummarizeConvertResultsAggregatesOutcomes(t *testing.T) {
 		{Outcome: convertOutcomeSkippedPuzzle},
 		{Outcome: convertOutcomeSkippedPuzzle},
 		{Outcome: convertOutcomeSkippedMismatch},
+		{Outcome: convertOutcomeFailed},
 	}
 	got := summarizeConvertResults(results)
 	assert.Equal(t, convertSummary{
-		Total:           6,
+		Total:           7,
 		Saved:           2,
 		SkippedExisting: 1,
 		SkippedPuzzle:   2,
 		SkippedMismatch: 1,
+		Failed:          1,
 	}, got)
-}
-
-func TestWriteConvertProgressFormatsVerb(t *testing.T) {
-	var saved bytes.Buffer
-	writeConvertProgress(&saved, 1, 5, convertResult{
-		Target:  convertReplayTarget{ID: 42},
-		Outcome: convertOutcomeSaved,
-		Detail:  "league=2 turns=10 scores=1.0:0.0",
-	})
-	assert.Equal(t, "[1/5] save 42 (league=2 turns=10 scores=1.0:0.0)\n", saved.String())
-
-	var skipped bytes.Buffer
-	writeConvertProgress(&skipped, 2, 5, convertResult{
-		Target:  convertReplayTarget{ID: 100},
-		Outcome: convertOutcomeSkippedPuzzle,
-		Detail:  "puzzleId 999 != 1",
-	})
-	assert.Equal(t, "[2/5] skip 100 (puzzleId 999 != 1)\n", skipped.String())
-}
-
-func TestWriteConvertSummaryFormat(t *testing.T) {
-	var stdout bytes.Buffer
-	opts := ConvertOptions{TraceDir: "./tmp/traces"}
-	results := []convertResult{
-		{Outcome: convertOutcomeSaved},
-		{Outcome: convertOutcomeSkippedExisting},
-		{Outcome: convertOutcomeSkippedMismatch},
-	}
-	require.NoError(t, writeConvertSummary(&stdout, opts, results))
-	assert.Equal(t,
-		"done: 1 saved, 1 skipped-existing, 0 skipped-puzzle, 1 skipped-mismatch (replays=3 out=./tmp/traces)\n",
-		stdout.String())
 }
 
 func makeConvertTestDir(t *testing.T) string {

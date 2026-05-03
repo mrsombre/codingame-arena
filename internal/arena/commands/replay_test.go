@@ -89,7 +89,7 @@ func TestRunReplayDownloadsSkipsExistingByDefault(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	results, err := runReplayDownloads(fetcher, cfg, &stdout, fixedClock(time.Unix(1700000000, 0).UTC()))
+	results, _, err := runReplayDownloads(fetcher, cfg, &stdout, fixedClock(time.Unix(1700000000, 0).UTC()))
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	assert.Equal(t, downloadOutcomeSkippedExisting, results[0].Outcome)
@@ -113,7 +113,7 @@ func TestRunReplayDownloadsForceRefetches(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	results, err := runReplayDownloads(fetcher, cfg, &stdout, fixedClock(time.Now()))
+	results, _, err := runReplayDownloads(fetcher, cfg, &stdout, fixedClock(time.Now()))
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, downloadOutcomeSaved, results[0].Outcome)
@@ -132,7 +132,7 @@ func TestRunReplayDownloadsAppliesLimit(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	results, err := runReplayDownloads(fetcher, cfg, &stdout, fixedClock(time.Now()))
+	results, _, err := runReplayDownloads(fetcher, cfg, &stdout, fixedClock(time.Now()))
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	assert.Equal(t, []int64{1, 2}, fetcher.requested)
@@ -150,7 +150,7 @@ func TestRunReplayDownloadsSoftFailsOnFetchError(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	results, err := runReplayDownloads(fetcher, cfg, &stdout, fixedClock(time.Now()))
+	results, _, err := runReplayDownloads(fetcher, cfg, &stdout, fixedClock(time.Now()))
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	assert.Equal(t, downloadOutcomeFailed, results[0].Outcome)

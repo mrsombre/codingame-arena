@@ -2,7 +2,7 @@
 
 Aggregate trace files into a standard outcome report plus game-owned metrics.
 
-The command reads every `*.json` trace in `--trace-dir` (self-play `trace-*.json` files from `arena run --trace` and converted `replay-*.json` files from `arena convert`), filters them to one selected game, and emits an arena-owned report.
+The command reads every `*.json` trace in `--trace-dir` (self-play `trace-*.json` files from `arena run --trace` and converted `replay-*.json` files written by `arena replay`), filters them to one selected game, and emits an arena-owned report.
 
 ## Quick start
 

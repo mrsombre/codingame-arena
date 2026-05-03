@@ -99,12 +99,6 @@ func commandSet() map[string]commandSpec {
 			handler:  commands.Analyze,
 			usage:    commands.AnalyzeUsage,
 		},
-		"convert": {
-			addFlags:     commands.AddConvertFlags,
-			handler:      commands.Convert,
-			needsFactory: true,
-			usage:        commands.ConvertUsage,
-		},
 		"serve": {
 			addFlags: commands.AddServeFlags,
 			handler:  commands.Serve,

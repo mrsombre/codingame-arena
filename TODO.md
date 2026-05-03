@@ -6,8 +6,7 @@ The current flow:
 
 ```
 arena run --trace             ─▶ trace-<id>-<n>.json   (self-play)
-arena replay <user> [ids]     ─▶ replays/<id>.json
-arena convert                 ─▶ replay-<id>.json     (real CG matches)
+arena replay <user> [ids]     ─▶ replays/<id>.json + replay-<id>.json   (real CG)
 arena analyze                 ─▶ winner-vs-loser report
 ```
 
@@ -128,10 +127,10 @@ Output in JSON or text; add `--by opponent` flag.
 
 ### 9. Convert mismatch quarantine — NOT DONE
 
-`convert` currently logs `skipped-mismatch` lines to stdout (`commands/convert.go:76`). Each mismatch is engineering signal — the engine doesn't yet match CG behavior, and our trace dataset is silently smaller than expected.
+`arena replay`'s auto-convert step currently logs `skip` lines with `replay mismatch:` details to stdout. Each mismatch is engineering signal — the engine doesn't yet match CG behavior, and our trace dataset is silently smaller than expected.
 
 - Write skipped replays + reason to `<trace-dir>/_mismatch.json` with the replay id, league, expected vs actual scores, expected vs actual turns.
-- `arena convert --report-mismatches` prints aggregate counts per mismatch category for a quick "engine fidelity" health check.
+- A `--report-mismatches` flag on `arena replay` prints aggregate counts per mismatch category for a quick "engine fidelity" health check.
 - A future `make engine-fidelity` target can fail if mismatch rate increases.
 
 ### 10. JSON output for analyze — NOT DONE
@@ -162,9 +161,9 @@ For each apple eaten, record turn + side. Compute (per match) the "apple race" b
 
 ### 14. Auto-rerun replay seeds in simulator — NOT DONE
 
-After `convert` saves `replay-<id>.json`, optionally also run `arena run --seed <replay.seed> --blue <our-current-bot> --red <something>` and emit a paired `trace-replay-<id>.json`. We get to see how our **current** bot would have played the same seed, side-by-side with the historical CG match.
+After `arena replay` saves `replay-<id>.json`, optionally also run `arena run --seed <replay.seed> --blue <our-current-bot> --red <something>` and emit a paired `trace-replay-<id>.json`. We get to see how our **current** bot would have played the same seed, side-by-side with the historical CG match.
 
-CLI: `arena convert --rerun --blue bin/bot-winter2026-cpp` writes both files; analyze reports the delta.
+CLI: `arena replay --rerun --blue bin/bot-winter2026-cpp` writes both files; analyze reports the delta.
 
 ### 15. Track leaderboard rank at replay-fetch time — PARTIAL
 

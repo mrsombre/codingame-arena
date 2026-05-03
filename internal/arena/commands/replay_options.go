@@ -15,6 +15,7 @@ import (
 // AddReplayFlags registers flags used by the "replay" command on fs.
 func AddReplayFlags(fs *pflag.FlagSet) {
 	fs.StringP("out", "o", filepath.Clean("./replays"), "Directory to save replays as <gameId>.json")
+	fs.String("trace-dir", filepath.Clean("./traces"), "Directory to write converted trace files")
 	fs.IntP("limit", "n", 0, "Maximum number of replays to download (0 = all)")
 	fs.IntP("league", "l", 4, "League level recorded in saved replay")
 	fs.Duration("delay", 500*time.Millisecond, "Delay between replay downloads")
@@ -31,6 +32,7 @@ type ReplayOptions struct {
 	Username string
 	IDs      []int64
 	OutDir   string
+	TraceDir string
 	League   int
 	Limit    int
 	Delay    time.Duration
@@ -73,6 +75,10 @@ func parseReplayOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (Repla
 	opts.OutDir = v.GetString("out")
 	if opts.OutDir == "" {
 		opts.OutDir = "replays"
+	}
+	opts.TraceDir = v.GetString("trace-dir")
+	if opts.TraceDir == "" {
+		opts.TraceDir = "traces"
 	}
 	opts.League = v.GetInt("league")
 	if opts.League < 0 {

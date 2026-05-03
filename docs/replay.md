@@ -1,6 +1,6 @@
 # Command replay
 
-Download raw replay JSON from codingame.com for offline viewing and conversion.
+Download raw replay JSON from codingame.com and immediately convert each freshly-downloaded file into a verified arena trace.
 
 `arena replay <username> [<id|url>[,<id|url>...]]`
 
@@ -9,20 +9,20 @@ Download raw replay JSON from codingame.com for offline viewing and conversion.
 
 The leaderboard slug is baked into each game engine (e.g. `winter-challenge-2026-snakebyte`, `spring-challenge-2020`), so you no longer pass the puzzle URL on the command line — the active game is selected via `--game` (or `arena.yml`).
 
-`<username>` is the player you are playing for. It is recorded as the top-level `blue` field in each saved replay so the viewer and `convert` know which side is "yours".
+`<username>` is the player you are playing for. It is recorded as the top-level `blue` field in each saved replay so the viewer and the trace know which side is "yours".
 
 ## Quick start
 
 ```shell
-# Download every replay from a player's leaderboard last-battles list
+# Download + convert every replay from a player's leaderboard last-battles list
 bin/arena replay mrsombre --game winter2026
 
-# Download specific replays (comma- or space-separated)
+# Download + convert specific replays (comma- or space-separated)
 bin/arena replay mrsombre --game winter2026 875142454,875142455
 bin/arena replay mrsombre --game winter2026 875142454 875142455
 ```
 
-Files are saved as `<gameId>.json` under `--out` (default `./replays/`).
+Replay JSON is saved under `--out` (default `./replays/`) as `<gameId>.json`. The matching trace is written to `--trace-dir` (default `./traces/`) as `replay-<gameId>-0.json`.
 
 ## Argument forms
 
@@ -42,25 +42,40 @@ When invoked with no IDs, the command:
 
 Puzzle slug and agent ID lookups are cached in `db.sqlite3` to avoid repeated API calls.
 
+## Auto-convert step
+
+For every replay that is **freshly downloaded** (the file did not yet exist on disk, or `-f` was used), the command immediately runs the same conversion the old `arena convert` performed:
+
+1. Parse the replay JSON and extract the seed.
+2. Re-run the engine using the recorded player moves and the league parsed from the replay title.
+3. Verify final scores and turn count match the replay; if they diverge, skip writing the trace (logged as a `skip` with `replay mismatch:` detail).
+4. Write the verified trace to `--trace-dir` as a replay-typed trace file keyed by replay ID.
+
+Replays that are skipped during download (already on disk, no `-f`) are **not** re-converted — their existing trace is left alone. Mismatches are logged but do not abort the batch.
+
 ## Options
 
 | Flag           | Default     | Description                                       |
 |----------------|-------------|---------------------------------------------------|
 | `-o, --out`    | `./replays` | Directory to save replays as `<gameId>.json`      |
+| `--trace-dir`  | `./traces`  | Directory to write converted trace files          |
 | `-n, --limit`  | `0`         | Maximum replays to download (`0` = all)           |
 | `-l, --league` | `4`         | League level recorded in saved replay             |
 | `--delay`      | `500ms`     | Delay between requests                            |
-| `-f, --force`  | `false`     | Re-download even if file already exists           |
+| `-f, --force`  | `false`     | Re-download (and re-convert) even if file exists  |
 
 ## Output
 
-Per-replay status lines, then a final summary:
+Per-replay status lines: a `save` (or `skip`/`fail`) for the download, followed by a `trace` (or `skip`/`fail`) line whenever the replay was freshly downloaded. Two summary lines at the end:
 
 ```
 [1/3] save 875142454 (12345 bytes)
+[1/3] trace 875142454 (league=4 turns=187 scores=24.0:18.0)
 [2/3] skip 875142455 (exists)
-[3/3] fail 875142456: <error>
-done: 1 saved, 1 skipped, 1 failed (out=./replays)
+[3/3] save 875142456 (98765 bytes)
+[3/3] skip 875142456 (replay mismatch: score mismatch: replay=[...] engine=[...])
+done: 2 saved, 1 skipped, 0 failed (out=./replays)
+traces: 1 saved, 0 skipped-existing, 0 skipped-puzzle, 1 skipped-mismatch, 0 failed (out=./traces)
 ```
 
 Leaderboard mode also prints resolution steps before downloading:
@@ -71,7 +86,7 @@ player: mrsombre -> agentId 12345 (rank 210, division 3)
 battles: 50
 ```
 
-Saved replays are pretty-printed JSON ready for `arena convert` to turn into trace files.
+A `skipped-mismatch` trace usually means the engine doesn't yet match the recorded league behavior — the replay JSON is preserved so the engine fix can be re-tested with `-f`.
 
 ## Saved file shape
 
@@ -88,4 +103,4 @@ Each saved replay is the upstream CodinGame `gameResult` body with viewer-only p
 
 `league` and `leaderboard.division` are deliberately separate: the former is the level a given match was played at, the latter is where the player currently sits on the ladder (Wood / Bronze / Silver / Gold / Legend, indexed from 0).
 
-For replays saved before the seed-promotion change, `refereeInput` is still preserved on read; `arena convert` falls back to parsing it when the top-level `seed` is absent.
+For replays saved before the seed-promotion change, `refereeInput` is still preserved on read and parsed as a fallback when the top-level `seed` is absent.

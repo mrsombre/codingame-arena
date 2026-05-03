@@ -43,12 +43,16 @@ type downloadSummary struct {
 	Failed  int
 }
 
-// replayBatchConfig bundles the knobs the download loop needs. Built from
-// ReplayOptions plus the per-mode annotations layered into every saved replay.
+// replayBatchConfig bundles the knobs the download + auto-convert loop needs.
+// Built from ReplayOptions plus the per-mode annotations layered into every
+// saved replay. Factory is required for auto-convert; tests pass nil to skip
+// the conversion step.
 type replayBatchConfig struct {
 	IDs         []int64
 	Annotations arena.ReplayAnnotations
 	OutDir      string
+	TraceDir    string
+	Factory     arena.GameFactory
 	Limit       int
 	Delay       time.Duration
 	Force       bool
@@ -58,12 +62,14 @@ type replayBatchConfig struct {
 func ReplayUsage(fs *pflag.FlagSet) string {
 	return arena.CommandUsage(
 		"replay <username> [<id|url>[,<id|url>...]]",
-		"Download raw replay JSON from codingame.com. With no IDs, downloads "+
+		"Download raw replay JSON from codingame.com and convert each freshly-"+
+			"saved file into a verified arena trace. With no IDs, downloads "+
 			"every replay from <username>'s last battles list on the active "+
 			"game's leaderboard. With one or more IDs (or replay URLs), "+
 			"downloads only those games. <username> is the player we are "+
 			"playing for; it is recorded as the top-level \"blue\" field in "+
-			"every saved replay.",
+			"every saved replay. Already-downloaded replays are skipped (use "+
+			"-f to re-download and re-convert).",
 		fs,
 		"",
 	)
@@ -72,6 +78,7 @@ func ReplayUsage(fs *pflag.FlagSet) string {
 // Replay is the entry point for the "replay" command. With no IDs it
 // downloads every replay from the player's last battles list on the active
 // game's leaderboard; with one or more IDs/URLs it downloads only those games.
+// Each freshly-downloaded replay is immediately converted to a trace file.
 func Replay(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
 	opts, err := parseReplayOptions(args, fs, v)
 	if err != nil {
@@ -86,11 +93,13 @@ func Replay(args []string, stdout io.Writer, factory arena.GameFactory, fs *pfla
 
 func replayByIDs(opts ReplayOptions, factory arena.GameFactory, stdout io.Writer) error {
 	cfg := replayBatchConfig{
-		IDs:    opts.IDs,
-		OutDir: opts.OutDir,
-		Limit:  opts.Limit,
-		Delay:  opts.Delay,
-		Force:  opts.Force,
+		IDs:      opts.IDs,
+		OutDir:   opts.OutDir,
+		TraceDir: opts.TraceDir,
+		Factory:  factory,
+		Limit:    opts.Limit,
+		Delay:    opts.Delay,
+		Force:    opts.Force,
 		Annotations: arena.ReplayAnnotations{
 			Blue:        opts.Username,
 			League:      opts.League,
@@ -136,11 +145,13 @@ func replayFromLeaderboard(opts ReplayOptions, factory arena.GameFactory, stdout
 	_, _ = fmt.Fprintf(stdout, "battles: %d\n", len(gameIDs))
 
 	cfg := replayBatchConfig{
-		IDs:    gameIDs,
-		OutDir: opts.OutDir,
-		Limit:  opts.Limit,
-		Delay:  opts.Delay,
-		Force:  opts.Force,
+		IDs:      gameIDs,
+		OutDir:   opts.OutDir,
+		TraceDir: opts.TraceDir,
+		Factory:  factory,
+		Limit:    opts.Limit,
+		Delay:    opts.Delay,
+		Force:    opts.Force,
 		Annotations: arena.ReplayAnnotations{
 			Blue:   opts.Username,
 			League: opts.League,
@@ -159,31 +170,47 @@ func replayFromLeaderboard(opts ReplayOptions, factory arena.GameFactory, stdout
 
 // downloadReplays is the shared per-ID download orchestrator. Skipped-existing
 // replays don't reset the inter-fetch delay; fetch errors are soft (counted
-// as failed); prepare/write errors abort the batch.
+// as failed); prepare/write errors abort the batch. Each freshly-saved replay
+// is fed through convertReplay before the loop moves on (skipped when
+// cfg.Factory is nil — only tests do that).
 func downloadReplays(fetcher replayFetcher, cfg replayBatchConfig, stdout io.Writer) error {
 	if err := os.MkdirAll(cfg.OutDir, 0o755); err != nil {
 		return fmt.Errorf("create %s: %w", cfg.OutDir, err)
 	}
-	results, err := runReplayDownloads(fetcher, cfg, stdout, time.Now)
+	if cfg.Factory != nil {
+		if err := os.MkdirAll(cfg.TraceDir, 0o755); err != nil {
+			return fmt.Errorf("create %s: %w", cfg.TraceDir, err)
+		}
+	}
+	dlResults, cvResults, err := runReplayDownloads(fetcher, cfg, stdout, time.Now)
 	if err != nil {
 		return err
 	}
-	return writeDownloadSummary(stdout, cfg.OutDir, results)
+	if err := writeDownloadSummary(stdout, cfg.OutDir, dlResults); err != nil {
+		return err
+	}
+	if cfg.Factory != nil {
+		if err := writeAutoConvertSummary(stdout, cfg.TraceDir, cvResults); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func runReplayDownloads(fetcher replayFetcher, cfg replayBatchConfig, stdout io.Writer, now func() time.Time) ([]downloadResult, error) {
+func runReplayDownloads(fetcher replayFetcher, cfg replayBatchConfig, stdout io.Writer, now func() time.Time) ([]downloadResult, []convertResult, error) {
 	ids := cfg.IDs
 	if cfg.Limit > 0 && len(ids) > cfg.Limit {
 		ids = ids[:cfg.Limit]
 	}
 
-	results := make([]downloadResult, 0, len(ids))
+	dlResults := make([]downloadResult, 0, len(ids))
+	cvResults := make([]convertResult, 0, len(ids))
 	fetched := 0
 	for i, id := range ids {
 		if !cfg.Force && replayFileExists(cfg.OutDir, id) {
 			result := downloadResult{ID: id, Outcome: downloadOutcomeSkippedExisting, Detail: "exists"}
 			writeDownloadProgress(stdout, i+1, len(ids), result)
-			results = append(results, result)
+			dlResults = append(dlResults, result)
 			continue
 		}
 
@@ -193,13 +220,22 @@ func runReplayDownloads(fetcher replayFetcher, cfg replayBatchConfig, stdout io.
 
 		result, err := downloadReplay(fetcher, cfg, id, now())
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		fetched++
 		writeDownloadProgress(stdout, i+1, len(ids), result)
-		results = append(results, result)
+		dlResults = append(dlResults, result)
+
+		if result.Outcome == downloadOutcomeSaved && cfg.Factory != nil {
+			cv := autoConvertReplay(cfg.Factory, cfg.TraceDir, convertReplayTarget{
+				ID:   id,
+				Path: replayFilePath(cfg.OutDir, id),
+			})
+			writeAutoConvertProgress(stdout, i+1, len(ids), cv)
+			cvResults = append(cvResults, cv)
+		}
 	}
-	return results, nil
+	return dlResults, cvResults, nil
 }
 
 // downloadReplay handles one target. Fetch errors map to a soft failed result
@@ -222,6 +258,21 @@ func downloadReplay(fetcher replayFetcher, cfg replayBatchConfig, id int64, fetc
 		return downloadResult{}, fmt.Errorf("write %s: %w", path, err)
 	}
 	return downloadResult{ID: id, Outcome: downloadOutcomeSaved, Detail: fmt.Sprintf("%d bytes", len(body))}, nil
+}
+
+// autoConvertReplay runs convertReplay with Force=true (we just downloaded a
+// fresh replay, so any existing trace is stale) and folds I/O errors into a
+// soft Failed result so a single bad conversion does not abort the batch.
+func autoConvertReplay(factory arena.GameFactory, traceDir string, target convertReplayTarget) convertResult {
+	res, err := convertReplay(factory, ConvertOptions{TraceDir: traceDir, Force: true}, target)
+	if err != nil {
+		return convertResult{
+			Target:  target,
+			Outcome: convertOutcomeFailed,
+			Detail:  err.Error(),
+		}
+	}
+	return res
 }
 
 func replayFilePath(outDir string, id int64) string {
@@ -264,6 +315,27 @@ func summarizeDownloadResults(results []downloadResult) downloadSummary {
 		}
 	}
 	return s
+}
+
+// writeAutoConvertProgress prints one status line per converted replay. The
+// "trace" verb (rather than convert.go's "save") is used so the line is
+// visually distinct from the preceding download's "save" line for the same ID.
+func writeAutoConvertProgress(stdout io.Writer, current, total int, r convertResult) {
+	switch r.Outcome {
+	case convertOutcomeSaved:
+		_, _ = fmt.Fprintf(stdout, "[%d/%d] trace %d (%s)\n", current, total, r.Target.ID, r.Detail)
+	case convertOutcomeSkippedExisting, convertOutcomeSkippedPuzzle, convertOutcomeSkippedMismatch:
+		_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (%s)\n", current, total, r.Target.ID, r.Detail)
+	case convertOutcomeFailed:
+		_, _ = fmt.Fprintf(stdout, "[%d/%d] fail %d: %s\n", current, total, r.Target.ID, r.Detail)
+	}
+}
+
+func writeAutoConvertSummary(stdout io.Writer, traceDir string, results []convertResult) error {
+	s := summarizeConvertResults(results)
+	_, err := fmt.Fprintf(stdout, "traces: %d saved, %d skipped-existing, %d skipped-puzzle, %d skipped-mismatch, %d failed (out=%s)\n",
+		s.Saved, s.SkippedExisting, s.SkippedPuzzle, s.SkippedMismatch, s.Failed, traceDir)
+	return err
 }
 
 // cacheTag returns a short " (cached)" suffix when hit is true.
