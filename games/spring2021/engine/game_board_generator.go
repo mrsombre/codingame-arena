@@ -89,15 +89,15 @@ func (g *BoardGenerator) Generate(r *javarand.Random, cfg Config, enableHoles bo
 		coord = coord.Neighbor(0)
 	}
 
-	// Java keeps insertion order via `new ArrayList<>(board.keySet())` over a
-	// HashMap. That order is undefined across JVMs, but the consumer of this
-	// list (the empty-cell loop) only uses it as a sampling pool, so the
-	// resulting set of disabled cells will still be deterministic from r.
-	// We sort by cell index for stable Go iteration.
-	coordList := make([]CubeCoord, len(g.board))
+	// Java's `new ArrayList<>(board.keySet())` walks the HashMap's internal
+	// table in bucket order — the iteration is feed straight into r.NextInt
+	// below, so a different traversal order changes which cells become holes.
+	// We replay Java 8+ HashMap insertion + resize to recover the same order.
+	coords := make([]CubeCoord, len(g.board))
 	for c, cell := range g.board {
-		coordList[cell.Index] = c
+		coords[cell.Index] = c
 	}
+	coordList := javaHashMapKeyOrder(coords)
 	coordListSize := len(coordList)
 
 	wantedEmptyCells := 0
@@ -121,4 +121,68 @@ func (g *BoardGenerator) Generate(r *javarand.Random, cfg Config, enableHoles bo
 	}
 
 	return NewBoard(g.board)
+}
+
+// cubeCoordJavaHash mirrors CubeCoord.hashCode() in the Java reference:
+//
+//	result = 1
+//	result = 31*result + x
+//	result = 31*result + y
+//	result = 31*result + z
+//
+// Truncation to 32 bits matches Java's int arithmetic.
+func cubeCoordJavaHash(c CubeCoord) int32 {
+	var h int32 = 1
+	h = 31*h + int32(c.X)
+	h = 31*h + int32(c.Y)
+	h = 31*h + int32(c.Z)
+	return h
+}
+
+// javaHashMapKeyOrder returns keys in the iteration order Java 8+
+// HashMap<CubeCoord, V> produces after the same insertion sequence. Iteration
+// walks the internal table bucket-by-bucket; entries within a bucket are kept
+// in insertion order (tail-append). Resize doubles the capacity when
+// size > threshold and rehashes entries into low/high buckets.
+func javaHashMapKeyOrder(keys []CubeCoord) []CubeCoord {
+	const loadFactor = 0.75
+	capacity := 16
+	threshold := int(float64(capacity) * loadFactor)
+	table := make([][]CubeCoord, capacity)
+
+	bucketOf := func(k CubeCoord, cap int) int {
+		h := cubeCoordJavaHash(k)
+		spread := h ^ int32(uint32(h)>>16)
+		return int(spread & int32(cap-1))
+	}
+
+	resize := func() {
+		newCap := capacity * 2
+		newTable := make([][]CubeCoord, newCap)
+		for _, bucket := range table {
+			for _, k := range bucket {
+				idx := bucketOf(k, newCap)
+				newTable[idx] = append(newTable[idx], k)
+			}
+		}
+		capacity = newCap
+		threshold = int(float64(capacity) * loadFactor)
+		table = newTable
+	}
+
+	size := 0
+	for _, k := range keys {
+		idx := bucketOf(k, capacity)
+		table[idx] = append(table[idx], k)
+		size++
+		if size > threshold {
+			resize()
+		}
+	}
+
+	out := make([]CubeCoord, 0, size)
+	for _, bucket := range table {
+		out = append(out, bucket...)
+	}
+	return out
 }
