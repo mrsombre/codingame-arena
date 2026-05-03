@@ -4,23 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-var convertReplayFilePattern = regexp.MustCompile(`^\d+\.json$`)
-
 // errReplayMismatch flags a verification failure (engine output disagrees with
-// the replay) so the convert loop can skip writing the trace and move on
-// instead of aborting the whole batch.
+// the replay) so the caller can skip writing the trace and move on instead of
+// aborting the whole batch.
 var errReplayMismatch = errors.New("replay mismatch")
 
 type convertOutcome int
@@ -30,6 +25,7 @@ const (
 	convertOutcomeSkippedExisting
 	convertOutcomeSkippedPuzzle
 	convertOutcomeSkippedMismatch
+	convertOutcomeFailed
 )
 
 type convertReplayTarget struct {
@@ -49,48 +45,19 @@ type convertSummary struct {
 	SkippedExisting int
 	SkippedPuzzle   int
 	SkippedMismatch int
+	Failed          int
 }
 
-// ConvertUsage returns the help text shown for `arena help convert`.
-func ConvertUsage(fs *pflag.FlagSet) string {
-	return arena.CommandUsage("convert", "Convert replay JSON files into arena trace files.", fs, "")
-}
-
-// Convert is the entry point for the "convert" subcommand.
-func Convert(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	opts, err := parseConvertOptions(args, fs, v)
-	if err != nil {
-		return err
-	}
-
-	targets, err := convertReplayTargets(opts.ReplayDir, opts.IDs)
-	if err != nil {
-		return err
-	}
-
-	results, err := convertReplays(stdout, factory, opts, targets)
-	if err != nil {
-		return err
-	}
-	return writeConvertSummary(stdout, opts, results)
-}
-
-func convertReplays(stdout io.Writer, factory arena.GameFactory, opts ConvertOptions, targets []convertReplayTarget) ([]convertResult, error) {
-	results := make([]convertResult, 0, len(targets))
-	for i, target := range targets {
-		result, err := convertReplay(factory, opts, target)
-		if err != nil {
-			return nil, err
-		}
-		writeConvertProgress(stdout, i+1, len(targets), result)
-		results = append(results, result)
-	}
-	return results, nil
+// ConvertOptions bundles the knobs convertReplay needs.
+type ConvertOptions struct {
+	TraceDir string
+	Force    bool
+	League   string
 }
 
 // convertReplay processes a single target. Replay-content failures (existing
 // trace, wrong puzzle, engine mismatch) become a non-error result so the
-// batch keeps moving; only genuine I/O failures return an error and abort.
+// batch keeps moving; only genuine I/O failures return an error.
 func convertReplay(factory arena.GameFactory, opts ConvertOptions, target convertReplayTarget) (convertResult, error) {
 	res := convertResult{Target: target}
 
@@ -155,21 +122,14 @@ func applyReplayMetadata(trace *arena.TraceMatch, replay arena.CodinGameReplay[a
 	trace.Blue = replay.Blue
 	trace.League = replay.League
 	trace.CreatedAt = replay.FetchedAt
-}
-
-func writeConvertProgress(stdout io.Writer, current, total int, result convertResult) {
-	verb := "skip"
-	if result.Outcome == convertOutcomeSaved {
-		verb = "save"
+	// CG's gameResult.ranks is the ground truth for who won — finalScores
+	// alone can't reproduce CG-side tiebreakers when the engine reaches a
+	// tie that CG broke (e.g. winter2026 ties the raw counts but CG ranks
+	// one side ahead). Fall back to the replay-runner-derived ranks if the
+	// replay payload is malformed.
+	if r, ok := arena.RanksFromCGRanks(replay.GameResult.Ranks); ok {
+		trace.Ranks = r
 	}
-	_, _ = fmt.Fprintf(stdout, "[%d/%d] %s %d (%s)\n", current, total, verb, result.Target.ID, result.Detail)
-}
-
-func writeConvertSummary(stdout io.Writer, opts ConvertOptions, results []convertResult) error {
-	s := summarizeConvertResults(results)
-	_, err := fmt.Fprintf(stdout, "done: %d saved, %d skipped-existing, %d skipped-puzzle, %d skipped-mismatch (replays=%d out=%s)\n",
-		s.Saved, s.SkippedExisting, s.SkippedPuzzle, s.SkippedMismatch, s.Total, opts.TraceDir)
-	return err
 }
 
 func summarizeConvertResults(results []convertResult) convertSummary {
@@ -184,51 +144,11 @@ func summarizeConvertResults(results []convertResult) convertSummary {
 			s.SkippedPuzzle++
 		case convertOutcomeSkippedMismatch:
 			s.SkippedMismatch++
+		case convertOutcomeFailed:
+			s.Failed++
 		}
 	}
 	return s
-}
-
-func convertReplayTargets(replayDir string, ids []int64) ([]convertReplayTarget, error) {
-	if len(ids) > 0 {
-		targets := make([]convertReplayTarget, 0, len(ids))
-		for _, id := range ids {
-			path := filepath.Join(replayDir, fmt.Sprintf("%d.json", id))
-			info, err := os.Stat(path)
-			if err != nil {
-				if os.IsNotExist(err) {
-					return nil, fmt.Errorf("replay not found: %s", path)
-				}
-				return nil, fmt.Errorf("stat %s: %w", path, err)
-			}
-			if info.IsDir() {
-				return nil, fmt.Errorf("replay is a directory: %s", path)
-			}
-			targets = append(targets, convertReplayTarget{ID: id, Path: path})
-		}
-		return targets, nil
-	}
-
-	entries, err := os.ReadDir(replayDir)
-	if err != nil {
-		return nil, fmt.Errorf("read replay directory: %w", err)
-	}
-
-	targets := make([]convertReplayTarget, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() || !convertReplayFilePattern.MatchString(entry.Name()) {
-			continue
-		}
-		replayID, err := strconv.ParseInt(entry.Name()[:len(entry.Name())-len(".json")], 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("parse replay id from %s: %w", entry.Name(), err)
-		}
-		targets = append(targets, convertReplayTarget{
-			ID:   replayID,
-			Path: filepath.Join(replayDir, entry.Name()),
-		})
-	}
-	return targets, nil
 }
 
 func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], leagueOverride string) (arena.TraceMatch, int, error) {
@@ -252,7 +172,7 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 	}
 
 	if replay.Blue == "" {
-		return arena.TraceMatch{}, league, fmt.Errorf("%w: replay missing blue (re-fetch with `replay get` so the username is recorded)", errReplayMismatch)
+		return arena.TraceMatch{}, league, fmt.Errorf("%w: replay missing blue (re-fetch with `arena replay` so the username is recorded)", errReplayMismatch)
 	}
 	botNames := arena.ReplayPlayerNames(replay)
 	blueSide := -1

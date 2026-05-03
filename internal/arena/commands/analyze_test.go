@@ -179,6 +179,8 @@ func (f *recordingAnalyzeFactory) PuzzleID() int { return 0 }
 
 func (f *recordingAnalyzeFactory) PuzzleTitle() string { return "" }
 
+func (f *recordingAnalyzeFactory) LeaderboardSlug() string { return "" }
+
 func (f *recordingAnalyzeFactory) NewGame(_ int64, _ *viper.Viper) (arena.Referee, []arena.Player) {
 	panic("not used")
 }
