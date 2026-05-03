@@ -157,12 +157,26 @@ func RunReplay(
 	referee.OnEnd()
 
 	finalScores := [2]int{players[0].GetScore(), players[1].GetScore()}
-	scores := finalScores
+	traceScores := finalScores
 	if haveRawScores {
-		scores = rawScores
+		traceScores = rawScores
 	}
 	deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
-	winner := TraceWinnerFromScores(scores, deactivated)
+	// Match CG's gameResult.scores convention: a deactivated side's score is
+	// reported as -1 even when its raw in-game count was higher. Without this
+	// the trace would show a live count for a player who never finished the
+	// match, disagreeing with the replay JSON for the same field.
+	for i := range deactivated {
+		if deactivated[i] {
+			traceScores[i] = -1
+		}
+	}
+	// Ranks derive from finalScores (post-OnEnd) so a deactivated side never
+	// records as drawing against the survivor and tie-break adjustments the
+	// engine performs in OnEnd are reflected. convert overrides this with the
+	// replay's gameResult.ranks for replay traces, which carries CG-side
+	// tiebreakers the engine doesn't model.
+	winner := TraceWinnerFromScores(finalScores, deactivated)
 
 	var endReason string
 	if erp, ok := referee.(EndReasonProvider); ok {
@@ -176,7 +190,7 @@ func RunReplay(
 		Seed:        seed,
 		EndReason:   endReason,
 		Deactivated: deactivated,
-		Scores:      [2]TraceScore{TraceScore(scores[0]), TraceScore(scores[1])},
+		Scores:      [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
 		Ranks:       RanksFromWinner(winner),
 		Players:     [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
 		Timing:      &TraceTiming{},

@@ -207,33 +207,38 @@ func runReplayDownloads(fetcher replayFetcher, cfg replayBatchConfig, stdout io.
 	cvResults := make([]convertResult, 0, len(ids))
 	fetched := 0
 	for i, id := range ids {
+		var dl downloadResult
 		if !cfg.Force && replayFileExists(cfg.OutDir, id) {
-			result := downloadResult{ID: id, Outcome: downloadOutcomeSkippedExisting, Detail: "exists"}
-			writeDownloadProgress(stdout, i+1, len(ids), result)
-			dlResults = append(dlResults, result)
+			dl = downloadResult{ID: id, Outcome: downloadOutcomeSkippedExisting, Detail: "exists"}
+		} else {
+			if fetched > 0 && cfg.Delay > 0 {
+				time.Sleep(cfg.Delay)
+			}
+			var err error
+			dl, err = downloadReplay(fetcher, cfg, id, now())
+			if err != nil {
+				return nil, nil, err
+			}
+			fetched++
+		}
+		writeDownloadProgress(stdout, i+1, len(ids), dl)
+		dlResults = append(dlResults, dl)
+
+		if cfg.Factory == nil || dl.Outcome == downloadOutcomeFailed {
 			continue
 		}
-
-		if fetched > 0 && cfg.Delay > 0 {
-			time.Sleep(cfg.Delay)
-		}
-
-		result, err := downloadReplay(fetcher, cfg, id, now())
-		if err != nil {
-			return nil, nil, err
-		}
-		fetched++
-		writeDownloadProgress(stdout, i+1, len(ids), result)
-		dlResults = append(dlResults, result)
-
-		if result.Outcome == downloadOutcomeSaved && cfg.Factory != nil {
-			cv := autoConvertReplay(cfg.Factory, cfg.TraceDir, convertReplayTarget{
-				ID:   id,
-				Path: replayFilePath(cfg.OutDir, id),
-			})
-			writeAutoConvertProgress(stdout, i+1, len(ids), cv)
-			cvResults = append(cvResults, cv)
-		}
+		// Convert whenever a replay file is on disk. Force-overwrite the
+		// trace when the download itself was a fresh save (the just-written
+		// replay supersedes any stale trace); otherwise honor the user's
+		// --force flag, so `delete traces && rerun replay` regenerates only
+		// the missing traces without re-downloading anything.
+		convertForce := cfg.Force || dl.Outcome == downloadOutcomeSaved
+		cv := autoConvertReplay(cfg.Factory, cfg.TraceDir, convertReplayTarget{
+			ID:   id,
+			Path: replayFilePath(cfg.OutDir, id),
+		}, convertForce)
+		writeAutoConvertProgress(stdout, i+1, len(ids), cv)
+		cvResults = append(cvResults, cv)
 	}
 	return dlResults, cvResults, nil
 }
@@ -260,11 +265,13 @@ func downloadReplay(fetcher replayFetcher, cfg replayBatchConfig, id int64, fetc
 	return downloadResult{ID: id, Outcome: downloadOutcomeSaved, Detail: fmt.Sprintf("%d bytes", len(body))}, nil
 }
 
-// autoConvertReplay runs convertReplay with Force=true (we just downloaded a
-// fresh replay, so any existing trace is stale) and folds I/O errors into a
-// soft Failed result so a single bad conversion does not abort the batch.
-func autoConvertReplay(factory arena.GameFactory, traceDir string, target convertReplayTarget) convertResult {
-	res, err := convertReplay(factory, ConvertOptions{TraceDir: traceDir, Force: true}, target)
+// autoConvertReplay runs convertReplay and folds I/O errors into a soft Failed
+// result so a single bad conversion does not abort the batch. force is true
+// when a fresh replay was just saved (the trace must follow the new replay) or
+// the user passed --force; otherwise convertReplay's existing-trace check
+// keeps already-converted files untouched.
+func autoConvertReplay(factory arena.GameFactory, traceDir string, target convertReplayTarget, force bool) convertResult {
+	res, err := convertReplay(factory, ConvertOptions{TraceDir: traceDir, Force: force}, target)
 	if err != nil {
 		return convertResult{
 			Target:  target,

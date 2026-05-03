@@ -116,6 +116,27 @@ func RanksFromWinner(winner int) [2]int {
 	}
 }
 
+// RanksFromCGRanks normalizes CodinGame's gameResult.ranks (any indexing
+// scheme; lower = better; ties allowed) into the [2]int form TraceMatch.Ranks
+// uses (0 = first place, equal entries = draw). Replay traces use this so the
+// trace's ranks reflect CG's ground-truth ordering — including any post-OnEnd
+// tiebreaker the engine cannot derive from raw scores alone — rather than
+// disagreeing with reality whenever rawScores happened to be tied. Returns
+// ok=false when the input is malformed (fewer than 2 entries).
+func RanksFromCGRanks(ranks []int) ([2]int, bool) {
+	if len(ranks) < 2 {
+		return [2]int{}, false
+	}
+	switch {
+	case ranks[0] < ranks[1]:
+		return [2]int{0, 1}, true
+	case ranks[1] < ranks[0]:
+		return [2]int{1, 0}, true
+	default:
+		return [2]int{0, 0}, true
+	}
+}
+
 // TraceWinnerFromScores derives the winner shown in a trace. Deactivation
 // outranks raw scores: a deactivated side cannot win, while an active side
 // beats a deactivated opponent regardless of raw counts. When neither side is

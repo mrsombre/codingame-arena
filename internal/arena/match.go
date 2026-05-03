@@ -241,6 +241,12 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		// Trace uses in-match side perspective: index 0 is left side, index 1
 		// is right side. result fields are blue/red perspective after the
 		// potential swap-back; un-swap to restore the in-match view.
+		//
+		// Scores are stored raw (pre-OnEnd) when the engine exposes them, so
+		// downstream tooling can see intrinsic game state without tie-break
+		// adjustments folded in. Ranks, however, follow result.Winner — i.e.
+		// the post-OnEnd outcome — so a tie-broken match never records as a
+		// draw and a deactivated side never ties against the survivor.
 		traceScores := result.Scores
 		if haveRawScores {
 			traceScores = result.RawScores
@@ -253,12 +259,12 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			}
 		}
 		deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
-		// Derive winner from raw scores so traces stay self-consistent even
-		// when tie-break adjustments made result.Winner differ from the raw
-		// outcome. Deactivation overrides a raw-score tie so a timed-out side
-		// is never recorded as drawing against the survivor.
-		if haveRawScores {
-			traceWinner = TraceWinnerFromScores(traceScores, deactivated)
+		// Match CG's gameResult.scores convention: a deactivated side's
+		// score is reported as -1, replacing the raw in-game count.
+		for i := range deactivated {
+			if deactivated[i] {
+				traceScores[i] = -1
+			}
 		}
 		stats := [2]playerTimingStats{controllers[0].TimingStats(), controllers[1].TimingStats()}
 		traceTiming := &TraceTiming{

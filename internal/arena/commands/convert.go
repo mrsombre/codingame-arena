@@ -122,6 +122,14 @@ func applyReplayMetadata(trace *arena.TraceMatch, replay arena.CodinGameReplay[a
 	trace.Blue = replay.Blue
 	trace.League = replay.League
 	trace.CreatedAt = replay.FetchedAt
+	// CG's gameResult.ranks is the ground truth for who won — finalScores
+	// alone can't reproduce CG-side tiebreakers when the engine reaches a
+	// tie that CG broke (e.g. winter2026 ties the raw counts but CG ranks
+	// one side ahead). Fall back to the replay-runner-derived ranks if the
+	// replay payload is malformed.
+	if r, ok := arena.RanksFromCGRanks(replay.GameResult.Ranks); ok {
+		trace.Ranks = r
+	}
 }
 
 func summarizeConvertResults(results []convertResult) convertSummary {
