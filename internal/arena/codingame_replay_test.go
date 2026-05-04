@@ -275,6 +275,9 @@ func TestParseReplayLeague(t *testing.T) {
 	if got := ParseReplayLeague("SnakeBot level4"); got != 4 {
 		t.Fatalf("ParseReplayLeague() = %d, want 4", got)
 	}
+	if got := ParseReplayLeague("Spring Challenge 2021 - Level 4"); got != 4 {
+		t.Fatalf("ParseReplayLeague() = %d, want 4", got)
+	}
 	if got := ParseReplayLeague("Winter Challenge"); got != 0 {
 		t.Fatalf("ParseReplayLeague() = %d, want 0", got)
 	}

@@ -119,7 +119,7 @@ func ParseReplaySeed(refereeInput string) (int64, bool) {
 	return 0, false
 }
 
-var replayLeaguePattern = regexp.MustCompile(`(?i)level(\d)`)
+var replayLeaguePattern = regexp.MustCompile(`(?i)level\s*(\d)`)
 
 // ParseReplayLeague extracts the CodinGame league level from the replay title.
 func ParseReplayLeague(questionTitle string) int {

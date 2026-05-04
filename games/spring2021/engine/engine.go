@@ -23,7 +23,7 @@ func NewFactory() arena.GameFactory {
 
 func (f *Factory) Name() string { return "spring2021" }
 
-func (f *Factory) PuzzleID() int { return 0 }
+func (f *Factory) PuzzleID() int { return 730 }
 
 func (f *Factory) PuzzleTitle() string { return "Spring Challenge 2021 - Photosynthesis" }
 
