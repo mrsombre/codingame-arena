@@ -25,6 +25,8 @@ func (f *Factory) Name() string { return "spring2021" }
 
 func (f *Factory) PuzzleID() int { return 730 }
 
+func (f *Factory) EmitsReplayPhaseFrames() bool { return true }
+
 func (f *Factory) PuzzleTitle() string { return "Spring Challenge 2021 - Photosynthesis" }
 
 func (f *Factory) LeaderboardSlug() string { return "spring-challenge-2021" }

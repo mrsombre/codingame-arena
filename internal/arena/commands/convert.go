@@ -200,7 +200,11 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 	if e, ok := factory.(arena.PostEndFrameEmitter); ok {
 		emitsPostEndFrame = e.EmitsPostEndFrame()
 	}
-	if err := verifyReplayTrace(trace, finalScores, replay, emitsPostEndFrame); err != nil {
+	emitsPhaseFrames := false
+	if e, ok := factory.(arena.ReplayPhaseFrameEmitter); ok {
+		emitsPhaseFrames = e.EmitsReplayPhaseFrames()
+	}
+	if err := verifyReplayTrace(trace, finalScores, replay, emitsPostEndFrame, emitsPhaseFrames); err != nil {
 		return arena.TraceMatch{}, league, err
 	}
 
@@ -214,9 +218,9 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 // score, which diverges whenever OnEnd touches it (e.g. ties trigger a losses
 // subtraction, deactivated players become -1).
 //
-// emitsPostEndFrame selects the trace-turn counting strategy: see
-// arena.ReplayTraceTurnCount for what it means.
-func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], emitsPostEndFrame bool) error {
+// emitsPostEndFrame and emitsPhaseFrames select the trace-turn counting
+// strategy: see arena.ReplayTraceTurnCount for what they mean.
+func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], emitsPostEndFrame, emitsPhaseFrames bool) error {
 	if len(replay.GameResult.Scores) < 2 {
 		return fmt.Errorf("replay scores must contain two entries")
 	}
@@ -226,7 +230,7 @@ func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.
 			replay.GameResult.Scores[0], replay.GameResult.Scores[1], finalScores[0], finalScores[1])
 	}
 
-	expectedTurns := arena.ReplayTraceTurnCount(replay, emitsPostEndFrame)
+	expectedTurns := arena.ReplayTraceTurnCount(replay, emitsPostEndFrame, emitsPhaseFrames)
 	if len(trace.Turns) != expectedTurns {
 		return fmt.Errorf("%w: turn mismatch: replay=%d engine=%d", errReplayMismatch, expectedTurns, len(trace.Turns))
 	}

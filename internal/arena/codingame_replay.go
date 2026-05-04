@@ -162,23 +162,24 @@ func ReplayTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 
 // ReplayTraceTurnCount returns the number of engine frames represented by the
 // replay. CodinGame stores simultaneous player outputs as one frame per player.
-// Mid-replay empty-stdout frames are Spring 2020 speed sub-turns, which the
-// engine folds into the preceding main turn and emits no trace turn for.
 //
-// emitsPostEndFrame separates two engine families:
+// Three counting modes select on the two booleans:
 //
-//   - false: engine ends the match on the same turn game-over is detected
-//     (Winter 2026). A trailing empty stdout that pairs with the other
-//     side's stdout is the deactivation/timeout close of the in-progress
-//     turn — already counted by the regular flush — so it must not be
-//     double-counted.
-//   - true: engine emits a separate post-end trace turn after the last
-//     main turn (Java Spring 2020's gameOverFrame branch). The replay's
-//     trailing empty stdout always represents that frame and adds +1
-//     unconditionally, even when it appears to pair with another agent's
-//     stdout (in that case the pair is a polling-timeout close of the
-//     final main turn, with the gameOverFrame following separately).
-func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame], emitsPostEndFrame bool) int {
+//   - emitsPhaseFrames=true (Spring 2021): every empty-stdout frame is a
+//     standalone phase trace turn (GATHERING or SUN_MOVE) AND flushes any
+//     pending single-stdout pair. The trailing engine frame is the final
+//     SUN_MOVE phase, already counted, so the post-end branch is bypassed.
+//   - emitsPostEndFrame=true (Spring 2020): mid-replay empty-stdout frames
+//     are speed sub-turns the engine folds into the preceding main turn.
+//     The trailing empty stdout always represents the gameOverFrame and
+//     adds +1 unconditionally, even when it appears to pair with another
+//     agent's stdout (in that case the pair is a polling-timeout close of
+//     the final main turn, with the gameOverFrame following separately).
+//   - both false (Winter 2026): mid-replay empty stdouts are sub-turn
+//     flushes; a trailing empty that pairs with the other side's stdout is
+//     the deactivation/timeout close of the in-progress turn, already
+//     counted, so it must not be double-counted.
+func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame], emitsPostEndFrame, emitsPhaseFrames bool) int {
 	turns := 0
 	seenOutput := map[int]bool{}
 
@@ -189,6 +190,28 @@ func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame], emitsPos
 		turns++
 		clear(seenOutput)
 		return true
+	}
+
+	if emitsPhaseFrames {
+		for _, frame := range replay.GameResult.Frames {
+			if frame.AgentID < 0 {
+				continue
+			}
+			if strings.TrimSpace(frame.Stdout) == "" {
+				flushOutputTurn()
+				turns++
+				continue
+			}
+			if seenOutput[frame.AgentID] {
+				flushOutputTurn()
+			}
+			seenOutput[frame.AgentID] = true
+			if len(seenOutput) == 2 {
+				flushOutputTurn()
+			}
+		}
+		flushOutputTurn()
+		return turns
 	}
 
 	trailingEmptyClosedTurn := false

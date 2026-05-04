@@ -117,3 +117,14 @@ type GameOverFrameReporter interface {
 type PostEndFrameEmitter interface {
 	EmitsPostEndFrame() bool
 }
+
+// ReplayPhaseFrameEmitter signals that the engine emits standalone trace
+// turns for non-decision phases (e.g. Spring 2021's GATHERING and SUN_MOVE
+// frames) which appear in the CodinGame replay as empty-stdout frames.
+// Replay verification needs this hint because the default decision-only
+// counting model treats empty-stdout frames as sub-turn flushes that don't
+// add their own turn — correct for spring2020/winter2026 but undercounts
+// spring2021's per-round phase trio. Spring 2021 implements this.
+type ReplayPhaseFrameEmitter interface {
+	EmitsReplayPhaseFrames() bool
+}

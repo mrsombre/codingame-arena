@@ -332,7 +332,7 @@ func TestReplayTraceTurnCount(t *testing.T) {
 	// The mid-replay speed sub-turn frame is folded into the SPEED main turn
 	// by the engine and does not count. emitsPostEndFrame=true (Spring 2020):
 	// the trailing empty stdout always counts as the gameOverFrame.
-	if got := ReplayTraceTurnCount(replay, true); got != 3 {
+	if got := ReplayTraceTurnCount(replay, true, false); got != 3 {
 		t.Fatalf("ReplayTraceTurnCount() = %d, want 3", got)
 	}
 }
@@ -356,7 +356,7 @@ func TestReplayTraceTurnCount_DeactivationPairFrame(t *testing.T) {
 		},
 	}
 
-	if got := ReplayTraceTurnCount(replay, false); got != 2 {
+	if got := ReplayTraceTurnCount(replay, false, false); got != 2 {
 		t.Fatalf("ReplayTraceTurnCount() = %d, want 2", got)
 	}
 }
@@ -388,9 +388,88 @@ func TestReplayTraceTurnCount_PostEndDeactivationPair(t *testing.T) {
 	}
 
 	// 3 main turns (SPEED, MOVE, deactivation MOVE) + 1 gameOverFrame.
-	if got := ReplayTraceTurnCount(replay, true); got != 4 {
+	if got := ReplayTraceTurnCount(replay, true, false); got != 4 {
 		t.Fatalf("ReplayTraceTurnCount() = %d, want 4", got)
 	}
+}
+
+// TestReplayTraceTurnCount_PhaseFrames covers spring2021's phase-frame model:
+// each round emits a GATHERING empty-stdout frame, N ACTIONS pairs, and a
+// SUN_MOVE empty-stdout frame. Each empty-stdout frame is its own trace turn
+// and also flushes any pending single-stdout pair (the round-4 pattern in
+// real replay 885203502 where one player WAITs a turn before its partner).
+func TestReplayTraceTurnCount_PhaseFrames(t *testing.T) {
+	t.Parallel()
+
+	t.Run("single round: gather + WAIT pair + sun_move", func(t *testing.T) {
+		t.Parallel()
+		replay := CodinGameReplay[CodinGameReplayFrame]{
+			GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+				Frames: []CodinGameReplayFrame{
+					{AgentID: -1, Summary: "init"},
+					{AgentID: 0, Summary: "Round 0/23 collected"},
+					{AgentID: 0, Stdout: "WAIT\n"},
+					{AgentID: 1, Stdout: "WAIT\n", Summary: "$0 is waiting\n$1 is waiting"},
+					{AgentID: 0, Summary: "Round 0 ends"},
+				},
+			},
+		}
+		// 1 GATHERING + 1 ACTIONS + 1 SUN_MOVE = 3.
+		if got := ReplayTraceTurnCount(replay, false, true); got != 3 {
+			t.Fatalf("ReplayTraceTurnCount() = %d, want 3", got)
+		}
+	})
+
+	t.Run("two rounds: gather + GROW pair + WAIT pair + sun_move", func(t *testing.T) {
+		t.Parallel()
+		round := []CodinGameReplayFrame{
+			{AgentID: 0, Summary: "Round X collected"},
+			{AgentID: 0, Stdout: "GROW 1\n"},
+			{AgentID: 1, Stdout: "GROW 2\n", Summary: "growing"},
+			{AgentID: 0, Stdout: "WAIT\n"},
+			{AgentID: 1, Stdout: "WAIT\n", Summary: "waiting"},
+			{AgentID: 0, Summary: "Round X ends"},
+		}
+		frames := []CodinGameReplayFrame{{AgentID: -1, Summary: "init"}}
+		frames = append(frames, round...)
+		frames = append(frames, round...)
+		replay := CodinGameReplay[CodinGameReplayFrame]{
+			GameResult: CodinGameReplayResult[CodinGameReplayFrame]{Frames: frames},
+		}
+		// Per round: 1 GATHERING + 2 ACTIONS + 1 SUN_MOVE = 4. Two rounds = 8.
+		if got := ReplayTraceTurnCount(replay, false, true); got != 8 {
+			t.Fatalf("ReplayTraceTurnCount() = %d, want 8", got)
+		}
+	})
+
+	t.Run("solo WAIT closed by sun_move", func(t *testing.T) {
+		t.Parallel()
+		// Round 4 of replay 885203502: agent=1 declares WAIT mid-round, then
+		// agent=0 acts alone for one ACTIONS turn before declaring WAIT itself
+		// (closed by the SUN_MOVE empty frame). Sequence: gather, pair, pair,
+		// pair (incl. agent=1 WAIT), agent=0 WAIT alone, sun_move.
+		replay := CodinGameReplay[CodinGameReplayFrame]{
+			GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+				Frames: []CodinGameReplayFrame{
+					{AgentID: -1, Summary: "init"},
+					{AgentID: 0, Summary: "Round 4 collected"},
+					{AgentID: 0, Stdout: "GROW 5\n"},
+					{AgentID: 1, Stdout: "GROW 22\n", Summary: "growing"},
+					{AgentID: 0, Stdout: "GROW 6\n"},
+					{AgentID: 1, Stdout: "SEED 25 10\n", Summary: "growing"},
+					{AgentID: 0, Stdout: "SEED 31 15\n"},
+					{AgentID: 1, Stdout: "WAIT\n", Summary: "agent 1 waits"},
+					{AgentID: 0, Stdout: "WAIT\n", Summary: "agent 0 waits"},
+					{AgentID: 0, Summary: "Round 4 ends"},
+				},
+			},
+		}
+		// 1 GATHERING + 4 ACTIONS (3 pairs + 1 solo WAIT closed by sun_move) +
+		// 1 SUN_MOVE = 6.
+		if got := ReplayTraceTurnCount(replay, false, true); got != 6 {
+			t.Fatalf("ReplayTraceTurnCount() = %d, want 6", got)
+		}
+	})
 }
 
 func TestReplayPlayerNames(t *testing.T) {
