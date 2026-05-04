@@ -122,13 +122,27 @@ func applyReplayMetadata(trace *arena.TraceMatch, replay arena.CodinGameReplay[a
 	trace.Blue = replay.Blue
 	trace.League = replay.League
 	trace.CreatedAt = replay.FetchedAt
-	// CG's gameResult.ranks is the ground truth for who won — finalScores
-	// alone can't reproduce CG-side tiebreakers when the engine reaches a
-	// tie that CG broke (e.g. winter2026 ties the raw counts but CG ranks
-	// one side ahead). Fall back to the replay-runner-derived ranks if the
-	// replay payload is malformed.
-	if r, ok := arena.RanksFromCGRanks(replay.GameResult.Ranks); ok {
-		trace.Ranks = r
+	// CG's gameResult.ranks is normally the ground truth for who won —
+	// finalScores alone can't reproduce CG-side tiebreakers when the
+	// engine reaches a tie that CG broke (winter2026 raw-count tie broken
+	// by loss subtraction in OnEnd, etc). One exception: when CG's
+	// gameResult.scores are equal and neither side is DQ, the visible
+	// outcome on the replay page is a draw even if gameResult.ranks
+	// orders the agents internally (spring2020 replay 885029092: scores
+	// 98:98, ranks [0,1], summary "Game tied!" — CG appears to keep an
+	// ordering hint such as lost-pacs but displays the leaderboard
+	// outcome as 1st/1st). Force draw in that case so the saved trace
+	// matches the UI verdict.
+	scoresTied := len(replay.GameResult.Scores) >= 2 &&
+		replay.GameResult.Scores[0] == replay.GameResult.Scores[1] &&
+		replay.GameResult.Scores[0] != -1
+	switch {
+	case scoresTied:
+		trace.Ranks = [2]int{0, 0}
+	default:
+		if r, ok := arena.RanksFromCGRanks(replay.GameResult.Ranks); ok {
+			trace.Ranks = r
+		}
 	}
 }
 
