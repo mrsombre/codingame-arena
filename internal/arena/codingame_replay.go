@@ -248,6 +248,45 @@ func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame], emitsPos
 	return turns
 }
 
+// ReplayOutcome captures the L0 verification surface of a CodinGame replay:
+// what's visible from gameResult alone, without re-simulating the engine.
+// Winner is 0, 1, or -1 for draw; Scores carries -1 for any side CG marked
+// disqualified (its gameResult.scores[i] is -1); Deactivated mirrors the
+// score check (deactivated[i] = scores[i] == -1).
+type ReplayOutcome struct {
+	Winner      int
+	Scores      [2]int
+	Deactivated [2]bool
+}
+
+// ExtractReplayOutcome derives the replay's outcome from gameResult.scores
+// (with -1 indicating disqualification) and gameResult.ranks (winner). No
+// summary parsing — every field is read directly from CG's structured
+// match result. ok=false when scores or ranks are malformed.
+func ExtractReplayOutcome(replay CodinGameReplay[CodinGameReplayFrame]) (ReplayOutcome, bool) {
+	if len(replay.GameResult.Scores) < 2 {
+		return ReplayOutcome{}, false
+	}
+	out := ReplayOutcome{}
+	for i := 0; i < 2; i++ {
+		out.Scores[i] = int(replay.GameResult.Scores[i])
+		out.Deactivated[i] = out.Scores[i] == -1
+	}
+	ranks, ok := RanksFromCGRanks(replay.GameResult.Ranks)
+	if !ok {
+		return ReplayOutcome{}, false
+	}
+	switch {
+	case ranks[0] == ranks[1]:
+		out.Winner = -1
+	case ranks[0] < ranks[1]:
+		out.Winner = 0
+	default:
+		out.Winner = 1
+	}
+	return out, true
+}
+
 // hasTrailingEngineFrame reports whether the replay ends with the game-over
 // engine marker frame CodinGame appends after every match. The marker has no
 // stdout; its agentId is either -1 (engine-attributed, e.g. when the first

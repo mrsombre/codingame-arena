@@ -472,6 +472,84 @@ func TestReplayTraceTurnCount_PhaseFrames(t *testing.T) {
 	})
 }
 
+func TestExtractReplayOutcome(t *testing.T) {
+	t.Parallel()
+
+	t.Run("p1 wins, no DQ", func(t *testing.T) {
+		t.Parallel()
+		replay := CodinGameReplay[CodinGameReplayFrame]{
+			GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+				Scores: []float64{122, 134},
+				Ranks:  []int{1, 0},
+			},
+		}
+		got, ok := ExtractReplayOutcome(replay)
+		if !ok {
+			t.Fatalf("ExtractReplayOutcome() ok=false")
+		}
+		want := ReplayOutcome{Winner: 1, Scores: [2]int{122, 134}, Deactivated: [2]bool{false, false}}
+		if got != want {
+			t.Fatalf("ExtractReplayOutcome() = %#v, want %#v", got, want)
+		}
+	})
+
+	t.Run("p0 DQ, p1 wins", func(t *testing.T) {
+		t.Parallel()
+		replay := CodinGameReplay[CodinGameReplayFrame]{
+			GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+				Scores: []float64{-1, 50},
+				Ranks:  []int{1, 0},
+			},
+		}
+		got, _ := ExtractReplayOutcome(replay)
+		want := ReplayOutcome{Winner: 1, Scores: [2]int{-1, 50}, Deactivated: [2]bool{true, false}}
+		if got != want {
+			t.Fatalf("ExtractReplayOutcome() = %#v, want %#v", got, want)
+		}
+	})
+
+	t.Run("draw", func(t *testing.T) {
+		t.Parallel()
+		replay := CodinGameReplay[CodinGameReplayFrame]{
+			GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+				Scores: []float64{50, 50},
+				Ranks:  []int{0, 0},
+			},
+		}
+		got, _ := ExtractReplayOutcome(replay)
+		want := ReplayOutcome{Winner: -1, Scores: [2]int{50, 50}, Deactivated: [2]bool{false, false}}
+		if got != want {
+			t.Fatalf("ExtractReplayOutcome() = %#v, want %#v", got, want)
+		}
+	})
+
+	t.Run("malformed scores", func(t *testing.T) {
+		t.Parallel()
+		replay := CodinGameReplay[CodinGameReplayFrame]{
+			GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+				Scores: []float64{50},
+				Ranks:  []int{0, 1},
+			},
+		}
+		if _, ok := ExtractReplayOutcome(replay); ok {
+			t.Fatalf("ExtractReplayOutcome() ok=true, want false")
+		}
+	})
+
+	t.Run("malformed ranks", func(t *testing.T) {
+		t.Parallel()
+		replay := CodinGameReplay[CodinGameReplayFrame]{
+			GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+				Scores: []float64{50, 60},
+				Ranks:  []int{0},
+			},
+		}
+		if _, ok := ExtractReplayOutcome(replay); ok {
+			t.Fatalf("ExtractReplayOutcome() ok=true, want false")
+		}
+	})
+}
+
 func TestReplayPlayerNames(t *testing.T) {
 	t.Parallel()
 

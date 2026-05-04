@@ -211,23 +211,38 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 	return trace, league, nil
 }
 
-// verifyReplayTrace checks the engine reproduces the replay. finalScores are
-// the post-OnEnd values (Player.GetScore after tie-break and deactivation
-// adjustments) — the same shape the replay's gameResult.scores carries.
-// trace.Scores cannot be used for this comparison: it stores the raw pre-OnEnd
-// score, which diverges whenever OnEnd touches it (e.g. ties trigger a losses
-// subtraction, deactivated players become -1).
+// verifyReplayTrace checks the engine reproduces the replay across three
+// agreement layers:
+//
+//   - L0 outcome: post-OnEnd scores match (finalScores vs gameResult.scores),
+//     winner ranks match (trace.Ranks vs gameResult.ranks), and deactivation
+//     flags match (trace.Deactivated vs scores[i] == -1). finalScores are
+//     compared against the replay's gameResult.scores rather than
+//     trace.Scores because trace.Scores carries raw pre-OnEnd values that
+//     diverge whenever OnEnd touches them (tie subtractions, -1 for DQ).
+//   - L2 trace turn count: len(trace.Turns) == expected count from the
+//     replay's frame stream.
 //
 // emitsPostEndFrame and emitsPhaseFrames select the trace-turn counting
 // strategy: see arena.ReplayTraceTurnCount for what they mean.
 func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], emitsPostEndFrame, emitsPhaseFrames bool) error {
-	if len(replay.GameResult.Scores) < 2 {
-		return fmt.Errorf("replay scores must contain two entries")
+	outcome, ok := arena.ExtractReplayOutcome(replay)
+	if !ok {
+		return fmt.Errorf("replay scores or ranks malformed")
 	}
 	if float64(finalScores[0]) != replay.GameResult.Scores[0] || float64(finalScores[1]) != replay.GameResult.Scores[1] {
 		return fmt.Errorf("%w: score mismatch: replay=[%.1f %.1f] engine=[%d %d]",
 			errReplayMismatch,
 			replay.GameResult.Scores[0], replay.GameResult.Scores[1], finalScores[0], finalScores[1])
+	}
+
+	replayRanks, _ := arena.RanksFromCGRanks(replay.GameResult.Ranks)
+	if trace.Ranks != replayRanks {
+		return fmt.Errorf("%w: rank mismatch: replay=%v engine=%v", errReplayMismatch, replayRanks, trace.Ranks)
+	}
+
+	if trace.Deactivated != outcome.Deactivated {
+		return fmt.Errorf("%w: deactivation mismatch: replay=%v engine=%v", errReplayMismatch, outcome.Deactivated, trace.Deactivated)
 	}
 
 	expectedTurns := arena.ReplayTraceTurnCount(replay, emitsPostEndFrame, emitsPhaseFrames)

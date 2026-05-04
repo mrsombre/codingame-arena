@@ -138,3 +138,48 @@ func (r *Referee) ActivePlayers(players []arena.Player) int {
 	}
 	return active
 }
+
+// RawScores returns each player's pre-OnEnd accumulated score (sun-points
+// converted via COMPLETE actions). OnEnd then layers on the floor(sun/3)
+// bonus and the all-equal tree-count tiebreaker, so the post-OnEnd value
+// reported via Player.GetScore is not the raw in-match score.
+func (r *Referee) RawScores() [2]int {
+	var scores [2]int
+	for _, p := range r.Game.Players {
+		idx := p.GetIndex()
+		if idx < 0 || idx >= len(scores) {
+			continue
+		}
+		scores[idx] = p.GetScore()
+	}
+	return scores
+}
+
+// EndReason categorizes how the match terminated. Priority: deactivation
+// reason (if any side is deactivated) > round cap reached (SCORE) > turn
+// cap (TURNS_OUT). Spring 2021 has no ELIMINATED equivalent — there is no
+// "all units dead" condition, only round exhaustion or deactivation.
+//
+// "Timeout!" is the literal deactivation message used by both the arena
+// runner (on no output) and CommandManager.ParseCommands (on empty input).
+func (r *Referee) EndReason(_ int, players []arena.Player, deactivationTurns [2]int) string {
+	for i, p := range players {
+		if !p.IsDeactivated() {
+			continue
+		}
+		reason := p.DeactivationReason()
+		switch {
+		case reason == "Timeout!" && deactivationTurns[i] == 0:
+			return arena.EndReasonTimeoutStart
+		case reason == "Timeout!":
+			return arena.EndReasonTimeout
+		default:
+			return arena.EndReasonInvalid
+		}
+	}
+
+	if r.Game.Round >= r.Game.MAX_ROUNDS {
+		return arena.EndReasonScore
+	}
+	return arena.EndReasonTurnsOut
+}
