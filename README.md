@@ -39,7 +39,6 @@ Timing: avg_first_response=29msx198ms avg_turn_response=0msx0ms
 |-------------|---------------------------------------------------------|
 | `run`       | Run one or more match simulations against a player      |
 | `replay`    | Download replay JSON (`get`, `leaderboard` subcommands) |
-| `convert`   | Convert replay JSON files into arena trace files        |
 | `analyze`   | Analyze trace outcomes and game-owned metrics           |
 | `serialize` | Print initial game input for first turn for a seed      |
 | `serve`     | Serve the embedded web viewer                           |

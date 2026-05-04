@@ -9,31 +9,27 @@ Go backend with a TypeScript / React viewer.
 ## Project Structure
 
 ```
-cmd/arena/              # CLI entrypoint
+cmd/arena/          # CLI entrypoint
 internal/
-├─ arena/               # Match runner, batching, tracing, server
-│  ├─ commands/          # CLI subcommands (run, analyze, serialize, convert, replay, serve)
-│  └─ server/            # HTTP server for viewer
+├─ arena/           # Match runner, batching, tracing, server
+│  ├─ commands/     # CLI subcommands
+│  └─ server/       # HTTP server for viewer
 ├─ util/
-│  ├─ javarand/          # Java random port
-│  └─ sha1prng/          # SHA1PRNG port
+│  ├─ javarand/     # Java random port
+│  └─ sha1prng/     # SHA1PRNG port
 games/
-├─ game.go              # Game registry interface
-├─ spring2020/
-│  ├─ engine/            # Spring 2020 (Pac-Man) game engine
-│  └─ agents/            # Bot sources (C++, Python)
-└─ winter2026/
-   ├─ engine/            # Winter 2026 game engine (referee, grid, actions)
-   └─ agents/            # Bot sources (C++, Python)
-source/                  # Upstream subtree imports (DO NOT MODIFY)
-viewer/                  # React + PixiJS match viewer (pnpm, Vite, shadcn)
+├─ game.go          # Game registry interface
+├─ .../
+│  ├─ engine/       # Game engine
+│  └─ agents/       # Bot sources (C++, Python)
+source/             # Upstream subtree imports (DO NOT MODIFY)
+viewer/             # React + PixiJS match viewer (pnpm, Vite, shadcn)
 ├─ packages/
-│  ├─ shared/            # Shared router, components, API, styles
-│  ├─ spring2020/        # Spring 2020 viewer (Pac-Man)
-│  └─ winter2026/        # Winter 2026 viewer (Snakes)
-bin/                     # Build artifacts (gitignored)
-replays/                 # Downloaded replay JSON files (gitignored)
-traces/                  # Match trace files for analysis (gitignored)
+│  ├─ shared/       # Shared router, components, API, styles
+│  └─ .../          # Game views
+bin/                # Build artifacts (gitignored)
+replays/            # Downloaded replay JSON files (gitignored)
+traces/             # Match trace files for analysis (gitignored)
 ```
 
 ## Project Rules
