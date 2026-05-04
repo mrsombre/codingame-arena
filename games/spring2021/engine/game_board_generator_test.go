@@ -161,7 +161,7 @@ func buildInitialInput(seed int64, leagueLevel int) string {
 // via the shared Random, so we must do the same to keep the seeded RNG in
 // sync. Without it, round 1's SEED ordering drifts.
 func advanceToRound1Actions(g *Game, players []*Player) {
-	for !(g.Round == 1 && g.NextFrameType == FrameActions) {
+	for g.Round != 1 || g.NextFrameType != FrameActions {
 		g.ResetGameTurnData()
 		if g.CurrentFrameType == FrameActions {
 			for _, p := range players {
