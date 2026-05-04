@@ -111,7 +111,7 @@ consumer falls back to a sensible default.
 | Interface                | Methods                                   | Effect when implemented |
 | ------------------------ | ----------------------------------------- | ----------------------- |
 | `EndReasonProvider`      | `EndReason(turn, players, deactTurns) string` | Trace records `end_reason` (TIMEOUT / SCORE / TURNS_OUT / …). Empty otherwise. |
-| `RawScoresProvider`      | `RawScores() [2]int`                      | `trace.Scores` records pre-OnEnd raw values; otherwise post-OnEnd `Player.GetScore()` is used. Required when OnEnd modifies scores (tiebreakers, bonuses). |
+| `RawScoresProvider`      | `RawScores() [2]int`                      | `trace.Scores` records the pre-OnEnd raw values. Without it, `trace.Scores` falls back to the post-OnEnd value (same as `trace.FinalScores`). Required when OnEnd modifies scores (tiebreakers, bonuses) so analyzers can see the intrinsic in-game count separately from CG's final number. |
 | `MetricsProvider`        | `Metrics() []arena.Metric`                | Per-match summary metrics (e.g. apples remaining, pellets remaining) attached to live-run results. |
 | `TurnTraceProvider`      | `TurnTraces(turn, players) []TurnTrace`   | Per-turn structured event stream attached to each `TraceTurn.Traces`. Drained after `PerformGameUpdate`. |
 | `GameOverFrameReporter`  | `InGameOverFrame() bool`                  | Signals the runner to skip player polling for a post-end "gameOverFrame" turn (avoids spurious deactivation). Pair with `PostEndTurnModel`. |
@@ -151,9 +151,15 @@ layers, all mandatory:
 
 | Layer | Replay side                              | Trace side                |
 | ----- | ---------------------------------------- | ------------------------- |
-| L0    | `gameResult.scores` (-1 = DQ), `gameResult.ranks` | `trace.Scores` (post-OnEnd compared), `trace.Ranks`, `trace.Deactivated` |
+| L0    | `gameResult.scores` (-1 = DQ), `gameResult.ranks` | `trace.FinalScores` (post-OnEnd, -1 for DQ), `trace.Ranks`, `trace.Deactivated` |
 | L1    | `model.MainTurnCount(replay)`            | `trace.MainTurns`         |
 | L2    | `model.ExpectedTraceTurnCount(replay)`   | `len(trace.Turns)`        |
+
+`trace.Scores` (raw pre-OnEnd) is written to every trace alongside
+`trace.FinalScores` but is not compared against the replay — CG records only
+the post-OnEnd value. Tooling that wants the intrinsic in-game count reads
+`trace.Scores`; tooling that wants the CG-side outcome reads
+`trace.FinalScores`.
 
 L0 has one tolerated case: the engine declares a draw (tied scores, no DQ)
 but CodinGame ranks pick a winner via an unmodeled post-OnEnd tiebreaker. In

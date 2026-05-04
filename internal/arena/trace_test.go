@@ -17,11 +17,12 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 	writer := NewTraceWriter(dir, traceID)
 
 	match := TraceMatch{
-		MatchID:   3,
-		Seed:      12345,
-		CreatedAt: "2026-04-29T18:34:46Z",
-		Scores:    [2]TraceScore{15, 12},
-		Ranks:     [2]int{0, 1},
+		MatchID:     3,
+		Seed:        12345,
+		CreatedAt:   "2026-04-29T18:34:46Z",
+		Scores:      [2]TraceScore{15, 12},
+		FinalScores: [2]TraceScore{17, 12},
+		Ranks:       [2]int{0, 1},
 		Timing: &TraceTiming{
 			FirstResponse:   [2]float64{820, 910},
 			ResponseAverage: [2]float64{12, 14},
@@ -52,6 +53,8 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 	assert.Equal(t, TraceTypeTrace, got.Type)
 	assert.Equal(t, int64(12345), got.Seed)
 	assert.Equal(t, "2026-04-29T18:34:46Z", got.CreatedAt)
+	assert.Equal(t, [2]TraceScore{15, 12}, got.Scores)
+	assert.Equal(t, [2]TraceScore{17, 12}, got.FinalScores)
 	assert.Equal(t, [2]int{0, 1}, got.Ranks)
 	require.NotNil(t, got.Timing)
 	assert.Equal(t, [2]float64{820, 910}, got.Timing.FirstResponse)

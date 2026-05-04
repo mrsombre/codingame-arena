@@ -99,7 +99,9 @@ func convertReplay(factory arena.GameFactory, opts ConvertOptions, target conver
 	}
 
 	res.Outcome = convertOutcomeSaved
-	res.Detail = fmt.Sprintf("league=%d turns=%d scores=%.1f:%.1f", league, len(trace.Turns), trace.Scores[0], trace.Scores[1])
+	res.Detail = fmt.Sprintf("league=%d turns=%d scores=%.1f:%.1f",
+		league, len(trace.Turns),
+		trace.FinalScores[0], trace.FinalScores[1])
 	return res, nil
 }
 
@@ -200,7 +202,7 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		return arena.TraceMatch{}, league, fmt.Errorf("%w: blue %q not found in players %v", errReplayMismatch, replay.Blue, botNames)
 	}
 
-	trace, finalScores := arena.RunReplay(
+	trace, _ := arena.RunReplay(
 		factory,
 		seed,
 		gameOptions,
@@ -211,7 +213,7 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 	)
 
 	turnModel := resolveTurnModel(factory)
-	if err := verifyReplayTrace(trace, finalScores, replay, turnModel); err != nil {
+	if err := verifyReplayTrace(trace, replay, turnModel); err != nil {
 		return arena.TraceMatch{}, league, err
 	}
 
@@ -230,26 +232,26 @@ func resolveTurnModel(factory arena.GameFactory) arena.TurnModel {
 // verifyReplayTrace checks the engine reproduces the replay across three
 // agreement layers:
 //
-//   - L0 outcome: post-OnEnd scores match (finalScores vs gameResult.scores),
-//     winner ranks match (trace.Ranks vs gameResult.ranks), and deactivation
-//     flags match (trace.Deactivated vs scores[i] == -1). finalScores are
-//     compared against the replay's gameResult.scores rather than
-//     trace.Scores because trace.Scores carries raw pre-OnEnd values that
-//     diverge whenever OnEnd touches them (tie subtractions, -1 for DQ).
+//   - L0 outcome: trace.FinalScores (post-OnEnd, -1 for DQ) matches
+//     replay.gameResult.scores — the only score the replay records. Winner
+//     ranks match (trace.Ranks vs gameResult.ranks) and deactivation flags
+//     match (trace.Deactivated vs scores[i] == -1). trace.Scores (raw
+//     pre-OnEnd, -1 for DQ) is stored for analysis but is not compared.
 //   - L1 main-turn count: trace.MainTurns matches the model's MainTurnCount.
 //     Counts player-decision turns only; phase frames and post-end frames
 //     are excluded on both sides.
 //   - L2 total trace-turn count: len(trace.Turns) matches the model's
 //     ExpectedTraceTurnCount.
-func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], model arena.TurnModel) error {
+func verifyReplayTrace(trace arena.TraceMatch, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], model arena.TurnModel) error {
 	outcome, ok := arena.ExtractReplayOutcome(replay)
 	if !ok {
 		return fmt.Errorf("replay scores or ranks malformed")
 	}
-	if float64(finalScores[0]) != replay.GameResult.Scores[0] || float64(finalScores[1]) != replay.GameResult.Scores[1] {
-		return fmt.Errorf("%w: score mismatch: replay=[%.1f %.1f] engine=[%d %d]",
+	if float64(trace.FinalScores[0]) != replay.GameResult.Scores[0] || float64(trace.FinalScores[1]) != replay.GameResult.Scores[1] {
+		return fmt.Errorf("%w: final score mismatch: replay=[%.1f %.1f] engine=[%.1f %.1f]",
 			errReplayMismatch,
-			replay.GameResult.Scores[0], replay.GameResult.Scores[1], finalScores[0], finalScores[1])
+			replay.GameResult.Scores[0], replay.GameResult.Scores[1],
+			float64(trace.FinalScores[0]), float64(trace.FinalScores[1]))
 	}
 
 	replayRanks, _ := arena.RanksFromCGRanks(replay.GameResult.Ranks)

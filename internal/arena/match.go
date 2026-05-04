@@ -242,28 +242,32 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		// is right side. result fields are blue/red perspective after the
 		// potential swap-back; un-swap to restore the in-match view.
 		//
-		// Scores are stored raw (pre-OnEnd) when the engine exposes them, so
-		// downstream tooling can see intrinsic game state without tie-break
-		// adjustments folded in. Ranks, however, follow result.Winner — i.e.
-		// the post-OnEnd outcome — so a tie-broken match never records as a
-		// draw and a deactivated side never ties against the survivor.
-		traceScores := result.Scores
+		// Scores stores the raw pre-OnEnd value when the engine exposes one
+		// (intrinsic in-game count, no tie-break adjustments) and FinalScores
+		// stores the post-OnEnd value matching CG's gameResult.scores
+		// convention. Ranks follow result.Winner — i.e. the post-OnEnd
+		// outcome — so a tie-broken match never records as a draw and a
+		// deactivated side never ties against the survivor.
+		rawTraceScores := result.Scores
 		if haveRawScores {
-			traceScores = result.RawScores
+			rawTraceScores = result.RawScores
 		}
+		finalTraceScores := result.Scores
 		traceWinner := result.Winner
 		if result.Swapped {
-			traceScores[0], traceScores[1] = traceScores[1], traceScores[0]
+			rawTraceScores[0], rawTraceScores[1] = rawTraceScores[1], rawTraceScores[0]
+			finalTraceScores[0], finalTraceScores[1] = finalTraceScores[1], finalTraceScores[0]
 			if traceWinner != -1 {
 				traceWinner = 1 - traceWinner
 			}
 		}
 		deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
 		// Match CG's gameResult.scores convention: a deactivated side's
-		// score is reported as -1, replacing the raw in-game count.
+		// score is reported as -1, replacing the raw or post-OnEnd count.
 		for i := range deactivated {
 			if deactivated[i] {
-				traceScores[i] = -1
+				rawTraceScores[i] = -1
+				finalTraceScores[i] = -1
 			}
 		}
 		stats := [2]playerTimingStats{controllers[0].TimingStats(), controllers[1].TimingStats()}
@@ -299,7 +303,8 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			CreatedAt:   time.Now().UTC().Format(time.RFC3339),
 			EndReason:   endReason,
 			Deactivated: deactivated,
-			Scores:      [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
+			Scores:      [2]TraceScore{TraceScore(rawTraceScores[0]), TraceScore(rawTraceScores[1])},
+			FinalScores: [2]TraceScore{TraceScore(finalTraceScores[0]), TraceScore(finalTraceScores[1])},
 			Ranks:       RanksFromWinner(traceWinner),
 			Players:     [2]string{filepath.Base(sideOptions.BlueBotBin), filepath.Base(sideOptions.RedBotBin)},
 			Timing:      traceTiming,

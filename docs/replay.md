@@ -73,10 +73,12 @@ Per-replay status lines: a `save` (or `skip`/`fail`) for the download, followed 
 [1/3] trace 875142454 (league=4 turns=187 scores=24.0:18.0)
 [2/3] skip 875142455 (exists)
 [3/3] save 875142456 (98765 bytes)
-[3/3] skip 875142456 (replay mismatch: score mismatch: replay=[...] engine=[...])
+[3/3] skip 875142456 (replay mismatch: final score mismatch: replay=[...] engine=[...])
 done: 2 saved, 1 skipped, 0 failed (out=./replays)
 traces: 1 saved, 0 skipped-existing, 0 skipped-puzzle, 1 skipped-mismatch, 0 failed (out=./traces)
 ```
+
+The progress line's `scores` is the post-OnEnd value matching CG's `gameResult.scores` (the verifier's only score check). The trace file additionally stores the raw pre-OnEnd value as `scores` and the post-OnEnd value as `final_scores`; the two diverge whenever `OnEnd()` adjusts the raw in-game count — e.g. spring2021 adds `floor(sun/3)` to each player on game end.
 
 Leaderboard mode also prints resolution steps before downloading:
 

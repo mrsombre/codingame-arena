@@ -19,11 +19,9 @@ type ReplayMoves struct {
 // the engine instead of spawning external bot processes. The returned
 // TraceMatch has the same shape as TraceWriter.WriteMatch produces, so viewers
 // that consume /api/matches can render replays without any format translation.
-// The second return value is the post-OnEnd score reported by Player.GetScore
-// for each side; convert verification compares these against the replay's
-// recorded scores (which are already post-OnEnd, with -1 for deactivated
-// players and tie-break adjustments applied) since TraceMatch.Scores carries
-// raw bird-segment counts that diverge whenever OnEnd touched the value.
+// TraceMatch.Scores carries the raw pre-OnEnd value (intrinsic in-game count)
+// and TraceMatch.FinalScores carries the post-OnEnd value matching CG's
+// gameResult.scores; both have -1 substituted for any deactivated side.
 //
 // botNames are copied into TraceMatch.Players (basename applied). blueSide
 // (0 or 1) is the in-match side whose FrameInfoFor lines are recorded as
@@ -157,10 +155,11 @@ func RunReplay(
 	referee.OnEnd()
 
 	finalScores := [2]int{players[0].GetScore(), players[1].GetScore()}
-	traceScores := finalScores
+	rawTraceScores := finalScores
 	if haveRawScores {
-		traceScores = rawScores
+		rawTraceScores = rawScores
 	}
+	finalTraceScores := finalScores
 	deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
 	// Match CG's gameResult.scores convention: a deactivated side's score is
 	// reported as -1 even when its raw in-game count was higher. Without this
@@ -168,7 +167,8 @@ func RunReplay(
 	// match, disagreeing with the replay JSON for the same field.
 	for i := range deactivated {
 		if deactivated[i] {
-			traceScores[i] = -1
+			rawTraceScores[i] = -1
+			finalTraceScores[i] = -1
 		}
 	}
 	// Ranks derive from finalScores (post-OnEnd) so a deactivated side never
@@ -190,7 +190,8 @@ func RunReplay(
 		Seed:        seed,
 		EndReason:   endReason,
 		Deactivated: deactivated,
-		Scores:      [2]TraceScore{TraceScore(traceScores[0]), TraceScore(traceScores[1])},
+		Scores:      [2]TraceScore{TraceScore(rawTraceScores[0]), TraceScore(rawTraceScores[1])},
+		FinalScores: [2]TraceScore{TraceScore(finalTraceScores[0]), TraceScore(finalTraceScores[1])},
 		Ranks:       RanksFromWinner(winner),
 		Players:     [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
 		Timing:      &TraceTiming{},
