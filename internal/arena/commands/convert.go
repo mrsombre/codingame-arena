@@ -240,7 +240,15 @@ func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.
 
 	replayRanks, _ := arena.RanksFromCGRanks(replay.GameResult.Ranks)
 	if trace.Ranks != replayRanks {
-		return fmt.Errorf("%w: rank mismatch: replay=%v engine=%v", errReplayMismatch, replayRanks, trace.Ranks)
+		// An engine-declared draw with CG picking a winner means CG applied
+		// a post-OnEnd tiebreaker the engine doesn't model (observed in
+		// spring2020 replay 885029092: scores 98:98, summary "Game tied!",
+		// CG ranks [0,1]). Accept silently — applyReplayMetadata overrides
+		// trace.Ranks with CG's ranks before the trace is written. Fail
+		// strictly when the engine claims a winner CG disputes.
+		if trace.Ranks[0] != trace.Ranks[1] {
+			return fmt.Errorf("%w: rank mismatch: replay=%v engine=%v", errReplayMismatch, replayRanks, trace.Ranks)
+		}
 	}
 
 	if trace.Deactivated != outcome.Deactivated {
