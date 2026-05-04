@@ -25,6 +25,8 @@ func (f *factory) LeaderboardSlug() string { return "winter-challenge-2026-snake
 
 func (f *factory) MaxTurns() int { return 200 }
 
+func (f *factory) TurnModel() arena.TurnModel { return arena.FlatTurnModel{} }
+
 func (f *factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []arena.Player) {
 	game := NewGame(seed, f.ResolveLeague(options))
 	players := []arena.Player{NewPlayer(0), NewPlayer(1)}

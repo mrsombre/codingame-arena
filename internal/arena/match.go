@@ -304,6 +304,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			Players:     [2]string{filepath.Base(sideOptions.BlueBotBin), filepath.Base(sideOptions.RedBotBin)},
 			Timing:      traceTiming,
 			Turns:       traceTurns,
+			MainTurns:   countMainTurns(traceTurns),
 		}
 		if err := runner.Options.TraceSink.WriteMatch(traceMatch); err != nil {
 			panic(err)

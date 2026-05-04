@@ -25,7 +25,10 @@ func (f *Factory) Name() string { return "spring2021" }
 
 func (f *Factory) PuzzleID() int { return 730 }
 
-func (f *Factory) EmitsReplayPhaseFrames() bool { return true }
+// TurnModel selects PhaseTurnModel: Spring 2021's engine emits standalone
+// trace turns for GATHERING and SUN_MOVE phases (alongside ACTIONS), so
+// every empty-stdout frame in the CG replay is counted as its own turn.
+func (f *Factory) TurnModel() arena.TurnModel { return arena.PhaseTurnModel{} }
 
 func (f *Factory) PuzzleTitle() string { return "Spring Challenge 2021 - Photosynthesis" }
 

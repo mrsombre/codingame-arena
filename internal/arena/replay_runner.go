@@ -195,5 +195,20 @@ func RunReplay(
 		Players:     [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
 		Timing:      &TraceTiming{},
 		Turns:       traceTurns,
+		MainTurns:   countMainTurns(traceTurns),
 	}, finalScores
+}
+
+// countMainTurns returns the number of trace turns where at least one side
+// produced output — i.e. player-decision turns. Phase turns (spring2021)
+// and post-end frames (spring2020) carry empty Output on both sides and
+// are excluded.
+func countMainTurns(turns []TraceTurn) int {
+	n := 0
+	for _, t := range turns {
+		if t.Output[0] != "" || t.Output[1] != "" {
+			n++
+		}
+	}
+	return n
 }

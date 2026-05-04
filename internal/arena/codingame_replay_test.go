@@ -332,8 +332,8 @@ func TestReplayTraceTurnCount(t *testing.T) {
 	// The mid-replay speed sub-turn frame is folded into the SPEED main turn
 	// by the engine and does not count. emitsPostEndFrame=true (Spring 2020):
 	// the trailing empty stdout always counts as the gameOverFrame.
-	if got := ReplayTraceTurnCount(replay, true, false); got != 3 {
-		t.Fatalf("ReplayTraceTurnCount() = %d, want 3", got)
+	if got := (PostEndTurnModel{}).ExpectedTraceTurnCount(replay); got != 3 {
+		t.Fatalf("PostEndTurnModel.ExpectedTraceTurnCount() = %d, want 3", got)
 	}
 }
 
@@ -356,8 +356,8 @@ func TestReplayTraceTurnCount_DeactivationPairFrame(t *testing.T) {
 		},
 	}
 
-	if got := ReplayTraceTurnCount(replay, false, false); got != 2 {
-		t.Fatalf("ReplayTraceTurnCount() = %d, want 2", got)
+	if got := (FlatTurnModel{}).ExpectedTraceTurnCount(replay); got != 2 {
+		t.Fatalf("FlatTurnModel.ExpectedTraceTurnCount() = %d, want 2", got)
 	}
 }
 
@@ -388,8 +388,8 @@ func TestReplayTraceTurnCount_PostEndDeactivationPair(t *testing.T) {
 	}
 
 	// 3 main turns (SPEED, MOVE, deactivation MOVE) + 1 gameOverFrame.
-	if got := ReplayTraceTurnCount(replay, true, false); got != 4 {
-		t.Fatalf("ReplayTraceTurnCount() = %d, want 4", got)
+	if got := (PostEndTurnModel{}).ExpectedTraceTurnCount(replay); got != 4 {
+		t.Fatalf("PostEndTurnModel.ExpectedTraceTurnCount() = %d, want 4", got)
 	}
 }
 
@@ -415,8 +415,8 @@ func TestReplayTraceTurnCount_PhaseFrames(t *testing.T) {
 			},
 		}
 		// 1 GATHERING + 1 ACTIONS + 1 SUN_MOVE = 3.
-		if got := ReplayTraceTurnCount(replay, false, true); got != 3 {
-			t.Fatalf("ReplayTraceTurnCount() = %d, want 3", got)
+		if got := (PhaseTurnModel{}).ExpectedTraceTurnCount(replay); got != 3 {
+			t.Fatalf("PhaseTurnModel.ExpectedTraceTurnCount() = %d, want 3", got)
 		}
 	})
 
@@ -437,8 +437,8 @@ func TestReplayTraceTurnCount_PhaseFrames(t *testing.T) {
 			GameResult: CodinGameReplayResult[CodinGameReplayFrame]{Frames: frames},
 		}
 		// Per round: 1 GATHERING + 2 ACTIONS + 1 SUN_MOVE = 4. Two rounds = 8.
-		if got := ReplayTraceTurnCount(replay, false, true); got != 8 {
-			t.Fatalf("ReplayTraceTurnCount() = %d, want 8", got)
+		if got := (PhaseTurnModel{}).ExpectedTraceTurnCount(replay); got != 8 {
+			t.Fatalf("PhaseTurnModel.ExpectedTraceTurnCount() = %d, want 8", got)
 		}
 	})
 
@@ -466,8 +466,77 @@ func TestReplayTraceTurnCount_PhaseFrames(t *testing.T) {
 		}
 		// 1 GATHERING + 4 ACTIONS (3 pairs + 1 solo WAIT closed by sun_move) +
 		// 1 SUN_MOVE = 6.
-		if got := ReplayTraceTurnCount(replay, false, true); got != 6 {
-			t.Fatalf("ReplayTraceTurnCount() = %d, want 6", got)
+		if got := (PhaseTurnModel{}).ExpectedTraceTurnCount(replay); got != 6 {
+			t.Fatalf("PhaseTurnModel.ExpectedTraceTurnCount() = %d, want 6", got)
+		}
+	})
+}
+
+// TestMainTurnCount confirms the universal MainTurnCount logic counts only
+// pair-flush events: empty-stdout phase frames and trailing engine markers
+// are excluded for every TurnModel.
+func TestMainTurnCount(t *testing.T) {
+	t.Parallel()
+
+	t.Run("flat: 2 decision turns", func(t *testing.T) {
+		t.Parallel()
+		replay := CodinGameReplay[CodinGameReplayFrame]{
+			GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+				Frames: []CodinGameReplayFrame{
+					{AgentID: -1, Summary: "init"},
+					{AgentID: 0, Stdout: "MOVE A"},
+					{AgentID: 1, Stdout: "MOVE B"},
+					{AgentID: 0, Stdout: "MOVE C"},
+					{AgentID: 1, Stdout: "MOVE D"},
+				},
+			},
+		}
+		want := 2
+		if got := (FlatTurnModel{}).MainTurnCount(replay); got != want {
+			t.Fatalf("Flat MainTurnCount = %d, want %d", got, want)
+		}
+		if got := (PostEndTurnModel{}).MainTurnCount(replay); got != want {
+			t.Fatalf("PostEnd MainTurnCount = %d, want %d", got, want)
+		}
+		if got := (PhaseTurnModel{}).MainTurnCount(replay); got != want {
+			t.Fatalf("Phase MainTurnCount = %d, want %d", got, want)
+		}
+	})
+
+	t.Run("phase: 1 ACTIONS pair surrounded by gather + sun_move", func(t *testing.T) {
+		t.Parallel()
+		replay := CodinGameReplay[CodinGameReplayFrame]{
+			GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+				Frames: []CodinGameReplayFrame{
+					{AgentID: -1, Summary: "init"},
+					{AgentID: 0, Summary: "Round gather"},
+					{AgentID: 0, Stdout: "WAIT"},
+					{AgentID: 1, Stdout: "WAIT"},
+					{AgentID: 0, Summary: "Round ends"},
+				},
+			},
+		}
+		// Only the WAIT pair counts as a main (decision) turn.
+		if got := (PhaseTurnModel{}).MainTurnCount(replay); got != 1 {
+			t.Fatalf("MainTurnCount = %d, want 1", got)
+		}
+	})
+
+	t.Run("postend: trailing engine frame excluded", func(t *testing.T) {
+		t.Parallel()
+		replay := CodinGameReplay[CodinGameReplayFrame]{
+			GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
+				Frames: []CodinGameReplayFrame{
+					{AgentID: -1, Summary: "init"},
+					{AgentID: 0, Stdout: "SPEED 0"},
+					{AgentID: 1, Stdout: "SPEED 0"},
+					{AgentID: 0, Summary: "game over"},
+				},
+			},
+		}
+		// 1 decision turn (SPEED pair); the trailing empty is the gameOverFrame.
+		if got := (PostEndTurnModel{}).MainTurnCount(replay); got != 1 {
+			t.Fatalf("MainTurnCount = %d, want 1", got)
 		}
 	})
 }

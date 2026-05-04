@@ -196,19 +196,21 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		0,
 	)
 
-	emitsPostEndFrame := false
-	if e, ok := factory.(arena.PostEndFrameEmitter); ok {
-		emitsPostEndFrame = e.EmitsPostEndFrame()
-	}
-	emitsPhaseFrames := false
-	if e, ok := factory.(arena.ReplayPhaseFrameEmitter); ok {
-		emitsPhaseFrames = e.EmitsReplayPhaseFrames()
-	}
-	if err := verifyReplayTrace(trace, finalScores, replay, emitsPostEndFrame, emitsPhaseFrames); err != nil {
+	turnModel := resolveTurnModel(factory)
+	if err := verifyReplayTrace(trace, finalScores, replay, turnModel); err != nil {
 		return arena.TraceMatch{}, league, err
 	}
 
 	return trace, league, nil
+}
+
+// resolveTurnModel returns the factory's TurnModel, defaulting to
+// FlatTurnModel for factories that don't implement TurnModeler.
+func resolveTurnModel(factory arena.GameFactory) arena.TurnModel {
+	if tm, ok := factory.(arena.TurnModeler); ok {
+		return tm.TurnModel()
+	}
+	return arena.FlatTurnModel{}
 }
 
 // verifyReplayTrace checks the engine reproduces the replay across three
@@ -220,12 +222,12 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 //     compared against the replay's gameResult.scores rather than
 //     trace.Scores because trace.Scores carries raw pre-OnEnd values that
 //     diverge whenever OnEnd touches them (tie subtractions, -1 for DQ).
-//   - L2 trace turn count: len(trace.Turns) == expected count from the
-//     replay's frame stream.
-//
-// emitsPostEndFrame and emitsPhaseFrames select the trace-turn counting
-// strategy: see arena.ReplayTraceTurnCount for what they mean.
-func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], emitsPostEndFrame, emitsPhaseFrames bool) error {
+//   - L1 main-turn count: trace.MainTurns matches the model's MainTurnCount.
+//     Counts player-decision turns only; phase frames and post-end frames
+//     are excluded on both sides.
+//   - L2 total trace-turn count: len(trace.Turns) matches the model's
+//     ExpectedTraceTurnCount.
+func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], model arena.TurnModel) error {
 	outcome, ok := arena.ExtractReplayOutcome(replay)
 	if !ok {
 		return fmt.Errorf("replay scores or ranks malformed")
@@ -245,7 +247,12 @@ func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.
 		return fmt.Errorf("%w: deactivation mismatch: replay=%v engine=%v", errReplayMismatch, outcome.Deactivated, trace.Deactivated)
 	}
 
-	expectedTurns := arena.ReplayTraceTurnCount(replay, emitsPostEndFrame, emitsPhaseFrames)
+	expectedMain := model.MainTurnCount(replay)
+	if trace.MainTurns != expectedMain {
+		return fmt.Errorf("%w: main-turn mismatch: replay=%d engine=%d", errReplayMismatch, expectedMain, trace.MainTurns)
+	}
+
+	expectedTurns := model.ExpectedTraceTurnCount(replay)
 	if len(trace.Turns) != expectedTurns {
 		return fmt.Errorf("%w: turn mismatch: replay=%d engine=%d", errReplayMismatch, expectedTurns, len(trace.Turns))
 	}

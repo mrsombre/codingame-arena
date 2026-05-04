@@ -68,6 +68,11 @@ type TraceMatch struct {
 	Players     [2]string     `json:"players"`
 	Timing      *TraceTiming  `json:"timing,omitempty"`
 	Turns       []TraceTurn   `json:"turns"`
+	// MainTurns is the count of player-decision trace turns. Excludes
+	// non-decision phase turns (Spring 2021 GATHERING/SUN_MOVE) and
+	// post-end frames (Spring 2020 gameOverFrame). Populated going forward
+	// only; older trace files load with 0 ("unknown").
+	MainTurns int `json:"main_turns,omitempty"`
 }
 
 // Shared EndReason values. Games may use these or add their own.
