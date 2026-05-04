@@ -708,6 +708,7 @@ func (g *Game) PerformGameUpdate(turn int) {
 	switch g.CurrentFrameType {
 	case FrameGathering:
 		g.Summary.AddRound(g.Round)
+		g.trace(arena.MakeTurnTrace(TraceGatherPhase, GatherPhaseMeta{Round: g.Round}))
 		g.performSunGatheringUpdate()
 		g.NextFrameType = FrameActions
 	case FrameActions:
@@ -717,8 +718,14 @@ func (g *Game) PerformGameUpdate(turn int) {
 			g.NextFrameType = FrameSunMove
 		}
 	case FrameSunMove:
+		endedRound := g.Round
 		g.Summary.AddRoundTransition(g.Round)
 		g.performSunMoveUpdate()
+		direction := g.Sun.Orientation
+		if g.Round >= g.MAX_ROUNDS {
+			direction = -1
+		}
+		g.trace(arena.MakeTurnTrace(TraceSunMove, SunMoveMeta{Round: endedRound, Direction: direction}))
 		g.NextFrameType = FrameGathering
 	default:
 		// FrameInit shouldn't reach PerformGameUpdate; the runner calls
