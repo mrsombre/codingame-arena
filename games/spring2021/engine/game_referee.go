@@ -129,6 +129,18 @@ func (r *Referee) ShouldSkipPlayerTurn(player arena.Player) bool {
 	return r.Game.ShouldSkipPlayerTurn(player.(*Player))
 }
 
+// TurnTraces returns a copy of this turn's accumulated game traces.
+// Drained after each PerformGameUpdate by the runner; the underlying
+// slice is reset on the next call.
+func (r *Referee) TurnTraces(_ int, _ []arena.Player) []arena.TurnTrace {
+	if len(r.Game.traces) == 0 {
+		return nil
+	}
+	out := make([]arena.TurnTrace, len(r.Game.traces))
+	copy(out, r.Game.traces)
+	return out
+}
+
 func (r *Referee) ActivePlayers(players []arena.Player) int {
 	active := 0
 	for _, player := range players {

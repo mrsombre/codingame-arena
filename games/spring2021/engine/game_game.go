@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/mrsombre/codingame-arena/internal/arena"
 	"github.com/mrsombre/codingame-arena/internal/util/javarand"
 )
 
@@ -79,6 +80,11 @@ type Game struct {
 	random *javarand.Random
 	league int
 	ended  bool
+
+	// traces accumulates per-turn structured events for the current
+	// PerformGameUpdate call. Reset at the top of each call; drained by
+	// Referee.TurnTraces after the call returns.
+	traces []arena.TurnTrace
 }
 
 func NewGame(seed int64, leagueLevel int) *Game {
@@ -488,6 +494,7 @@ func (g *Game) doGrow(player *Player, action Action) error {
 	g.AvailableSun[player.GetIndex()] = current - cost
 	tree.Grow()
 	g.Summary.AddGrowTree(player, cell)
+	g.trace(arena.MakeTurnTrace(TraceGrow, TreeActionMeta{Player: player.GetIndex(), Cell: cell.GetIndex()}))
 	tree.SetDormant()
 	return nil
 }
@@ -585,6 +592,7 @@ func (g *Game) doSeed(player *Player, action Action) error {
 		TargetCell: targetCell.GetIndex(),
 	})
 	g.Summary.AddPlantSeed(player, targetCell, sourceCell)
+	g.trace(arena.MakeTurnTrace(TraceSeed, SeedMeta{Player: player.GetIndex(), Source: sourceCell.GetIndex(), Target: targetCell.GetIndex()}))
 	return nil
 }
 
@@ -622,6 +630,7 @@ func (g *Game) giveSun() {
 		v := given[p.GetIndex()]
 		if v > 0 {
 			g.Summary.AddGather(p, v)
+			g.trace(arena.MakeTurnTrace(TraceGather, PlayerSunMeta{Player: p.GetIndex(), Sun: v}))
 		}
 	}
 }
@@ -655,6 +664,7 @@ func (g *Game) removeDyingTrees() {
 		player := g.Trees[cell.GetIndex()].Owner
 		player.AddScore(points)
 		g.Summary.AddCutTree(player, cell, points)
+		g.trace(arena.MakeTurnTrace(TraceComplete, CompleteMeta{Player: player.GetIndex(), Cell: cell.GetIndex(), Points: points}))
 		g.removeTree(cell.GetIndex())
 	}
 }
@@ -693,6 +703,7 @@ public void performGameUpdate() {
 
 func (g *Game) PerformGameUpdate(turn int) {
 	g.Turn++
+	g.traces = g.traces[:0]
 
 	switch g.CurrentFrameType {
 	case FrameGathering:
@@ -800,6 +811,7 @@ func (g *Game) performActionUpdate() {
 		default:
 			player.SetWaiting(true)
 			g.Summary.AddWait(player)
+			g.trace(arena.MakeTurnTrace(TraceWait, PlayerMeta{Player: player.GetIndex()}))
 		}
 		if err != nil {
 			g.Summary.AddError(fmt.Sprintf("%s: %s", player.NicknameToken(), err.Error()))
@@ -809,6 +821,7 @@ func (g *Game) performActionUpdate() {
 
 	if g.seedsAreConflicting() {
 		g.Summary.AddSeedConflict(g.SentSeeds[0])
+		g.trace(arena.MakeTurnTrace(TraceSeedConflict, SeedConflictMeta{Cell: g.SentSeeds[0].TargetCell}))
 	} else {
 		for _, seed := range g.SentSeeds {
 			g.plantSeed(g.Players[seed.Owner], seed.TargetCell, seed.SourceCell)
