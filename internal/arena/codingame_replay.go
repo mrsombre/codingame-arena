@@ -119,7 +119,7 @@ func ParseReplaySeed(refereeInput string) (int64, bool) {
 	return 0, false
 }
 
-var replayLeaguePattern = regexp.MustCompile(`(?i)level(\d)`)
+var replayLeaguePattern = regexp.MustCompile(`(?i)level\s*(\d)`)
 
 // ParseReplayLeague extracts the CodinGame league level from the replay title.
 func ParseReplayLeague(questionTitle string) int {
@@ -160,69 +160,200 @@ func ReplayTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	return len(moves.Right)
 }
 
-// ReplayTraceTurnCount returns the number of engine frames represented by the
-// replay. CodinGame stores simultaneous player outputs as one frame per player.
-// Mid-replay empty-stdout frames are Spring 2020 speed sub-turns, which the
-// engine folds into the preceding main turn and emits no trace turn for.
-//
-// emitsPostEndFrame separates two engine families:
-//
-//   - false: engine ends the match on the same turn game-over is detected
-//     (Winter 2026). A trailing empty stdout that pairs with the other
-//     side's stdout is the deactivation/timeout close of the in-progress
-//     turn — already counted by the regular flush — so it must not be
-//     double-counted.
-//   - true: engine emits a separate post-end trace turn after the last
-//     main turn (Java Spring 2020's gameOverFrame branch). The replay's
-//     trailing empty stdout always represents that frame and adds +1
-//     unconditionally, even when it appears to pair with another agent's
-//     stdout (in that case the pair is a polling-timeout close of the
-//     final main turn, with the gameOverFrame following separately).
-func ReplayTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame], emitsPostEndFrame bool) int {
-	turns := 0
-	seenOutput := map[int]bool{}
+// FlatTurnModel is the default TurnModel: 1 engine iteration = 1 player-
+// decision turn = 1 trace turn. The engine ends the match on the same turn
+// game-over is detected (no separate post-end frame). A trailing empty
+// stdout that pairs with the other side's stdout is the deactivation/
+// timeout close of the in-progress turn — already counted by the regular
+// flush — so it must not be double-counted. Used by Winter 2026.
+type FlatTurnModel struct{}
 
-	flushOutputTurn := func() bool {
-		if len(seenOutput) == 0 {
+// PostEndTurnModel handles engines that emit a separate post-end trace
+// turn for their game-over frame (Java spring2020's gameOverFrame branch).
+// Mid-replay empty stdouts are sub-turn markers (e.g. speed) that the
+// engine folds into the preceding main turn. The replay's trailing empty
+// stdout always represents the gameOverFrame and adds +1 unconditionally,
+// even when it appears to pair with another agent's stdout (in that case
+// the pair is a polling-timeout close of the final main turn, with the
+// gameOverFrame following separately). Used by Spring 2020.
+type PostEndTurnModel struct{}
+
+// PhaseTurnModel handles engines that emit standalone trace turns for
+// non-decision phases (Spring 2021's GATHERING and SUN_MOVE). Every
+// empty-stdout frame in the replay is its own phase trace turn AND
+// flushes any pending single-stdout pair. The trailing engine frame is
+// the final phase, already counted, so no post-end add. Used by Spring 2021.
+type PhaseTurnModel struct{}
+
+// MainTurnCount counts player-decision turns in a replay: stdout-pair
+// flushes only, with empty-stdout phase frames and trailing engine
+// markers excluded. The same logic applies to all three current games,
+// so each TurnModel's MainTurnCount delegates here.
+func mainTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
+	turns := 0
+	seen := map[int]bool{}
+	flush := func() {
+		if len(seen) == 0 {
+			return
+		}
+		turns++
+		clear(seen)
+	}
+	for _, frame := range replay.GameResult.Frames {
+		if frame.AgentID < 0 {
+			continue
+		}
+		if strings.TrimSpace(frame.Stdout) == "" {
+			flush()
+			continue
+		}
+		if seen[frame.AgentID] {
+			flush()
+		}
+		seen[frame.AgentID] = true
+		if len(seen) == 2 {
+			flush()
+		}
+	}
+	flush()
+	return turns
+}
+
+func (FlatTurnModel) ExpectedTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
+	turns, trailingEmptyClosedTurn := pairFlushCount(replay)
+	if hasTrailingEngineFrame(replay) && !trailingEmptyClosedTurn {
+		turns++
+	}
+	return turns
+}
+
+func (FlatTurnModel) MainTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
+	return mainTurnCount(replay)
+}
+
+func (PostEndTurnModel) ExpectedTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
+	turns, _ := pairFlushCount(replay)
+	if hasTrailingEngineFrame(replay) {
+		turns++
+	}
+	return turns
+}
+
+func (PostEndTurnModel) MainTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
+	return mainTurnCount(replay)
+}
+
+func (PhaseTurnModel) ExpectedTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
+	turns := 0
+	seen := map[int]bool{}
+	flush := func() {
+		if len(seen) == 0 {
+			return
+		}
+		turns++
+		clear(seen)
+	}
+	for _, frame := range replay.GameResult.Frames {
+		if frame.AgentID < 0 {
+			continue
+		}
+		if strings.TrimSpace(frame.Stdout) == "" {
+			flush()
+			turns++
+			continue
+		}
+		if seen[frame.AgentID] {
+			flush()
+		}
+		seen[frame.AgentID] = true
+		if len(seen) == 2 {
+			flush()
+		}
+	}
+	flush()
+	return turns
+}
+
+func (PhaseTurnModel) MainTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
+	return mainTurnCount(replay)
+}
+
+// pairFlushCount runs the shared flat counting loop used by FlatTurnModel
+// and PostEndTurnModel. It returns the pair-flush turn count and whether
+// the very last replay frame was an empty stdout that flushed a pending
+// pair (matters for FlatTurnModel: a deactivation pair close must not be
+// double-counted as a post-end frame).
+func pairFlushCount(replay CodinGameReplay[CodinGameReplayFrame]) (turns int, trailingEmptyClosedTurn bool) {
+	seen := map[int]bool{}
+	flush := func() bool {
+		if len(seen) == 0 {
 			return false
 		}
 		turns++
-		clear(seenOutput)
+		clear(seen)
 		return true
 	}
-
-	trailingEmptyClosedTurn := false
 	frames := replay.GameResult.Frames
 	for i, frame := range frames {
 		if frame.AgentID < 0 {
 			continue
 		}
-
 		if strings.TrimSpace(frame.Stdout) == "" {
-			flushed := flushOutputTurn()
+			flushed := flush()
 			if i == len(frames)-1 {
 				trailingEmptyClosedTurn = flushed
 			}
 			continue
 		}
-
-		if seenOutput[frame.AgentID] {
-			flushOutputTurn()
+		if seen[frame.AgentID] {
+			flush()
 		}
-		seenOutput[frame.AgentID] = true
-		if len(seenOutput) == 2 {
-			flushOutputTurn()
-		}
-	}
-	flushOutputTurn()
-
-	if hasTrailingEngineFrame(replay) {
-		if emitsPostEndFrame || !trailingEmptyClosedTurn {
-			turns++
+		seen[frame.AgentID] = true
+		if len(seen) == 2 {
+			flush()
 		}
 	}
+	flush()
+	return turns, trailingEmptyClosedTurn
+}
 
-	return turns
+// ReplayOutcome captures the L0 verification surface of a CodinGame replay:
+// what's visible from gameResult alone, without re-simulating the engine.
+// Winner is 0, 1, or -1 for draw; Scores carries -1 for any side CG marked
+// disqualified (its gameResult.scores[i] is -1); Deactivated mirrors the
+// score check (deactivated[i] = scores[i] == -1).
+type ReplayOutcome struct {
+	Winner      int
+	Scores      [2]int
+	Deactivated [2]bool
+}
+
+// ExtractReplayOutcome derives the replay's outcome from gameResult.scores
+// (with -1 indicating disqualification) and gameResult.ranks (winner). No
+// summary parsing — every field is read directly from CG's structured
+// match result. ok=false when scores or ranks are malformed.
+func ExtractReplayOutcome(replay CodinGameReplay[CodinGameReplayFrame]) (ReplayOutcome, bool) {
+	if len(replay.GameResult.Scores) < 2 {
+		return ReplayOutcome{}, false
+	}
+	out := ReplayOutcome{}
+	for i := 0; i < 2; i++ {
+		out.Scores[i] = int(replay.GameResult.Scores[i])
+		out.Deactivated[i] = out.Scores[i] == -1
+	}
+	ranks, ok := RanksFromCGRanks(replay.GameResult.Ranks)
+	if !ok {
+		return ReplayOutcome{}, false
+	}
+	switch {
+	case ranks[0] == ranks[1]:
+		out.Winner = -1
+	case ranks[0] < ranks[1]:
+		out.Winner = 0
+	default:
+		out.Winner = 1
+	}
+	return out, true
 }
 
 // hasTrailingEngineFrame reports whether the replay ends with the game-over

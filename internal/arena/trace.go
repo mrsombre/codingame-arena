@@ -30,10 +30,12 @@ func (s TraceScore) MarshalJSON() ([]byte, error) {
 //
 // Everything is reported from the in-match side perspective (index 0 = left
 // side of the map, index 1 = right). Players[i] is the bot basename that
-// played on side i; Scores[i] is that side's final score; Ranks encodes the
-// winner CodinGame-style (0 = first place, [0,0] = draw). Random side-swap is
-// intentionally not recorded — the bot→side mapping here is ground truth for
-// downstream trace consumers (e.g. training).
+// played on side i; Scores[i] is that side's raw pre-OnEnd score and
+// FinalScores[i] is the post-OnEnd value matching CodinGame's gameResult.
+// scores convention; Ranks encodes the winner CodinGame-style (0 = first
+// place, [0,0] = draw). Random side-swap is intentionally not recorded — the
+// bot→side mapping here is ground truth for downstream trace consumers
+// (e.g. training).
 //
 // Blue is the bot/agent name analyze treats as "us". It is required on every
 // trace: self-play sets it to the basename of --blue (which always equals one
@@ -63,11 +65,23 @@ type TraceMatch struct {
 	// command) during the match. Used by analyzers to attribute fault end
 	// reasons to a specific side.
 	Deactivated [2]bool       `json:"deactivated,omitzero"`
-	Scores      [2]TraceScore `json:"scores"`
+	// Scores carries the raw pre-OnEnd value reported by RawScoresProvider
+	// (intrinsic in-game count, e.g. spring2021 tree segments before the sun
+	// bonus). Deactivated sides are reported as -1 to match CG.
+	Scores [2]TraceScore `json:"scores"`
+	// FinalScores carries the post-OnEnd value (with bonuses, tiebreakers,
+	// -1 for DQ) — the same number CG records in gameResult.scores. This is
+	// the authoritative outcome for win/loss; Scores is the analytical raw.
+	FinalScores [2]TraceScore `json:"final_scores"`
 	Ranks       [2]int        `json:"ranks"`
 	Players     [2]string     `json:"players"`
 	Timing      *TraceTiming  `json:"timing,omitempty"`
 	Turns       []TraceTurn   `json:"turns"`
+	// MainTurns is the count of player-decision trace turns. Excludes
+	// non-decision phase turns (Spring 2021 GATHERING/SUN_MOVE) and
+	// post-end frames (Spring 2020 gameOverFrame). Populated going forward
+	// only; older trace files load with 0 ("unknown").
+	MainTurns int `json:"main_turns,omitempty"`
 }
 
 // Shared EndReason values. Games may use these or add their own.

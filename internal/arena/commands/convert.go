@@ -99,7 +99,9 @@ func convertReplay(factory arena.GameFactory, opts ConvertOptions, target conver
 	}
 
 	res.Outcome = convertOutcomeSaved
-	res.Detail = fmt.Sprintf("league=%d turns=%d scores=%.1f:%.1f", league, len(trace.Turns), trace.Scores[0], trace.Scores[1])
+	res.Detail = fmt.Sprintf("league=%d turns=%d scores=%.1f:%.1f",
+		league, len(trace.Turns),
+		trace.FinalScores[0], trace.FinalScores[1])
 	return res, nil
 }
 
@@ -122,13 +124,27 @@ func applyReplayMetadata(trace *arena.TraceMatch, replay arena.CodinGameReplay[a
 	trace.Blue = replay.Blue
 	trace.League = replay.League
 	trace.CreatedAt = replay.FetchedAt
-	// CG's gameResult.ranks is the ground truth for who won — finalScores
-	// alone can't reproduce CG-side tiebreakers when the engine reaches a
-	// tie that CG broke (e.g. winter2026 ties the raw counts but CG ranks
-	// one side ahead). Fall back to the replay-runner-derived ranks if the
-	// replay payload is malformed.
-	if r, ok := arena.RanksFromCGRanks(replay.GameResult.Ranks); ok {
-		trace.Ranks = r
+	// CG's gameResult.ranks is normally the ground truth for who won —
+	// finalScores alone can't reproduce CG-side tiebreakers when the
+	// engine reaches a tie that CG broke (winter2026 raw-count tie broken
+	// by loss subtraction in OnEnd, etc). One exception: when CG's
+	// gameResult.scores are equal and neither side is DQ, the visible
+	// outcome on the replay page is a draw even if gameResult.ranks
+	// orders the agents internally (spring2020 replay 885029092: scores
+	// 98:98, ranks [0,1], summary "Game tied!" — CG appears to keep an
+	// ordering hint such as lost-pacs but displays the leaderboard
+	// outcome as 1st/1st). Force draw in that case so the saved trace
+	// matches the UI verdict.
+	scoresTied := len(replay.GameResult.Scores) >= 2 &&
+		replay.GameResult.Scores[0] == replay.GameResult.Scores[1] &&
+		replay.GameResult.Scores[0] != -1
+	switch {
+	case scoresTied:
+		trace.Ranks = [2]int{0, 0}
+	default:
+		if r, ok := arena.RanksFromCGRanks(replay.GameResult.Ranks); ok {
+			trace.Ranks = r
+		}
 	}
 }
 
@@ -186,7 +202,7 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		return arena.TraceMatch{}, league, fmt.Errorf("%w: blue %q not found in players %v", errReplayMismatch, replay.Blue, botNames)
 	}
 
-	trace, finalScores := arena.RunReplay(
+	trace, _ := arena.RunReplay(
 		factory,
 		seed,
 		gameOptions,
@@ -196,37 +212,71 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		0,
 	)
 
-	emitsPostEndFrame := false
-	if e, ok := factory.(arena.PostEndFrameEmitter); ok {
-		emitsPostEndFrame = e.EmitsPostEndFrame()
-	}
-	if err := verifyReplayTrace(trace, finalScores, replay, emitsPostEndFrame); err != nil {
+	turnModel := resolveTurnModel(factory)
+	if err := verifyReplayTrace(trace, replay, turnModel); err != nil {
 		return arena.TraceMatch{}, league, err
 	}
 
 	return trace, league, nil
 }
 
-// verifyReplayTrace checks the engine reproduces the replay. finalScores are
-// the post-OnEnd values (Player.GetScore after tie-break and deactivation
-// adjustments) — the same shape the replay's gameResult.scores carries.
-// trace.Scores cannot be used for this comparison: it stores the raw pre-OnEnd
-// score, which diverges whenever OnEnd touches it (e.g. ties trigger a losses
-// subtraction, deactivated players become -1).
-//
-// emitsPostEndFrame selects the trace-turn counting strategy: see
-// arena.ReplayTraceTurnCount for what it means.
-func verifyReplayTrace(trace arena.TraceMatch, finalScores [2]int, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], emitsPostEndFrame bool) error {
-	if len(replay.GameResult.Scores) < 2 {
-		return fmt.Errorf("replay scores must contain two entries")
+// resolveTurnModel returns the factory's TurnModel, defaulting to
+// FlatTurnModel for factories that don't implement TurnModeler.
+func resolveTurnModel(factory arena.GameFactory) arena.TurnModel {
+	if tm, ok := factory.(arena.TurnModeler); ok {
+		return tm.TurnModel()
 	}
-	if float64(finalScores[0]) != replay.GameResult.Scores[0] || float64(finalScores[1]) != replay.GameResult.Scores[1] {
-		return fmt.Errorf("%w: score mismatch: replay=[%.1f %.1f] engine=[%d %d]",
+	return arena.FlatTurnModel{}
+}
+
+// verifyReplayTrace checks the engine reproduces the replay across three
+// agreement layers:
+//
+//   - L0 outcome: trace.FinalScores (post-OnEnd, -1 for DQ) matches
+//     replay.gameResult.scores — the only score the replay records. Winner
+//     ranks match (trace.Ranks vs gameResult.ranks) and deactivation flags
+//     match (trace.Deactivated vs scores[i] == -1). trace.Scores (raw
+//     pre-OnEnd, -1 for DQ) is stored for analysis but is not compared.
+//   - L1 main-turn count: trace.MainTurns matches the model's MainTurnCount.
+//     Counts player-decision turns only; phase frames and post-end frames
+//     are excluded on both sides.
+//   - L2 total trace-turn count: len(trace.Turns) matches the model's
+//     ExpectedTraceTurnCount.
+func verifyReplayTrace(trace arena.TraceMatch, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], model arena.TurnModel) error {
+	outcome, ok := arena.ExtractReplayOutcome(replay)
+	if !ok {
+		return fmt.Errorf("replay scores or ranks malformed")
+	}
+	if float64(trace.FinalScores[0]) != replay.GameResult.Scores[0] || float64(trace.FinalScores[1]) != replay.GameResult.Scores[1] {
+		return fmt.Errorf("%w: final score mismatch: replay=[%.1f %.1f] engine=[%.1f %.1f]",
 			errReplayMismatch,
-			replay.GameResult.Scores[0], replay.GameResult.Scores[1], finalScores[0], finalScores[1])
+			replay.GameResult.Scores[0], replay.GameResult.Scores[1],
+			float64(trace.FinalScores[0]), float64(trace.FinalScores[1]))
 	}
 
-	expectedTurns := arena.ReplayTraceTurnCount(replay, emitsPostEndFrame)
+	replayRanks, _ := arena.RanksFromCGRanks(replay.GameResult.Ranks)
+	if trace.Ranks != replayRanks {
+		// An engine-declared draw with CG picking a winner means CG applied
+		// a post-OnEnd tiebreaker the engine doesn't model (observed in
+		// spring2020 replay 885029092: scores 98:98, summary "Game tied!",
+		// CG ranks [0,1]). Accept silently — applyReplayMetadata overrides
+		// trace.Ranks with CG's ranks before the trace is written. Fail
+		// strictly when the engine claims a winner CG disputes.
+		if trace.Ranks[0] != trace.Ranks[1] {
+			return fmt.Errorf("%w: rank mismatch: replay=%v engine=%v", errReplayMismatch, replayRanks, trace.Ranks)
+		}
+	}
+
+	if trace.Deactivated != outcome.Deactivated {
+		return fmt.Errorf("%w: deactivation mismatch: replay=%v engine=%v", errReplayMismatch, outcome.Deactivated, trace.Deactivated)
+	}
+
+	expectedMain := model.MainTurnCount(replay)
+	if trace.MainTurns != expectedMain {
+		return fmt.Errorf("%w: main-turn mismatch: replay=%d engine=%d", errReplayMismatch, expectedMain, trace.MainTurns)
+	}
+
+	expectedTurns := model.ExpectedTraceTurnCount(replay)
 	if len(trace.Turns) != expectedTurns {
 		return fmt.Errorf("%w: turn mismatch: replay=%d engine=%d", errReplayMismatch, expectedTurns, len(trace.Turns))
 	}

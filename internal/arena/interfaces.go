@@ -108,12 +108,24 @@ type GameOverFrameReporter interface {
 	InGameOverFrame() bool
 }
 
-// PostEndFrameEmitter is the static factory-level companion to
-// GameOverFrameReporter: GameFactories whose engines always emit a separate
-// post-end trace turn for their game-over frame implement this so replay
-// verification can pre-compute the expected trace turn count without
-// instantiating a referee. Spring 2020 implements this; Winter 2026 does
-// not.
-type PostEndFrameEmitter interface {
-	EmitsPostEndFrame() bool
+// TurnModel describes how a game's trace turns relate to the frames in a
+// CodinGame replay. Replay verification asks the model two things:
+//
+//   - ExpectedTraceTurnCount: how many trace turns the engine should emit
+//     for this replay (matches len(trace.Turns)).
+//   - MainTurnCount: how many of those are player-decision turns (matches
+//     trace.MainTurns). Phase frames (spring2021 GATHERING/SUN_MOVE) and
+//     post-end frames (spring2020 gameOverFrame) are excluded.
+//
+// Concrete implementations are FlatTurnModel (winter2026), PostEndTurnModel
+// (spring2020), and PhaseTurnModel (spring2021).
+type TurnModel interface {
+	ExpectedTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int
+	MainTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int
+}
+
+// TurnModeler is the factory-level hook that names which TurnModel a game
+// uses. Factories without this hook fall back to FlatTurnModel.
+type TurnModeler interface {
+	TurnModel() TurnModel
 }
