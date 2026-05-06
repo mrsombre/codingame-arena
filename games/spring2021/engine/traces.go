@@ -2,7 +2,6 @@ package engine
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
@@ -24,8 +23,6 @@ const (
 	TraceSeed     = "SEED"
 	TraceComplete = "COMPLETE"
 	TraceWait     = "WAIT"
-
-	TraceActions = "ACTIONS"
 )
 
 // TraceTurnState is the spring2021-owned per-turn payload written into
@@ -34,11 +31,11 @@ const (
 type TraceTurnState struct {
 	Day              *int       `json:"day,omitempty"`
 	Phase            string     `json:"phase,omitempty"`
+	DayActionIndex   *int       `json:"day_action_index,omitempty"`
 	SunDirection     *int       `json:"sun_direction,omitempty"`
 	Sun              []int      `json:"sun,omitempty"`
 	Trees            [][][3]int `json:"trees,omitempty"`
 	SeedConflictCell *int       `json:"seed_conflict_cell,omitempty"`
-	DayActionIndex   *int       `json:"day_action_index,omitempty"`
 }
 
 // GatherData is the data for GATHER events: one event per tree that gathered
@@ -71,10 +68,6 @@ type CompleteData struct {
 	Points int `json:"points"`
 }
 
-type ValuesMeta[T any] struct {
-	Values T `json:"values"`
-}
-
 func (g *Game) DecorateTraceTurn(_ int, _ []arena.Player) json.RawMessage {
 	state := TraceTurnState{
 		Day:          new(g.Round),
@@ -95,18 +88,6 @@ func (g *Game) DecorateTraceTurn(_ int, _ []arena.Player) json.RawMessage {
 		panic(err)
 	}
 	return raw
-}
-
-// emitActionTraces appends a per-player ACTIONS event to g.traces summarizing
-// the action each side is about to take. Called from PerformGameUpdate at the
-// top of the FrameActions branch (after g.traces is reset, before
-// performActionUpdate consumes the actions) so the events surface through
-// the standard TurnTraces channel.
-func (g *Game) emitActionTraces() {
-	actions := g.traceActions()
-	for i, action := range actions {
-		g.tracePlayer(i, arena.MakeTurnTrace(TraceActions, ValuesMeta[string]{Values: action}))
-	}
 }
 
 func phaseLabel(f FrameType) string {
@@ -162,99 +143,6 @@ func (g *Game) traceTrees() [][][3]int {
 		trees[player] = append(trees[player], [3]int{idx, tree.Size, cell.GetRichness()})
 	}
 	return trees
-}
-
-func (g *Game) traceActions() []string {
-	actions := make([]string, tracePlayerCount(g))
-	for _, player := range g.Players {
-		idx := player.GetIndex()
-		if idx < 0 || idx >= len(actions) {
-			continue
-		}
-		actions[idx] = g.traceAction(player)
-	}
-	return actions
-}
-
-func (g *Game) traceAction(player *Player) string {
-	if player.IsDeactivated() {
-		return "SKIP DEACTIVATED"
-	}
-	if player.IsWaiting() {
-		return "SKIP WAITING"
-	}
-
-	action := player.GetAction()
-	switch {
-	case action.IsGrow():
-		tree, ok := g.Trees[action.GetTargetID()]
-		if !ok {
-			return fmt.Sprintf("GROW %d MISSING", action.GetTargetID())
-		}
-		return fmt.Sprintf(
-			"GROW %d %s %s",
-			action.GetTargetID(),
-			traceTreeSizeLabel(tree.Size),
-			traceTreeSizeLabel(tree.Size+1),
-		)
-	case action.IsSeed():
-		if _, ok := g.Trees[action.GetSourceID()]; !ok {
-			return fmt.Sprintf("SEED %d %d MISSING", action.GetSourceID(), action.GetTargetID())
-		}
-		richness := "UNKNOWN"
-		if g.Board != nil {
-			cell := g.Board.CellByIndex(action.GetTargetID())
-			if cell != nil {
-				richness = traceRichnessLabel(cell.GetRichness())
-			}
-		}
-		return fmt.Sprintf(
-			"SEED %d %d %s",
-			action.GetSourceID(),
-			action.GetTargetID(),
-			richness,
-		)
-	case action.IsComplete():
-		tree, ok := g.Trees[action.GetTargetID()]
-		if !ok {
-			return fmt.Sprintf("COMPLETE %d MISSING", action.GetTargetID())
-		}
-		return fmt.Sprintf("COMPLETE %d %s", action.GetTargetID(), traceTreeSizeLabel(tree.Size))
-	case action.IsWait():
-		return "WAIT"
-	default:
-		return "WAIT"
-	}
-}
-
-func traceRichnessLabel(richness int) string {
-	switch richness {
-	case RICHNESS_NULL:
-		return "NULL"
-	case RICHNESS_POOR:
-		return "POOR"
-	case RICHNESS_OK:
-		return "OK"
-	case RICHNESS_LUSH:
-		return "LUSH"
-	default:
-		return "UNKNOWN"
-	}
-}
-
-func traceTreeSizeLabel(size int) string {
-	switch size {
-	case TREE_SEED:
-		return "SEED"
-	case TREE_SMALL:
-		return "SMALL"
-	case TREE_MEDIUM:
-		return "MEDIUM"
-	case TREE_TALL:
-		return "LARGE"
-	default:
-		return "UNKNOWN"
-	}
 }
 
 // tracePlayer appends a player-owned event into the per-player slot.

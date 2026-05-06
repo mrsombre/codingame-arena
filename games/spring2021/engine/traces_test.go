@@ -119,14 +119,6 @@ func TestDecorateTraceTurnAddsDecisionTraces(t *testing.T) {
 		{{1, TREE_SEED, RICHNESS_LUSH}, {24, TREE_SMALL, RICHNESS_POOR}},
 		{{7, TREE_MEDIUM, RICHNESS_OK}, {19, TREE_TALL, RICHNESS_POOR}},
 	}, state.Trees)
-
-	// PerformGameUpdate emits ACTIONS events into g.traces; the runner
-	// drains them via Referee.TurnTraces.
-	g.PerformGameUpdate(0)
-	p0Action := findTraceMeta[ValuesMeta[string]](t, g.traces[0], TraceActions)
-	assert.Equal(t, "GROW 24 SMALL MEDIUM", p0Action.Values)
-	p1Action := findTraceMeta[ValuesMeta[string]](t, g.traces[1], TraceActions)
-	assert.Equal(t, "SEED 7 8 OK", p1Action.Values)
 }
 
 func TestRefereeTurnTracesReturnsCopy(t *testing.T) {
@@ -157,23 +149,6 @@ func TestPerformGameUpdateResetsTraces(t *testing.T) {
 			assert.NotEqual(t, TraceWait, e.Type, "stale traces must be cleared at the top of PerformGameUpdate")
 		}
 	}
-}
-
-// findTraceMeta locates the first trace of the given type and decodes its
-// data into T. Fails the test if no matching trace is present.
-func findTraceMeta[T any](t *testing.T, traces []arena.TurnTrace, typ string) T {
-	t.Helper()
-	for _, tr := range traces {
-		if tr.Type != typ {
-			continue
-		}
-		v, err := arena.DecodeData[T](tr)
-		require.NoError(t, err)
-		return v
-	}
-	require.Failf(t, "trace not found", "expected trace type %q in %v", typ, traceTypes(traces))
-	var zero T
-	return zero
 }
 
 // DecorateTraceTurn stamps the current frame type onto the State payload
