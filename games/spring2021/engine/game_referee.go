@@ -3,6 +3,8 @@
 package engine
 
 import (
+	"encoding/json"
+
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
@@ -144,8 +146,8 @@ func (r *Referee) TurnTraces(_ int, _ []arena.Player) [2][]arena.TurnTrace {
 	return out
 }
 
-func (r *Referee) DecorateTraceTurn(turn int, players []arena.Player, traceTurn *arena.TraceTurn) {
-	r.Game.DecorateTraceTurn(turn, players, traceTurn)
+func (r *Referee) DecorateTraceTurn(turn int, players []arena.Player) json.RawMessage {
+	return r.Game.DecorateTraceTurn(turn, players)
 }
 
 func (r *Referee) ActivePlayers(players []arena.Player) int {

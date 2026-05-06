@@ -128,7 +128,9 @@ func RunReplay(
 		}
 
 		if decorator, ok := referee.(TraceTurnDecorator); ok {
-			decorator.DecorateTraceTurn(turn, players, &tt)
+			if state := decorator.DecorateTraceTurn(turn, players); len(state) > 0 {
+				tt.State = state
+			}
 		}
 
 		referee.PerformGameUpdate(turn)

@@ -198,31 +198,22 @@ type TraceTiming struct {
 // Output[i] is the raw stdout the side-i bot emitted this turn (empty when
 // the side was deactivated or skipped). Indexed [left, right] in match-side
 // space; the bot→side mapping is in TraceMatch.Players.
+//
+// State is an opaque per-turn payload owned by the game (mirrors the
+// TurnTrace.Data pattern at the per-turn level). Arena never inspects it;
+// games marshal a typed struct describing whatever board/scoring/phase
+// info downstream consumers need.
 type TraceTurn struct {
-	Turn         int              `json:"turn"`
-	Day          *int             `json:"day,omitempty"`
-	Phase        string           `json:"phase,omitempty"`
-	SunDirection *int             `json:"sun_direction,omitempty"`
-	GameInput    []string         `json:"game_input,omitempty"`
-	Output       [2]string        `json:"output,omitzero"`
-	Timing       *TraceTurnTiming `json:"timing,omitempty"`
-	Sun          []int            `json:"sun,omitempty"`
-	Score        []int            `json:"score,omitempty"`
-	// Trees is the per-player list of trees on the board, each entry
-	// [cell_id, size, richness]. Outer index = player index, inner list
-	// ordered by cell_id ascending. Game-specific (spring2021).
-	Trees [][][3]int `json:"trees,omitempty"`
-	// SeedConflictCell carries the contested cell index when both players'
-	// seeds collided this turn (both seeds canceled). Game-specific
-	// (spring2021); unset on turns without a conflict.
-	SeedConflictCell *int `json:"seed_conflict_cell,omitempty"`
-	// DayActionIndex is the 0-based action-frame index inside the current day.
-	DayActionIndex *int `json:"day_action_index,omitempty"`
+	Turn      int              `json:"turn"`
+	GameInput []string         `json:"game_input,omitempty"`
+	Output    [2]string        `json:"output,omitzero"`
+	Timing    *TraceTurnTiming `json:"timing,omitempty"`
 	// Traces partitions per-turn structured events by player: Traces[0] is
 	// everything player 0 owned this turn, Traces[1] is everything player 1
 	// owned. Cross-owner events (e.g. spring2020 COLLIDE_ENEMY, winter2026
 	// HIT_ENEMY) are mirrored into both slots.
-	Traces [2][]TurnTrace `json:"traces,omitzero"`
+	Traces [2][]TurnTrace  `json:"traces,omitzero"`
+	State  json.RawMessage `json:"state,omitempty"`
 }
 
 // TraceTurnTiming carries per-side response time for one turn in milliseconds.

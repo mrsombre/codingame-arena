@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
@@ -15,7 +16,8 @@ import (
 // player index is encoded positionally by the slot, so per-event payloads
 // no longer carry a "player" field. Phase markers and game-state events
 // (SUN_MOVE, SEED_CONFLICT) are not emitted as traces; that information
-// lives at the TraceTurn root (phase, sun_direction, seed_conflict_cell).
+// lives in the per-turn TraceTurnState payload (phase, sun_direction,
+// seed_conflict_cell).
 const (
 	TraceGather   = "GATHER"
 	TraceGrow     = "GROW"
@@ -25,6 +27,20 @@ const (
 
 	TraceActions = "ACTIONS"
 )
+
+// TraceTurnState is the spring2021-owned per-turn payload written into
+// TraceTurn.State. Field names use the original on-disk JSON keys, just
+// nested under "state" so the arena's TraceTurn stays game-agnostic.
+type TraceTurnState struct {
+	Day              *int       `json:"day,omitempty"`
+	Phase            string     `json:"phase,omitempty"`
+	SunDirection     *int       `json:"sun_direction,omitempty"`
+	Sun              []int      `json:"sun,omitempty"`
+	Score            []int      `json:"score,omitempty"`
+	Trees            [][][3]int `json:"trees,omitempty"`
+	SeedConflictCell *int       `json:"seed_conflict_cell,omitempty"`
+	DayActionIndex   *int       `json:"day_action_index,omitempty"`
+}
 
 // GatherData is the data for GATHER events: how many sun points the owning
 // player just collected this gathering phase.
@@ -57,34 +73,38 @@ type ValuesMeta[T any] struct {
 	Values T `json:"values"`
 }
 
-func (g *Game) DecorateTraceTurn(_ int, _ []arena.Player, traceTurn *arena.TraceTurn) {
-	if traceTurn == nil {
-		return
+func (g *Game) DecorateTraceTurn(_ int, _ []arena.Player) json.RawMessage {
+	state := TraceTurnState{
+		Day:          new(g.Round),
+		Phase:        phaseLabel(g.CurrentFrameType),
+		SunDirection: new(g.Sun.Orientation),
+		Sun:          g.traceSun(),
+		Score:        g.traceScore(),
+		Trees:        g.traceTrees(),
 	}
-
-	traceTurn.Day = new(g.Round)
-	traceTurn.Phase = phaseLabel(g.CurrentFrameType)
-	traceTurn.SunDirection = new(g.Sun.Orientation)
-	traceTurn.Sun = g.traceSun()
-	traceTurn.Score = g.traceScore()
-	traceTurn.Trees = g.traceTrees()
 	if g.seedConflictCell != nil {
 		cell := *g.seedConflictCell
-		traceTurn.SeedConflictCell = &cell
+		state.SeedConflictCell = &cell
 	}
-
 	if g.CurrentFrameType == FrameActions {
-		traceTurn.DayActionIndex = new(g.DayActionIndex)
-		actions := g.traceActions()
-		// Distribute the per-side action description into each player's slot.
-		for i, action := range actions {
-			if i >= len(traceTurn.Traces) {
-				break
-			}
-			traceTurn.Traces[i] = append(traceTurn.Traces[i],
-				arena.MakeTurnTrace(TraceActions, ValuesMeta[string]{Values: action}),
-			)
-		}
+		state.DayActionIndex = new(g.DayActionIndex)
+	}
+	raw, err := json.Marshal(state)
+	if err != nil {
+		panic(err)
+	}
+	return raw
+}
+
+// emitActionTraces appends a per-player ACTIONS event to g.traces summarizing
+// the action each side is about to take. Called from PerformGameUpdate at the
+// top of the FrameActions branch (after g.traces is reset, before
+// performActionUpdate consumes the actions) so the events surface through
+// the standard TurnTraces channel.
+func (g *Game) emitActionTraces() {
+	actions := g.traceActions()
+	for i, action := range actions {
+		g.tracePlayer(i, arena.MakeTurnTrace(TraceActions, ValuesMeta[string]{Values: action}))
 	}
 }
 

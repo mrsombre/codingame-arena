@@ -719,6 +719,7 @@ func (g *Game) PerformGameUpdate(turn int) {
 		g.NextFrameType = FrameActions
 	case FrameActions:
 		g.Summary.AddRound(g.Round)
+		g.emitActionTraces()
 		g.performActionUpdate()
 		g.DayActionIndex++
 		if g.allPlayersAreWaiting() {

@@ -409,7 +409,7 @@ type ReplayAnnotations struct {
 	// make convert reject the file.
 	PuzzleID int
 	// PuzzleTitle is the canonical title for the puzzle (e.g.
-	// "SnakeByte - Winter Challenge 2026"). Written as the same two-element
+	// "<Game> - <Season> <Year>"). Written as the same two-element
 	// array CG's API uses so on-disk replays have a uniform shape.
 	PuzzleTitle string
 }

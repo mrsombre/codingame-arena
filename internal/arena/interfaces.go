@@ -1,6 +1,8 @@
 package arena
 
 import (
+	"encoding/json"
+
 	"github.com/spf13/viper"
 )
 
@@ -46,14 +48,14 @@ type GameFactory interface {
 	Name() string
 	PuzzleID() int
 	// PuzzleTitle returns the human-readable CodinGame puzzle title
-	// (e.g. "SnakeByte - Winter Challenge 2026"). convert uses it to
-	// recover replays where the API returned puzzleId=0 but did include
-	// a puzzleTitle entry.
+	// (e.g. "<Game> - <Season> <Year>"). convert uses it to recover
+	// replays where the API returned puzzleId=0 but did include a
+	// puzzleTitle entry.
 	PuzzleTitle() string
 	// LeaderboardSlug returns the puzzle pretty-id used in the CodinGame
-	// leaderboard URL (e.g. "winter-challenge-2026-snakebyte"), so the
-	// replay command can resolve a player's last battles without the
-	// caller passing the URL on each invocation.
+	// leaderboard URL (e.g. "<season>-<year>-<game>"), so the replay
+	// command can resolve a player's last battles without the caller
+	// passing the URL on each invocation.
 	LeaderboardSlug() string
 	NewGame(seed int64, options *viper.Viper) (Referee, []Player)
 	MaxTurns() int
@@ -73,11 +75,17 @@ type TurnTraceProvider interface {
 	TurnTraces(turn int, players []Player) [2][]TurnTrace
 }
 
-// TraceTurnDecorator can attach game-owned pre-update traces to a trace turn.
+// TraceTurnDecorator returns a game-owned opaque per-turn payload that the
+// arena copies into TraceTurn.State as-is. The arena never inspects it;
+// downstream consumers (game viewers, analyzers) decode the bytes back
+// into a game-specific struct. Mirrors the TurnTrace.Data pattern at the
+// per-turn level.
+//
 // Match calls it after command parsing and before PerformGameUpdate, so
-// decision traces describe the state the players saw when choosing actions.
+// the payload reflects the state the players saw when choosing actions.
+// Returning nil/empty bytes leaves State unset on that turn.
 type TraceTurnDecorator interface {
-	DecorateTraceTurn(turn int, players []Player, traceTurn *TraceTurn)
+	DecorateTraceTurn(turn int, players []Player) json.RawMessage
 }
 
 // RawScoresProvider returns per-player raw scores before any end-of-game

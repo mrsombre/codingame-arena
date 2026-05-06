@@ -200,11 +200,11 @@ func TestPrepareReplay_OverridesPuzzleIDAndTitle(t *testing.T) {
 	// games like 882653023). Annotations carry the canonical values from the
 	// factory; PrepareReplay must layer them on top, writing puzzleTitle as a
 	// plain string (CG's array form is unnecessary for our consumers).
-	body := []byte(`{"puzzleId":0,"questionTitle":"SnakeBot level4","gameResult":{"gameId":42}}`)
+	body := []byte(`{"puzzleId":0,"questionTitle":"TestGame level4","gameResult":{"gameId":42}}`)
 
 	got, err := PrepareReplay(body, ReplayAnnotations{
 		PuzzleID:    13771,
-		PuzzleTitle: "SnakeByte - Winter Challenge 2026",
+		PuzzleTitle: "TestGame - Winter Challenge 2026",
 	})
 	if err != nil {
 		t.Fatalf("PrepareReplay() error = %v", err)
@@ -215,8 +215,8 @@ func TestPrepareReplay_OverridesPuzzleIDAndTitle(t *testing.T) {
 		"    \"gameId\": 42\n" +
 		"  },\n" +
 		"  \"puzzleId\": 13771,\n" +
-		"  \"puzzleTitle\": \"SnakeByte - Winter Challenge 2026\",\n" +
-		"  \"questionTitle\": \"SnakeBot level4\"\n" +
+		"  \"puzzleTitle\": \"TestGame - Winter Challenge 2026\",\n" +
+		"  \"questionTitle\": \"TestGame level4\"\n" +
 		"}\n"
 	if string(got) != want {
 		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
@@ -272,7 +272,7 @@ func TestParseReplaySeed(t *testing.T) {
 func TestParseReplayLeague(t *testing.T) {
 	t.Parallel()
 
-	if got := ParseReplayLeague("SnakeBot level4"); got != 4 {
+	if got := ParseReplayLeague("TestGame level4"); got != 4 {
 		t.Fatalf("ParseReplayLeague() = %d, want 4", got)
 	}
 	if got := ParseReplayLeague("Spring Challenge 2021 - Level 4"); got != 4 {

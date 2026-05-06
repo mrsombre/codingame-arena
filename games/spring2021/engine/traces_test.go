@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,6 +9,17 @@ import (
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
+
+// decodeState calls DecorateTraceTurn and decodes the returned bytes into
+// TraceTurnState. Tests use this to assert on the typed payload.
+func decodeState(t *testing.T, g *Game) TraceTurnState {
+	t.Helper()
+	raw := g.DecorateTraceTurn(0, nil)
+	require.NotEmpty(t, raw, "DecorateTraceTurn returned empty payload")
+	var state TraceTurnState
+	require.NoError(t, json.Unmarshal(raw, &state))
+	return state
+}
 
 func traceTypes(traces []arena.TurnTrace) []string {
 	out := make([]string, len(traces))
@@ -85,6 +97,7 @@ func TestDecorateTraceTurnAddsDecisionTraces(t *testing.T) {
 	g.Sun.SetOrientation(g.Round)
 	g.DayActionIndex = 2
 	g.CurrentFrameType = FrameActions
+	g.NextFrameType = FrameActions
 	g.placeTree(p0, 1, TREE_SEED)
 	g.placeTree(p0, 24, TREE_SMALL)
 	g.placeTree(p1, 7, TREE_MEDIUM)
@@ -92,26 +105,28 @@ func TestDecorateTraceTurnAddsDecisionTraces(t *testing.T) {
 	p0.SetAction(NewGrowAction(24))
 	p1.SetAction(NewSeedAction(7, 8))
 
-	var turn arena.TraceTurn
-	g.DecorateTraceTurn(0, nil, &turn)
+	state := decodeState(t, g)
 
-	require.NotNil(t, turn.Day)
-	assert.Equal(t, 4, *turn.Day)
-	assert.Equal(t, "actions", turn.Phase)
-	require.NotNil(t, turn.SunDirection)
-	assert.Equal(t, 4, *turn.SunDirection)
-	assert.Equal(t, []int{8, 6}, turn.Sun)
-	assert.Equal(t, []int{3, 5}, turn.Score)
-	require.NotNil(t, turn.DayActionIndex)
-	assert.Equal(t, 2, *turn.DayActionIndex)
+	require.NotNil(t, state.Day)
+	assert.Equal(t, 4, *state.Day)
+	assert.Equal(t, "actions", state.Phase)
+	require.NotNil(t, state.SunDirection)
+	assert.Equal(t, 4, *state.SunDirection)
+	assert.Equal(t, []int{8, 6}, state.Sun)
+	assert.Equal(t, []int{3, 5}, state.Score)
+	require.NotNil(t, state.DayActionIndex)
+	assert.Equal(t, 2, *state.DayActionIndex)
 	assert.Equal(t, [][][3]int{
 		{{1, TREE_SEED, RICHNESS_LUSH}, {24, TREE_SMALL, RICHNESS_POOR}},
 		{{7, TREE_MEDIUM, RICHNESS_OK}, {19, TREE_TALL, RICHNESS_POOR}},
-	}, turn.Trees)
+	}, state.Trees)
 
-	p0Action := findTraceMeta[ValuesMeta[string]](t, turn.Traces[0], TraceActions)
+	// PerformGameUpdate emits ACTIONS events into g.traces; the runner
+	// drains them via Referee.TurnTraces.
+	g.PerformGameUpdate(0)
+	p0Action := findTraceMeta[ValuesMeta[string]](t, g.traces[0], TraceActions)
 	assert.Equal(t, "GROW 24 SMALL MEDIUM", p0Action.Values)
-	p1Action := findTraceMeta[ValuesMeta[string]](t, turn.Traces[1], TraceActions)
+	p1Action := findTraceMeta[ValuesMeta[string]](t, g.traces[1], TraceActions)
 	assert.Equal(t, "SEED 7 8 OK", p1Action.Values)
 }
 
@@ -162,8 +177,9 @@ func findTraceMeta[T any](t *testing.T, traces []arena.TurnTrace, typ string) T 
 	return zero
 }
 
-// DecorateTraceTurn stamps the current frame type onto the turn root so
-// consumers can identify gather/action/sun frames without inspecting traces.
+// DecorateTraceTurn stamps the current frame type onto the State payload
+// so consumers can identify gather/action/sun frames without inspecting
+// traces.
 func TestDecorateTraceTurnStampsPhase(t *testing.T) {
 	g := newScenario(4)
 
@@ -177,9 +193,8 @@ func TestDecorateTraceTurnStampsPhase(t *testing.T) {
 	}
 	for _, tc := range cases {
 		g.CurrentFrameType = tc.frame
-		var turn arena.TraceTurn
-		g.DecorateTraceTurn(0, nil, &turn)
-		assert.Equal(t, tc.want, turn.Phase, "frame %v", tc.frame)
+		state := decodeState(t, g)
+		assert.Equal(t, tc.want, state.Phase, "frame %v", tc.frame)
 	}
 }
 
@@ -214,7 +229,7 @@ func TestSunMoveSkippedOnFinalRound(t *testing.T) {
 	assert.Equal(t, priorOrientation, g.Sun.Orientation, "sun must not move past the final round")
 }
 
-// SEED_CONFLICT info is preserved at the trace turn root rather than as a
+// SEED_CONFLICT info is preserved in the State payload rather than as a
 // per-player event.
 func TestSeedConflictPromotedToTurnRoot(t *testing.T) {
 	g := newScenario(4)
@@ -234,8 +249,7 @@ func TestSeedConflictPromotedToTurnRoot(t *testing.T) {
 	require.NotNil(t, g.seedConflictCell)
 	assert.Equal(t, target, *g.seedConflictCell)
 
-	var turn arena.TraceTurn
-	g.DecorateTraceTurn(0, nil, &turn)
-	require.NotNil(t, turn.SeedConflictCell)
-	assert.Equal(t, target, *turn.SeedConflictCell)
+	state := decodeState(t, g)
+	require.NotNil(t, state.SeedConflictCell)
+	assert.Equal(t, target, *state.SeedConflictCell)
 }
