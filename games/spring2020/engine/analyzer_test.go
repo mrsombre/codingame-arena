@@ -10,34 +10,52 @@ import (
 )
 
 func TestAnalyzeSpringTraceMetricsAttributesAndCollapsesPerTurnMetrics(t *testing.T) {
+	// COLLIDE_ENEMY events are mirrored into both player slots by the
+	// engine, so the fixture replicates that pattern.
+	collideEnemyP0 := arena.MakeTurnTrace(TraceCollideEnemy, PacMeta{Pac: 0})
+	collideEnemyP2 := arena.MakeTurnTrace(TraceCollideEnemy, PacMeta{Pac: 2})
+
 	trace := arena.TraceMatch{
 		Turns: []arena.TraceTurn{
 			{
 				Turn: 0,
-				Traces: []arena.TurnTrace{
-					arena.MakeTurnTrace(TraceEat, EatMeta{Pac: 0, Coord: [2]int{1, 1}, Cost: 1}),
-					arena.MakeTurnTrace(TraceEat, EatMeta{Pac: 1, Coord: [2]int{2, 1}, Cost: 10}),
-					arena.MakeTurnTrace(TraceCollideSelf, PacMeta{Pac: 1}),
-					arena.MakeTurnTrace(TraceCollideSelf, PacMeta{Pac: 1}),
-					arena.MakeTurnTrace(TraceKilled, KilledMeta{Pac: 2, Coord: [2]int{3, 1}, Killer: 1}),
-					arena.MakeTurnTrace(TraceSwitch, SwitchMeta{Pac: 3, Type: "ROCK"}),
-					arena.MakeTurnTrace(TraceSpeed, PacMeta{Pac: 0}),
+				Traces: [2][]arena.TurnTrace{
+					{
+						arena.MakeTurnTrace(TraceEat, EatMeta{Pac: 0, Coord: [2]int{1, 1}, Cost: 1}),
+						arena.MakeTurnTrace(TraceKilled, KilledMeta{Pac: 2, Coord: [2]int{3, 1}, Killer: 1}),
+						arena.MakeTurnTrace(TraceSpeed, PacMeta{Pac: 0}),
+					},
+					{
+						arena.MakeTurnTrace(TraceEat, EatMeta{Pac: 1, Coord: [2]int{2, 1}, Cost: 10}),
+						arena.MakeTurnTrace(TraceCollideSelf, PacMeta{Pac: 1}),
+						arena.MakeTurnTrace(TraceCollideSelf, PacMeta{Pac: 1}),
+						arena.MakeTurnTrace(TraceSwitch, SwitchMeta{Pac: 3, Type: "ROCK"}),
+					},
 				},
 			},
 			{
 				Turn: 1,
-				Traces: []arena.TurnTrace{
-					arena.MakeTurnTrace(TraceCollideSelf, PacMeta{Pac: 1}),
-					arena.MakeTurnTrace(TraceCollideSelf, PacMeta{Pac: 3}),
-					arena.MakeTurnTrace(TraceCollideEnemy, PacMeta{Pac: 0}),
-					arena.MakeTurnTrace(TraceCollideEnemy, PacMeta{Pac: 2}),
-					arena.MakeTurnTrace(TraceEat, EatMeta{Pac: 0, Coord: [2]int{4, 1}, Cost: 1}),
+				Traces: [2][]arena.TurnTrace{
+					{
+						collideEnemyP0,
+						collideEnemyP2,
+						arena.MakeTurnTrace(TraceEat, EatMeta{Pac: 0, Coord: [2]int{4, 1}, Cost: 1}),
+					},
+					{
+						arena.MakeTurnTrace(TraceCollideSelf, PacMeta{Pac: 1}),
+						arena.MakeTurnTrace(TraceCollideSelf, PacMeta{Pac: 3}),
+						collideEnemyP0,
+						collideEnemyP2,
+					},
 				},
 			},
 			{
 				Turn: 25,
-				Traces: []arena.TurnTrace{
-					arena.MakeTurnTrace(TraceEat, EatMeta{Pac: 0, Coord: [2]int{5, 1}, Cost: 1}),
+				Traces: [2][]arena.TurnTrace{
+					{
+						arena.MakeTurnTrace(TraceEat, EatMeta{Pac: 0, Coord: [2]int{5, 1}, Cost: 1}),
+					},
+					nil,
 				},
 			},
 		},
@@ -51,7 +69,9 @@ func TestAnalyzeSpringTraceMetricsAttributesAndCollapsesPerTurnMetrics(t *testin
 	assert.Equal(t, [2]int{0, 1}, stats[springMetricEatSuper])
 	assert.Equal(t, [2]int{3, 1}, stats[springMetricEatT50])
 	assert.Equal(t, [2]int{0, 2}, stats[TraceCollideSelf])
-	assert.Equal(t, [2]int{1, 0}, stats[TraceCollideEnemy])
+	// COLLIDE_ENEMY appears in both slots when mirrored, so per-turn rate
+	// counts both sides as having "experienced" the cross-team collision.
+	assert.Equal(t, [2]int{1, 1}, stats[TraceCollideEnemy])
 	assert.Equal(t, [2]int{0, 2}, stats[springMetricNoEatTurn])
 }
 

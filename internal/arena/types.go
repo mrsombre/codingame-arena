@@ -12,32 +12,32 @@ type Metric struct {
 }
 
 // TurnTrace is opaque game-owned data produced by the engine per turn.
-// Arena stores the type discriminator and an opaque JSON-encoded meta object
+// Arena stores the type discriminator and an opaque JSON-encoded data object
 // for game viewers and metric analyzers, but never interprets their meaning.
 type TurnTrace struct {
 	Type string          `json:"type"`
-	Meta json.RawMessage `json:"meta,omitempty"`
+	Data json.RawMessage `json:"data,omitempty"`
 }
 
-// MakeTurnTrace marshals a typed game-owned meta into a TurnTrace. Games use
+// MakeTurnTrace marshals a typed game-owned payload into a TurnTrace. Games use
 // this to emit traces with structured payloads. The marshal must succeed:
-// trace metas are typed structs, so a panic indicates a programming error.
-func MakeTurnTrace[T any](typ string, meta T) TurnTrace {
-	raw, err := json.Marshal(meta)
+// trace payloads are typed structs, so a panic indicates a programming error.
+func MakeTurnTrace[T any](typ string, data T) TurnTrace {
+	raw, err := json.Marshal(data)
 	if err != nil {
 		panic(err)
 	}
-	return TurnTrace{Type: typ, Meta: raw}
+	return TurnTrace{Type: typ, Data: raw}
 }
 
-// DecodeMeta unmarshals a TurnTrace's opaque meta into a typed game struct.
+// DecodeData unmarshals a TurnTrace's opaque data into a typed game struct.
 // Returns the zero value plus an error on malformed input.
-func DecodeMeta[T any](t TurnTrace) (T, error) {
+func DecodeData[T any](t TurnTrace) (T, error) {
 	var v T
-	if len(t.Meta) == 0 {
+	if len(t.Data) == 0 {
 		return v, nil
 	}
-	err := json.Unmarshal(t.Meta, &v)
+	err := json.Unmarshal(t.Data, &v)
 	return v, err
 }
 

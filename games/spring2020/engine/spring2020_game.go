@@ -41,7 +41,7 @@ type Game struct {
 	EndedFlag         bool
 	GameOverProcessed bool
 	Summary           []string
-	traces            []arena.TurnTrace
+	traces            [2][]arena.TurnTrace
 }
 
 // NewGame sets up a fresh simulation with the given seed and league level.
@@ -427,7 +427,7 @@ Java's referee would have left on the grid.
 
 // PerformGameUpdate runs one full main turn including any speed sub-steps.
 func (g *Game) PerformGameUpdate() {
-	g.traces = g.traces[:0]
+	g.traces = [2][]arena.TurnTrace{}
 	g.ExecutePacmenAbilities()
 	g.UpdateAbilityModifiers()
 	g.ProcessPacmenIntent()
@@ -505,11 +505,11 @@ func (g *Game) ExecutePacmenAbilities() {
 		switch ability {
 		case AbilitySetRock, AbilitySetPaper, AbilitySetScissors:
 			pac.Type = PacTypeFromAbility(ability)
-			g.trace(arena.MakeTurnTrace(TraceSwitch, SwitchMeta{Pac: pac.ID, Type: pac.Type.Name()}))
+			g.tracePlayer(pac.Owner.Index, arena.MakeTurnTrace(TraceSwitch, SwitchMeta{Pac: pac.ID, Type: pac.Type.Name()}))
 		case AbilitySpeed:
 			pac.Speed = g.Config.SPEED_BOOST
 			pac.AbilityDuration = g.Config.ABILITY_DURATION
-			g.trace(arena.MakeTurnTrace(TraceSpeed, PacMeta{Pac: pac.ID}))
+			g.tracePlayer(pac.Owner.Index, arena.MakeTurnTrace(TraceSpeed, PacMeta{Pac: pac.ID}))
 		}
 		pac.AbilityCooldown = g.Config.ABILITY_COOLDOWN
 	}
@@ -653,11 +653,13 @@ func (g *Game) ResolveMovement() {
 		if blocker == nil {
 			continue
 		}
-		label := TraceCollideEnemy
-		if blocker.Owner == pac.Owner {
-			label = TraceCollideSelf
+		event := arena.MakeTurnTrace(TraceCollideSelf, PacMeta{Pac: pac.ID})
+		if blocker.Owner != pac.Owner {
+			event = arena.MakeTurnTrace(TraceCollideEnemy, PacMeta{Pac: pac.ID})
+			g.traceBoth(event)
+			continue
 		}
-		g.trace(arena.MakeTurnTrace(label, PacMeta{Pac: pac.ID}))
+		g.tracePlayer(pac.Owner.Index, event)
 	}
 
 	for _, pac := range g.Pacmen {
@@ -677,7 +679,7 @@ func (g *Game) ResolveMovement() {
 	pacmenToKill := make([]*Pacman, len(kills))
 	for i, k := range kills {
 		pacmenToKill[i] = k.victim
-		g.trace(arena.MakeTurnTrace(TraceKilled, KilledMeta{
+		g.tracePlayer(k.victim.Owner.Index, arena.MakeTurnTrace(TraceKilled, KilledMeta{
 			Pac:    k.victim.ID,
 			Coord:  coordPair(k.victim.Position),
 			Killer: k.killer.ID,
@@ -1065,7 +1067,7 @@ func (g *Game) EatItem(hasItem func(*Cell) bool, pelletValue int) {
 			}
 			credited[pac.Owner] = struct{}{}
 			pac.Owner.Pellets += pelletValue
-			g.trace(arena.MakeTurnTrace(TraceEat, EatMeta{
+			g.tracePlayer(pac.Owner.Index, arena.MakeTurnTrace(TraceEat, EatMeta{
 				Pac:   pac.ID,
 				Coord: coordPair(coord),
 				Cost:  pelletValue,

@@ -74,6 +74,7 @@ type Game struct {
 
 	Round            int
 	Turn             int
+	DayActionIndex   int
 	CurrentFrameType FrameType
 	NextFrameType    FrameType
 
@@ -82,9 +83,13 @@ type Game struct {
 	ended  bool
 
 	// traces accumulates per-turn structured events for the current
-	// PerformGameUpdate call. Reset at the top of each call; drained by
-	// Referee.TurnTraces after the call returns.
-	traces []arena.TurnTrace
+	// PerformGameUpdate call, partitioned by player. Reset at the top of
+	// each call; drained by Referee.TurnTraces after the call returns.
+	traces [2][]arena.TurnTrace
+	// seedConflictCell is set when both players' seeds collide on the same
+	// target this action frame. The decorator copies it to the trace turn
+	// root field SeedConflictCell. Reset at the top of each game update.
+	seedConflictCell *int
 }
 
 func NewGame(seed int64, leagueLevel int) *Game {
@@ -494,7 +499,7 @@ func (g *Game) doGrow(player *Player, action Action) error {
 	g.AvailableSun[player.GetIndex()] = current - cost
 	tree.Grow()
 	g.Summary.AddGrowTree(player, cell)
-	g.trace(arena.MakeTurnTrace(TraceGrow, TreeActionMeta{Player: player.GetIndex(), Cell: cell.GetIndex()}))
+	g.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceGrow, GrowData{Cell: cell.GetIndex()}))
 	tree.SetDormant()
 	return nil
 }
@@ -592,7 +597,7 @@ func (g *Game) doSeed(player *Player, action Action) error {
 		TargetCell: targetCell.GetIndex(),
 	})
 	g.Summary.AddPlantSeed(player, targetCell, sourceCell)
-	g.trace(arena.MakeTurnTrace(TraceSeed, SeedMeta{Player: player.GetIndex(), Source: sourceCell.GetIndex(), Target: targetCell.GetIndex()}))
+	g.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceSeed, SeedData{Source: sourceCell.GetIndex(), Target: targetCell.GetIndex()}))
 	return nil
 }
 
@@ -630,7 +635,7 @@ func (g *Game) giveSun() {
 		v := given[p.GetIndex()]
 		if v > 0 {
 			g.Summary.AddGather(p, v)
-			g.trace(arena.MakeTurnTrace(TraceGather, PlayerSunMeta{Player: p.GetIndex(), Sun: v}))
+			g.tracePlayer(p.GetIndex(), arena.MakeTurnTrace(TraceGather, GatherData{Sun: v}))
 		}
 	}
 }
@@ -664,7 +669,7 @@ func (g *Game) removeDyingTrees() {
 		player := g.Trees[cell.GetIndex()].Owner
 		player.AddScore(points)
 		g.Summary.AddCutTree(player, cell, points)
-		g.trace(arena.MakeTurnTrace(TraceComplete, CompleteMeta{Player: player.GetIndex(), Cell: cell.GetIndex(), Points: points}))
+		g.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceComplete, CompleteData{Cell: cell.GetIndex(), Points: points}))
 		g.removeTree(cell.GetIndex())
 	}
 }
@@ -703,29 +708,25 @@ public void performGameUpdate() {
 
 func (g *Game) PerformGameUpdate(turn int) {
 	g.Turn++
-	g.traces = g.traces[:0]
+	g.traces = [2][]arena.TurnTrace{}
+	g.seedConflictCell = nil
 
 	switch g.CurrentFrameType {
 	case FrameGathering:
+		g.DayActionIndex = 0
 		g.Summary.AddRound(g.Round)
-		g.trace(arena.MakeTurnTrace(TraceGatherPhase, GatherPhaseMeta{Round: g.Round}))
 		g.performSunGatheringUpdate()
 		g.NextFrameType = FrameActions
 	case FrameActions:
 		g.Summary.AddRound(g.Round)
 		g.performActionUpdate()
+		g.DayActionIndex++
 		if g.allPlayersAreWaiting() {
 			g.NextFrameType = FrameSunMove
 		}
 	case FrameSunMove:
-		endedRound := g.Round
 		g.Summary.AddRoundTransition(g.Round)
 		g.performSunMoveUpdate()
-		direction := g.Sun.Orientation
-		if g.Round >= g.MAX_ROUNDS {
-			direction = -1
-		}
-		g.trace(arena.MakeTurnTrace(TraceSunMove, SunMoveMeta{Round: endedRound, Direction: direction}))
 		g.NextFrameType = FrameGathering
 	default:
 		// FrameInit shouldn't reach PerformGameUpdate; the runner calls
@@ -818,7 +819,7 @@ func (g *Game) performActionUpdate() {
 		default:
 			player.SetWaiting(true)
 			g.Summary.AddWait(player)
-			g.trace(arena.MakeTurnTrace(TraceWait, PlayerMeta{Player: player.GetIndex()}))
+			g.tracePlayer(player.GetIndex(), arena.TurnTrace{Type: TraceWait})
 		}
 		if err != nil {
 			g.Summary.AddError(fmt.Sprintf("%s: %s", player.NicknameToken(), err.Error()))
@@ -828,7 +829,8 @@ func (g *Game) performActionUpdate() {
 
 	if g.seedsAreConflicting() {
 		g.Summary.AddSeedConflict(g.SentSeeds[0])
-		g.trace(arena.MakeTurnTrace(TraceSeedConflict, SeedConflictMeta{Cell: g.SentSeeds[0].TargetCell}))
+		cell := g.SentSeeds[0].TargetCell
+		g.seedConflictCell = &cell
 	} else {
 		for _, seed := range g.SentSeeds {
 			g.plantSeed(g.Players[seed.Owner], seed.TargetCell, seed.SourceCell)

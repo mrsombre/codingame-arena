@@ -78,40 +78,31 @@ func analyzeSpringTraceMetrics(trace arena.TraceMatch) arena.TraceMetricStats {
 			TraceCollideEnemy: {},
 		}
 
-		for _, ev := range turn.Traces {
-			pacID, ok := decodeSpringSubject(ev)
-			if !ok {
-				continue
-			}
-			side, ok := springPacSide(pacID)
-			if !ok {
-				continue
-			}
-
-			switch ev.Type {
-			case TraceSwitch:
-				addTraceMetricCount(stats, ev.Type, side, 1)
-			case TraceKilled:
-				addTraceMetricCount(stats, TraceKilled, side, 1)
-				meta, err := arena.DecodeMeta[KilledMeta](ev)
-				if err == nil {
-					if killerSide, ok := springPacSide(meta.Killer); ok {
-						addTraceMetricCount(stats, springMetricKills, killerSide, 1)
+		for side := 0; side < 2; side++ {
+			for _, ev := range turn.Traces[side] {
+				switch ev.Type {
+				case TraceSwitch:
+					addTraceMetricCount(stats, ev.Type, side, 1)
+				case TraceKilled:
+					addTraceMetricCount(stats, TraceKilled, side, 1)
+					// KILLS counts toward the killer's side. The killer pac
+					// can't share an owner with the victim, so the killer's
+					// side is always the opposite of the victim's slot.
+					addTraceMetricCount(stats, springMetricKills, 1-side, 1)
+				case TraceEat:
+					eatBySide[side] = true
+					if turn.Turn < springEarlyTurnCutoff {
+						addTraceMetricCount(stats, springMetricEatT50, side, 1)
 					}
+					meta, err := arena.DecodeData[EatMeta](ev)
+					if err == nil && meta.Cost > 1 {
+						addTraceMetricCount(stats, springMetricEatSuper, side, 1)
+					}
+				case TraceCollideSelf, TraceCollideEnemy:
+					sides := turnMetrics[ev.Type]
+					sides[side] = true
+					turnMetrics[ev.Type] = sides
 				}
-			case TraceEat:
-				eatBySide[side] = true
-				if turn.Turn < springEarlyTurnCutoff {
-					addTraceMetricCount(stats, springMetricEatT50, side, 1)
-				}
-				meta, err := arena.DecodeMeta[EatMeta](ev)
-				if err == nil && meta.Cost > 1 {
-					addTraceMetricCount(stats, springMetricEatSuper, side, 1)
-				}
-			case TraceCollideSelf, TraceCollideEnemy:
-				sides := turnMetrics[ev.Type]
-				sides[side] = true
-				turnMetrics[ev.Type] = sides
 			}
 		}
 
@@ -130,24 +121,6 @@ func analyzeSpringTraceMetrics(trace arena.TraceMatch) arena.TraceMetricStats {
 	}
 
 	return stats
-}
-
-// decodeSpringSubject extracts the subject pac ID from any Spring 2020 trace.
-// Every spring meta carries a top-level "pac" field, so a single shape covers
-// all event types.
-func decodeSpringSubject(t arena.TurnTrace) (int, bool) {
-	meta, err := arena.DecodeMeta[PacMeta](t)
-	if err != nil {
-		return 0, false
-	}
-	return meta.Pac, true
-}
-
-func springPacSide(pacID int) (int, bool) {
-	if pacID < 0 {
-		return 0, false
-	}
-	return pacID % 2, true
 }
 
 func addTraceMetricCount(stats arena.TraceMetricStats, key string, side, delta int) {

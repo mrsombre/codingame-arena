@@ -27,10 +27,9 @@ func TestTraceGrowEmitsOnSuccessfulAction(t *testing.T) {
 		p0.SetAction(NewGrowAction(0))
 	})
 
-	// p0 grows, p1 has no action set so defaults to WAIT.
-	types := traceTypes(g.traces)
-	assert.Contains(t, types, TraceGrow)
-	assert.Contains(t, types, TraceWait)
+	// p0 grows in slot 0; p1 has no action set so defaults to WAIT in slot 1.
+	assert.Contains(t, traceTypes(g.traces[0]), TraceGrow)
+	assert.Contains(t, traceTypes(g.traces[1]), TraceWait)
 }
 
 func TestTraceSeedEmitsOnSuccessfulAction(t *testing.T) {
@@ -43,7 +42,7 @@ func TestTraceSeedEmitsOnSuccessfulAction(t *testing.T) {
 		p0.SetAction(NewSeedAction(19, 7))
 	})
 
-	assert.Contains(t, traceTypes(g.traces), TraceSeed)
+	assert.Contains(t, traceTypes(g.traces[0]), TraceSeed)
 }
 
 func TestTraceCompleteEmitsWithPoints(t *testing.T) {
@@ -58,7 +57,7 @@ func TestTraceCompleteEmitsWithPoints(t *testing.T) {
 		p0.SetAction(NewCompleteAction(cell.GetIndex()))
 	})
 
-	assert.Contains(t, traceTypes(g.traces), TraceComplete)
+	assert.Contains(t, traceTypes(g.traces[0]), TraceComplete)
 	assert.Greater(t, p0.GetScore(), startScore, "completion should award points")
 }
 
@@ -70,46 +69,91 @@ func TestTraceWaitEmitsWhenPlayerWaits(t *testing.T) {
 		p0.SetAction(NewWaitAction())
 	})
 
-	assert.Contains(t, traceTypes(g.traces), TraceWait)
+	assert.Contains(t, traceTypes(g.traces[0]), TraceWait)
 	assert.True(t, p0.IsWaiting())
+}
+
+func TestDecorateTraceTurnAddsDecisionTraces(t *testing.T) {
+	g := newScenario(4)
+	p0 := g.Players[0]
+	p1 := g.Players[1]
+	p0.Sun = 8
+	p1.Sun = 6
+	p0.SetScore(3)
+	p1.SetScore(5)
+	g.Round = 4
+	g.Sun.SetOrientation(g.Round)
+	g.DayActionIndex = 2
+	g.CurrentFrameType = FrameActions
+	g.placeTree(p0, 1, TREE_SEED)
+	g.placeTree(p0, 24, TREE_SMALL)
+	g.placeTree(p1, 7, TREE_MEDIUM)
+	g.placeTree(p1, 19, TREE_TALL)
+	p0.SetAction(NewGrowAction(24))
+	p1.SetAction(NewSeedAction(7, 8))
+
+	var turn arena.TraceTurn
+	g.DecorateTraceTurn(0, nil, &turn)
+
+	require.NotNil(t, turn.Day)
+	assert.Equal(t, 4, *turn.Day)
+	assert.Equal(t, "actions", turn.Phase)
+	require.NotNil(t, turn.SunDirection)
+	assert.Equal(t, 4, *turn.SunDirection)
+	assert.Equal(t, []int{8, 6}, turn.Sun)
+	assert.Equal(t, []int{3, 5}, turn.Score)
+	require.NotNil(t, turn.DayActionIndex)
+	assert.Equal(t, 2, *turn.DayActionIndex)
+	assert.Equal(t, [][][3]int{
+		{{1, TREE_SEED, RICHNESS_LUSH}, {24, TREE_SMALL, RICHNESS_POOR}},
+		{{7, TREE_MEDIUM, RICHNESS_OK}, {19, TREE_TALL, RICHNESS_POOR}},
+	}, turn.Trees)
+
+	p0Action := findTraceMeta[ValuesMeta[string]](t, turn.Traces[0], TraceActions)
+	assert.Equal(t, "GROW 24 SMALL MEDIUM", p0Action.Values)
+	p1Action := findTraceMeta[ValuesMeta[string]](t, turn.Traces[1], TraceActions)
+	assert.Equal(t, "SEED 7 8 OK", p1Action.Values)
 }
 
 func TestRefereeTurnTracesReturnsCopy(t *testing.T) {
 	g := newScenario(4)
 	r := NewReferee(g)
-	g.traces = append(g.traces, arena.MakeTurnTrace(TraceWait, PlayerMeta{Player: 0}))
+	g.traces[0] = append(g.traces[0], arena.TurnTrace{Type: TraceWait})
 
 	out := r.TurnTraces(0, []arena.Player{g.Players[0], g.Players[1]})
-	require.Len(t, out, 1)
-	assert.Equal(t, TraceWait, out[0].Type)
+	require.Len(t, out[0], 1)
+	assert.Empty(t, out[1])
+	assert.Equal(t, TraceWait, out[0][0].Type)
 
 	// Mutating the engine slice must not bleed into the returned copy.
-	g.traces = g.traces[:0]
-	assert.Len(t, out, 1, "TurnTraces returns an independent copy")
+	g.traces[0] = g.traces[0][:0]
+	assert.Len(t, out[0], 1, "TurnTraces returns an independent copy")
 }
 
-// PerformGameUpdate resets g.traces[:0] at the start; verify the full
+// PerformGameUpdate resets g.traces at the start; verify the full
 // public API behaves as the runner expects (drained per turn, not stale).
 func TestPerformGameUpdateResetsTraces(t *testing.T) {
 	g := newScenario(4)
-	g.traces = append(g.traces, arena.MakeTurnTrace(TraceWait, PlayerMeta{Player: 0}))
+	g.traces[0] = append(g.traces[0], arena.TurnTrace{Type: TraceWait})
 
 	g.PerformGameUpdate(0)
 
-	for _, e := range g.traces {
-		assert.NotEqual(t, TraceWait, e.Type, "stale traces must be cleared at the top of PerformGameUpdate")
+	for _, slot := range g.traces {
+		for _, e := range slot {
+			assert.NotEqual(t, TraceWait, e.Type, "stale traces must be cleared at the top of PerformGameUpdate")
+		}
 	}
 }
 
 // findTraceMeta locates the first trace of the given type and decodes its
-// meta into T. Fails the test if no matching trace is present.
+// data into T. Fails the test if no matching trace is present.
 func findTraceMeta[T any](t *testing.T, traces []arena.TurnTrace, typ string) T {
 	t.Helper()
 	for _, tr := range traces {
 		if tr.Type != typ {
 			continue
 		}
-		v, err := arena.DecodeMeta[T](tr)
+		v, err := arena.DecodeData[T](tr)
 		require.NoError(t, err)
 		return v
 	}
@@ -118,22 +162,32 @@ func findTraceMeta[T any](t *testing.T, traces []arena.TurnTrace, typ string) T 
 	return zero
 }
 
-// Phase markers fire even when no per-player action does — guarantees a
-// non-empty trace turn for every CG phase frame.
-
-func TestTraceGatherPhaseEmittedOnGatheringFrame(t *testing.T) {
+// DecorateTraceTurn stamps the current frame type onto the turn root so
+// consumers can identify gather/action/sun frames without inspecting traces.
+func TestDecorateTraceTurnStampsPhase(t *testing.T) {
 	g := newScenario(4)
-	g.CurrentFrameType = FrameGathering
-	g.NextFrameType = FrameActions
-	g.Round = 3
 
-	g.PerformGameUpdate(0)
-
-	meta := findTraceMeta[GatherPhaseMeta](t, g.traces, TraceGatherPhase)
-	assert.Equal(t, 3, meta.Round)
+	cases := []struct {
+		frame FrameType
+		want  string
+	}{
+		{FrameGathering, "gathering"},
+		{FrameActions, "actions"},
+		{FrameSunMove, "sun"},
+	}
+	for _, tc := range cases {
+		g.CurrentFrameType = tc.frame
+		var turn arena.TraceTurn
+		g.DecorateTraceTurn(0, nil, &turn)
+		assert.Equal(t, tc.want, turn.Phase, "frame %v", tc.frame)
+	}
 }
 
-func TestTraceSunMoveEmittedWithNewDirection(t *testing.T) {
+// TestSunMoveAdvancesOrientation verifies the sun rotates after a SUN_MOVE
+// frame and the orientation reflects on the next trace turn's sun_direction.
+// (The SUN_MOVE event itself is no longer emitted; phase=sun + next-turn
+// sun_direction are the consumer signals.)
+func TestSunMoveAdvancesOrientation(t *testing.T) {
 	g := newScenario(4)
 	g.CurrentFrameType = FrameSunMove
 	g.NextFrameType = FrameGathering
@@ -142,14 +196,13 @@ func TestTraceSunMoveEmittedWithNewDirection(t *testing.T) {
 
 	g.PerformGameUpdate(0)
 
-	meta := findTraceMeta[SunMoveMeta](t, g.traces, TraceSunMove)
-	assert.Equal(t, 0, meta.Round, "round that just ended")
-	assert.Equal(t, 1, meta.Direction, "sun.move() advances 0 -> 1")
+	assert.Equal(t, 1, g.Sun.Orientation, "sun.move() advances 0 -> 1")
+	assert.Equal(t, [2][]arena.TurnTrace{}, g.traces, "sun-move frame emits no per-player events")
 }
 
-// On the final SUN_MOVE the engine skips Sun.Move() and the game ends; the
-// trace must signal "no further direction" rather than report the stale value.
-func TestTraceSunMoveDirectionMinusOneOnFinalRound(t *testing.T) {
+// On the final SUN_MOVE the engine skips Sun.Move() so the orientation
+// stays put; phase=sun is still stamped at decorate time.
+func TestSunMoveSkippedOnFinalRound(t *testing.T) {
 	g := newScenario(4)
 	g.CurrentFrameType = FrameSunMove
 	g.NextFrameType = FrameGathering
@@ -158,8 +211,31 @@ func TestTraceSunMoveDirectionMinusOneOnFinalRound(t *testing.T) {
 
 	g.PerformGameUpdate(0)
 
-	meta := findTraceMeta[SunMoveMeta](t, g.traces, TraceSunMove)
-	assert.Equal(t, g.MAX_ROUNDS-1, meta.Round)
-	assert.Equal(t, -1, meta.Direction)
 	assert.Equal(t, priorOrientation, g.Sun.Orientation, "sun must not move past the final round")
+}
+
+// SEED_CONFLICT info is preserved at the trace turn root rather than as a
+// per-player event.
+func TestSeedConflictPromotedToTurnRoot(t *testing.T) {
+	g := newScenario(4)
+	g.CurrentFrameType = FrameActions
+	g.NextFrameType = FrameActions
+	p0 := g.Players[0]
+	p1 := g.Players[1]
+	p0.Sun = 10
+	p1.Sun = 10
+	g.placeTree(p0, 0, TREE_TALL)
+	g.placeTree(p1, 18, TREE_TALL)
+	target := 5
+	p0.SetAction(NewSeedAction(0, target))
+	p1.SetAction(NewSeedAction(18, target))
+
+	g.PerformGameUpdate(0)
+	require.NotNil(t, g.seedConflictCell)
+	assert.Equal(t, target, *g.seedConflictCell)
+
+	var turn arena.TraceTurn
+	g.DecorateTraceTurn(0, nil, &turn)
+	require.NotNil(t, turn.SeedConflictCell)
+	assert.Equal(t, target, *turn.SeedConflictCell)
 }

@@ -5,8 +5,8 @@ import (
 )
 
 // Trace types emitted per turn, attached to trace output for replay viewers
-// and analyzers. Each type has a typed meta payload defined below; the wire
-// shape is `{"type": <const>, "meta": {...}}`.
+// and analyzers. Each type has a typed payload defined below; the wire
+// shape is `{"type": <const>, "data": {...}}`.
 //
 // Naming follows the analyze-report family prefix: HIT_* for non-fatal head
 // intersections (lose 1 segment), DEAD_FALL for fall removals, DEAD for
@@ -69,6 +69,11 @@ func coordPair(c Coord) [2]int {
 	return [2]int{c.X, c.Y}
 }
 
-func (g *Game) trace(t arena.TurnTrace) {
-	g.traces = append(g.traces, t)
+// tracePlayer appends a player-owned event into the per-player slot.
+// Slots out of [0, 1] are silently dropped (defensive).
+func (g *Game) tracePlayer(playerIdx int, t arena.TurnTrace) {
+	if playerIdx < 0 || playerIdx >= len(g.traces) {
+		return
+	}
+	g.traces[playerIdx] = append(g.traces[playerIdx], t)
 }

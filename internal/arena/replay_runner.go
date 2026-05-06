@@ -127,6 +127,10 @@ func RunReplay(
 			handlePlayerCommands(players, referee)
 		}
 
+		if decorator, ok := referee.(TraceTurnDecorator); ok {
+			decorator.DecorateTraceTurn(turn, players, &tt)
+		}
+
 		referee.PerformGameUpdate(turn)
 
 		for i, player := range players {
@@ -136,7 +140,10 @@ func RunReplay(
 		}
 
 		if ttp, ok := referee.(TurnTraceProvider); ok {
-			tt.Traces = ttp.TurnTraces(turn, players)
+			per := ttp.TurnTraces(turn, players)
+			for i := range per {
+				tt.Traces[i] = append(tt.Traces[i], per[i]...)
+			}
 		}
 		traceTurns = append(traceTurns, tt)
 	}

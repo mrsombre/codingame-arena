@@ -9,28 +9,39 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-func findTrace(traces []arena.TurnTrace, typ string) (arena.TurnTrace, bool) {
-	for _, tr := range traces {
-		if tr.Type == typ {
-			return tr, true
+// findTrace scans both player slots for a trace of typ. Tests that don't
+// care which side owned the event use this — the per-side specifics are
+// covered by dedicated assertions where they matter.
+func findTrace(traces [2][]arena.TurnTrace, typ string) (arena.TurnTrace, bool) {
+	for _, slot := range traces {
+		for _, tr := range slot {
+			if tr.Type == typ {
+				return tr, true
+			}
 		}
 	}
 	return arena.TurnTrace{}, false
 }
 
-func countTraces(traces []arena.TurnTrace, typ string) int {
+func countTraces(traces [2][]arena.TurnTrace, typ string) int {
 	n := 0
-	for _, tr := range traces {
-		if tr.Type == typ {
-			n++
+	for _, slot := range traces {
+		for _, tr := range slot {
+			if tr.Type == typ {
+				n++
+			}
 		}
 	}
 	return n
 }
 
+func totalTraces(traces [2][]arena.TurnTrace) int {
+	return len(traces[0]) + len(traces[1])
+}
+
 func decodeMeta[T any](t *testing.T, tr arena.TurnTrace) T {
 	t.Helper()
-	v, err := arena.DecodeMeta[T](tr)
+	v, err := arena.DecodeData[T](tr)
 	require.NoError(t, err)
 	return v
 }
@@ -50,6 +61,7 @@ func TestTraceEatPelletValueOne(t *testing.T) {
 	tr, ok := findTrace(g.traces, TraceEat)
 	require.True(t, ok, "EAT trace emitted")
 	assert.Equal(t, EatMeta{Pac: 0, Coord: [2]int{2, 1}, Cost: 1}, decodeMeta[EatMeta](t, tr))
+	assert.Empty(t, g.traces[1], "events for pac on side 0 must not leak into side 1")
 }
 
 func TestTraceEatSuperPelletValueTen(t *testing.T) {
@@ -86,9 +98,12 @@ func TestTraceCollideEnemyOnSameTypeBodyBlock(t *testing.T) {
 		b.Intent = NewMoveAction(Coord{X: 1, Y: 1})
 	})
 
-	// Both pacs are body-blocked; each emits its own COLLIDE_ENEMY.
-	assert.Equal(t, 2, countTraces(g.traces, TraceCollideEnemy))
+	// Each blocked pac emits its own COLLIDE_ENEMY, mirrored into both slots.
+	// Two pacs collide → 2 events × 2 mirrors = 4 events total.
+	assert.Equal(t, 4, countTraces(g.traces, TraceCollideEnemy))
 	assert.Equal(t, 0, countTraces(g.traces, TraceCollideSelf))
+	assert.Equal(t, 2, len(g.traces[0]), "side 0 sees both mirrored events")
+	assert.Equal(t, 2, len(g.traces[1]), "side 1 sees both mirrored events")
 }
 
 func TestTraceCollideSelfOnFriendlyBodyBlock(t *testing.T) {
@@ -107,6 +122,7 @@ func TestTraceCollideSelfOnFriendlyBodyBlock(t *testing.T) {
 
 	assert.Equal(t, 2, countTraces(g.traces, TraceCollideSelf))
 	assert.Equal(t, 0, countTraces(g.traces, TraceCollideEnemy))
+	assert.Empty(t, g.traces[1], "same-team collisions stay in the owner's slot only")
 }
 
 func TestTraceKilledOnRPSCombat(t *testing.T) {
@@ -131,6 +147,8 @@ func TestTraceKilledOnRPSCombat(t *testing.T) {
 		Coord:  coordPair(victim.Position),
 		Killer: attacker.ID,
 	}, decodeMeta[KilledMeta](t, tr))
+	assert.Equal(t, 1, len(g.traces[1]), "KILLED lives in the victim's owner slot (side 1)")
+	assert.Equal(t, 0, len(g.traces[0]), "killer's slot does not receive the KILLED event")
 }
 
 func TestTraceSpeedAbility(t *testing.T) {
@@ -195,15 +213,15 @@ func TestTracesClearedPerTurn(t *testing.T) {
 	runTurn(g, func() {
 		pac.Intent = NewMoveAction(Coord{X: 5, Y: 1})
 	})
-	require.NotEmpty(t, g.traces, "first turn produced traces")
+	require.Greater(t, totalTraces(g.traces), 0, "first turn produced traces")
 
 	runTurn(g, func() {
 		pac.Intent = NewMoveAction(Coord{X: 5, Y: 1})
 	})
 	// One EAT for the new cell stepped onto, no leftover from the first turn.
-	require.Len(t, g.traces, 1)
-	assert.Equal(t, TraceEat, g.traces[0].Type)
-	assert.Equal(t, EatMeta{Pac: 0, Coord: [2]int{3, 1}, Cost: 1}, decodeMeta[EatMeta](t, g.traces[0]))
+	require.Equal(t, 1, totalTraces(g.traces))
+	assert.Equal(t, TraceEat, g.traces[0][0].Type)
+	assert.Equal(t, EatMeta{Pac: 0, Coord: [2]int{3, 1}, Cost: 1}, decodeMeta[EatMeta](t, g.traces[0][0]))
 }
 
 func TestTraceSpeedSubTurnAccumulatesEats(t *testing.T) {
@@ -240,20 +258,22 @@ func TestRefereeTurnTracesReturnsCopy(t *testing.T) {
 	runTurn(g, func() {
 		pac.Intent = NewMoveAction(Coord{X: 5, Y: 1})
 	})
-	require.NotEmpty(t, g.traces)
+	require.Greater(t, totalTraces(g.traces), 0)
 
 	asArena := []arena.Player{g.Players[0], g.Players[1]}
 	out := r.TurnTraces(0, asArena)
-	require.NotEmpty(t, out)
-	out[0].Type = "MUTATED"
-	assert.NotEqual(t, "MUTATED", g.traces[0].Type, "TurnTraces returned a copy")
+	require.Greater(t, totalTraces(out), 0)
+	// Mutate the copy and verify the engine slot is unaffected.
+	out[0][0].Type = "MUTATED"
+	assert.NotEqual(t, "MUTATED", g.traces[0][0].Type, "TurnTraces returned a copy")
 }
 
-func TestRefereeTurnTracesNilWhenEmpty(t *testing.T) {
+func TestRefereeTurnTracesEmptyWhenNoEvents(t *testing.T) {
 	g := newScenario(4, []string{"###", "# #", "###"}, false)
 	spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
 	r := NewReferee(g)
 
 	asArena := []arena.Player{g.Players[0], g.Players[1]}
-	assert.Nil(t, r.TurnTraces(0, asArena), "no traces yet → nil")
+	out := r.TurnTraces(0, asArena)
+	assert.Equal(t, 0, totalTraces(out), "no traces yet → both slots empty")
 }

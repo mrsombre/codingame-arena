@@ -142,12 +142,15 @@ func (r *Referee) ActivePlayers(players []arena.Player) int {
 	return active
 }
 
-func (r *Referee) TurnTraces(_ int, _ []arena.Player) []arena.TurnTrace {
-	if len(r.Game.traces) == 0 {
-		return nil
+func (r *Referee) TurnTraces(_ int, _ []arena.Player) [2][]arena.TurnTrace {
+	var out [2][]arena.TurnTrace
+	for i, slot := range r.Game.traces {
+		if len(slot) == 0 {
+			continue
+		}
+		out[i] = make([]arena.TurnTrace, len(slot))
+		copy(out[i], slot)
 	}
-	out := make([]arena.TurnTrace, len(r.Game.traces))
-	copy(out, r.Game.traces)
 	return out
 }
 

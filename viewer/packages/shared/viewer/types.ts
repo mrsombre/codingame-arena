@@ -17,7 +17,7 @@ export interface TraceTurnTiming {
 
 export interface TurnTrace<M = unknown> {
   type: string
-  meta?: M
+  data?: M
 }
 
 export interface TraceTurnBase {
@@ -25,7 +25,11 @@ export interface TraceTurnBase {
   game_input?: string[]
   output?: [string, string]
   timing?: TraceTurnTiming
-  traces?: TurnTrace[]
+  /**
+   * Per-player trace events for this turn. Index 0 is everything player 0
+   * owned; index 1 player 1. Cross-owner events are mirrored into both slots.
+   */
+  traces?: [TurnTrace[], TurnTrace[]]
 }
 
 export interface TraceMatchBase<TTurn extends TraceTurnBase = TraceTurnBase> {

@@ -65,10 +65,19 @@ type MetricsProvider interface {
 	Metrics() []Metric
 }
 
-// TurnTraceProvider produces structured game traces per turn.
+// TurnTraceProvider produces structured game traces per turn, partitioned by
+// player: index 0 is everything player 0 owned this turn, index 1 player 1.
+// Cross-owner events should be mirrored into both slots.
 // Optional — if Referee also implements this, match captures traces.
 type TurnTraceProvider interface {
-	TurnTraces(turn int, players []Player) []TurnTrace
+	TurnTraces(turn int, players []Player) [2][]TurnTrace
+}
+
+// TraceTurnDecorator can attach game-owned pre-update traces to a trace turn.
+// Match calls it after command parsing and before PerformGameUpdate, so
+// decision traces describe the state the players saw when choosing actions.
+type TraceTurnDecorator interface {
+	DecorateTraceTurn(turn int, players []Player, traceTurn *TraceTurn)
 }
 
 // RawScoresProvider returns per-player raw scores before any end-of-game

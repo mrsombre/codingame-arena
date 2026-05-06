@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -98,8 +99,10 @@ func TestDebug_InspectReplay(t *testing.T) {
 
 	for i, tt := range trace.Turns {
 		var events []string
-		for _, ev := range tt.Traces {
-			events = append(events, ev.Type+"("+string(ev.Meta)+")")
+		for side, slot := range tt.Traces {
+			for _, ev := range slot {
+				events = append(events, fmt.Sprintf("p%d:%s(%s)", side, ev.Type, string(ev.Data)))
+			}
 		}
 		evstr := ""
 		if len(events) > 0 {

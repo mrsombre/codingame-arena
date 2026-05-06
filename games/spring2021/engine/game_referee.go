@@ -129,16 +129,23 @@ func (r *Referee) ShouldSkipPlayerTurn(player arena.Player) bool {
 	return r.Game.ShouldSkipPlayerTurn(player.(*Player))
 }
 
-// TurnTraces returns a copy of this turn's accumulated game traces.
-// Drained after each PerformGameUpdate by the runner; the underlying
-// slice is reset on the next call.
-func (r *Referee) TurnTraces(_ int, _ []arena.Player) []arena.TurnTrace {
-	if len(r.Game.traces) == 0 {
-		return nil
+// TurnTraces returns per-player copies of this turn's accumulated game
+// traces. Drained after each PerformGameUpdate by the runner; the engine
+// slots are reset on the next call.
+func (r *Referee) TurnTraces(_ int, _ []arena.Player) [2][]arena.TurnTrace {
+	var out [2][]arena.TurnTrace
+	for i, slot := range r.Game.traces {
+		if len(slot) == 0 {
+			continue
+		}
+		out[i] = make([]arena.TurnTrace, len(slot))
+		copy(out[i], slot)
 	}
-	out := make([]arena.TurnTrace, len(r.Game.traces))
-	copy(out, r.Game.traces)
 	return out
+}
+
+func (r *Referee) DecorateTraceTurn(turn int, players []arena.Player, traceTurn *arena.TraceTurn) {
+	r.Game.DecorateTraceTurn(turn, players, traceTurn)
 }
 
 func (r *Referee) ActivePlayers(players []arena.Player) int {

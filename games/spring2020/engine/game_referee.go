@@ -193,13 +193,16 @@ func (r *Referee) ActivePlayers(players []arena.Player) int {
 // optional arena interfaces for per-turn opaque traces, pre-adjustment scores,
 // and per-match metrics.
 
-// TurnTraces returns a copy of this turn's accumulated game traces.
-func (r *Referee) TurnTraces(_ int, _ []arena.Player) []arena.TurnTrace {
-	if len(r.Game.traces) == 0 {
-		return nil
+// TurnTraces returns per-player copies of this turn's accumulated game traces.
+func (r *Referee) TurnTraces(_ int, _ []arena.Player) [2][]arena.TurnTrace {
+	var out [2][]arena.TurnTrace
+	for i, slot := range r.Game.traces {
+		if len(slot) == 0 {
+			continue
+		}
+		out[i] = make([]arena.TurnTrace, len(slot))
+		copy(out[i], slot)
 	}
-	out := make([]arena.TurnTrace, len(r.Game.traces))
-	copy(out, r.Game.traces)
 	return out
 }
 

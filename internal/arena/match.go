@@ -93,7 +93,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		// where the referee runs only resetGameTurnData / performGameUpdate /
 		// performGameOver / endGame on the trailing frame. The same applies
 		// when the engine has flagged its post-end frame explicitly (Spring
-		// 2020's gameOverFrame branch) — both sides may still be active but
+		// 2020's gameOverFrame branch) — both sides may still be active, but
 		// the outcome is decided.
 		liveTurn := referee.ActivePlayers(players) >= 2
 		if reporter, ok := referee.(GameOverFrameReporter); ok && reporter.InGameOverFrame() {
@@ -186,6 +186,12 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			}
 		}
 
+		if tracing {
+			if decorator, ok := referee.(TraceTurnDecorator); ok {
+				decorator.DecorateTraceTurn(turn, players, &traceTurns[len(traceTurns)-1])
+			}
+		}
+
 		referee.PerformGameUpdate(turn)
 
 		// Record turn-of-deactivation for any side that became deactivated
@@ -199,7 +205,11 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 
 		if tracing {
 			if ttp, ok := referee.(TurnTraceProvider); ok {
-				traceTurns[len(traceTurns)-1].Traces = ttp.TurnTraces(turn, players)
+				per := ttp.TurnTraces(turn, players)
+				dst := &traceTurns[len(traceTurns)-1].Traces
+				for i := range per {
+					dst[i] = append(dst[i], per[i]...)
+				}
 			}
 		}
 	}
@@ -238,15 +248,15 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	}
 
 	if tracing {
-		// Trace uses in-match side perspective: index 0 is left side, index 1
-		// is right side. result fields are blue/red perspective after the
+		// Trace uses in-match side perspective: index 0 is the left side, index 1
+		// is the right side. result fields are blue/red perspective after the
 		// potential swap-back; un-swap to restore the in-match view.
 		//
 		// Scores stores the raw pre-OnEnd value when the engine exposes one
-		// (intrinsic in-game count, no tie-break adjustments) and FinalScores
+		// (intrinsic in-game count, no tie-break adjustments), and FinalScores
 		// stores the post-OnEnd value matching CG's gameResult.scores
-		// convention. Ranks follow result.Winner — i.e. the post-OnEnd
-		// outcome — so a tie-broken match never records as a draw and a
+		// convention. Ranks follow result.Winner — i.e., the post-OnEnd
+		// outcome — so a tie-broken match never records as a draw, and a
 		// deactivated side never ties against the survivor.
 		rawTraceScores := result.Scores
 		if haveRawScores {
@@ -328,8 +338,7 @@ func handlePlayerCommands(players []Player, referee Referee) {
 		if err == nil {
 			continue
 		}
-		var timeout hardTimeoutError
-		if errors.As(err, &timeout) {
+		if _, ok := errors.AsType[hardTimeoutError](err); ok {
 			player.SetTimedOut(true)
 		}
 		player.Deactivate(err.Error())

@@ -12,7 +12,7 @@ import (
 )
 
 // TraceScore is the per-side score as written into the trace. It marshals as a
-// JSON float with at least one fractional digit (e.g. 127.0) so the file shape
+// JSON float with at least one fractional digit (e.g., 127.0), so the file shape
 // matches CodinGame's replay encoding.
 type TraceScore float64
 
@@ -32,10 +32,10 @@ func (s TraceScore) MarshalJSON() ([]byte, error) {
 // side of the map, index 1 = right). Players[i] is the bot basename that
 // played on side i; Scores[i] is that side's raw pre-OnEnd score and
 // FinalScores[i] is the post-OnEnd value matching CodinGame's gameResult.
-// scores convention; Ranks encodes the winner CodinGame-style (0 = first
+// Scores convention; Ranks encodes the winner CodinGame-style (0 = first
 // place, [0,0] = draw). Random side-swap is intentionally not recorded — the
 // bot→side mapping here is ground truth for downstream trace consumers
-// (e.g. training).
+// (e.g., training).
 //
 // Blue is the bot/agent name analyze treats as "us". It is required on every
 // trace: self-play sets it to the basename of --blue (which always equals one
@@ -52,7 +52,7 @@ type TraceMatch struct {
 	Seed     int64  `json:"seed,string"`
 	Blue     string `json:"blue,omitempty"`
 	League   int    `json:"league,omitempty"`
-	// CreatedAt is the RFC 3339 timestamp the trace was produced. For
+	// CreatedAt is the RFC 3339 timestamp, the trace was produced. For
 	// self-play traces it's stamped at match completion; for replay traces
 	// it's copied from the source replay's fetched_at so analyze can sort
 	// converted replays chronologically without re-reading the JSON.
@@ -61,12 +61,12 @@ type TraceMatch struct {
 	// EndReason* constants for shared values. Empty when the referee doesn't
 	// implement EndReasonProvider.
 	EndReason string `json:"end_reason,omitempty"`
-	// Deactivated[i] is true when side i was deactivated (timeout / bad
+	// Deactivated[i] is true when side I was deactivated (timeout / bad
 	// command) during the match. Used by analyzers to attribute fault end
 	// reasons to a specific side.
-	Deactivated [2]bool       `json:"deactivated,omitzero"`
-	// Scores carries the raw pre-OnEnd value reported by RawScoresProvider
-	// (intrinsic in-game count, e.g. spring2021 tree segments before the sun
+	Deactivated [2]bool `json:"deactivated,omitzero"`
+	// Scores carry the raw pre-OnEnd value reported by RawScoresProvider
+	// (intrinsic in-game count, e.g., spring2021 tree segments before the sun
 	// bonus). Deactivated sides are reported as -1 to match CG.
 	Scores [2]TraceScore `json:"scores"`
 	// FinalScores carries the post-OnEnd value (with bonuses, tiebreakers,
@@ -98,7 +98,7 @@ const (
 // BlueSide returns the index (0 or 1) of the side identified by Blue in
 // Players. Blue is an invariant on loaded traces — convert refuses to write
 // a trace without it and analyze refuses to load one — so callers can treat
-// the result as 0/1. When both Players entries equal Blue (e.g. self-play
+// the result as 0/1. When both Players entries equal Blue (e.g., self-play
 // of identical binary names), the lower index wins. Returns -1 only on
 // unloaded zero-value TraceMatch instances.
 func (t TraceMatch) BlueSide() int {
@@ -117,8 +117,8 @@ func (t TraceMatch) BlueSide() int {
 // from a winner index. 0 = first place; tied players share the better rank, so
 // a draw becomes [0,0] (standard competition ranking).
 //
-// In our sample of 160 downloaded replays no draws appeared, so the [0,0]
-// convention is inferred — adjust if a real tied replay disagrees.
+// In our sample of 160 downloaded replays, no draws appeared, so the [0,0]
+// conventions are inferred — adjust if a real-tied replay disagrees.
 func RanksFromWinner(winner int) [2]int {
 	switch winner {
 	case 0:
@@ -157,10 +157,10 @@ func RanksFromCGRanks(ranks []int) ([2]int, bool) {
 // deactivated (or both are), the higher score wins; equal scores → -1 (draw).
 //
 // Why deactivation takes precedence: a TIMEOUT_START/TIMEOUT/INVALID_INPUT
-// player never finishes the game, but their pre-existing pieces (e.g. winter
+// player never finishes the game, but their pre-existing pieces (e.g., winter
 // 2026 birds) keep contributing to the raw alive-segment count. Without this
 // override the trace would call a 12-vs-12 raw tie a draw even though CG
-// scores it as -1 vs 12.
+// scores it as -1 vs. 12.
 func TraceWinnerFromScores(scores [2]int, deactivated [2]bool) int {
 	switch {
 	case deactivated[0] && !deactivated[1]:
@@ -187,7 +187,7 @@ type TraceTiming struct {
 	ResponseMedian  [2]float64 `json:"response_median"`
 }
 
-// TraceTurn captures one turn of game state for replay/debug.
+// TraceTurn captures one turn of the game state for replay/debug.
 //
 // GameInput is the stdin lines the engine fed the blue side this turn (the
 // user's bot — see TraceMatch.Blue). For symmetric-input games it equals
@@ -199,11 +199,30 @@ type TraceTiming struct {
 // the side was deactivated or skipped). Indexed [left, right] in match-side
 // space; the bot→side mapping is in TraceMatch.Players.
 type TraceTurn struct {
-	Turn      int              `json:"turn"`
-	GameInput []string         `json:"game_input,omitempty"`
-	Output    [2]string        `json:"output,omitzero"`
-	Timing    *TraceTurnTiming `json:"timing,omitempty"`
-	Traces    []TurnTrace      `json:"traces,omitempty"`
+	Turn         int              `json:"turn"`
+	Day          *int             `json:"day,omitempty"`
+	Phase        string           `json:"phase,omitempty"`
+	SunDirection *int             `json:"sun_direction,omitempty"`
+	GameInput    []string         `json:"game_input,omitempty"`
+	Output       [2]string        `json:"output,omitzero"`
+	Timing       *TraceTurnTiming `json:"timing,omitempty"`
+	Sun          []int            `json:"sun,omitempty"`
+	Score        []int            `json:"score,omitempty"`
+	// Trees is the per-player list of trees on the board, each entry
+	// [cell_id, size, richness]. Outer index = player index, inner list
+	// ordered by cell_id ascending. Game-specific (spring2021).
+	Trees [][][3]int `json:"trees,omitempty"`
+	// SeedConflictCell carries the contested cell index when both players'
+	// seeds collided this turn (both seeds canceled). Game-specific
+	// (spring2021); unset on turns without a conflict.
+	SeedConflictCell *int `json:"seed_conflict_cell,omitempty"`
+	// DayActionIndex is the 0-based action-frame index inside the current day.
+	DayActionIndex *int `json:"day_action_index,omitempty"`
+	// Traces partitions per-turn structured events by player: Traces[0] is
+	// everything player 0 owned this turn, Traces[1] is everything player 1
+	// owned. Cross-owner events (e.g. spring2020 COLLIDE_ENEMY, winter2026
+	// HIT_ENEMY) are mirrored into both slots.
+	Traces [2][]TurnTrace `json:"traces,omitzero"`
 }
 
 // TraceTurnTiming carries per-side response time for one turn in milliseconds.
@@ -213,7 +232,7 @@ type TraceTurnTiming struct {
 }
 
 // TraceSink receives a completed TraceMatch from the match runner. Implemented
-// by *TraceWriter (file-backed) and by ad-hoc capture sinks (e.g. the HTTP
+// by *TraceWriter (file-backed) and by ad-hoc capture sinks (e.g., the HTTP
 // single-match handler that returns the trace inline).
 type TraceSink interface {
 	WriteMatch(TraceMatch) error
@@ -237,7 +256,7 @@ const (
 var replayTraceFilePattern = regexp.MustCompile(`^replay-\d+\.json$`)
 
 // NewTraceWriter creates a TraceWriter that writes to the given directory and
-// stamps every match with traceID. Returns nil if dir is empty.
+// stamps every match with traceID. Returns nil if the dir is empty.
 func NewTraceWriter(dir string, traceID int64) *TraceWriter {
 	if dir == "" {
 		return nil

@@ -77,7 +77,8 @@ export interface TraceTurn {
    * not execute this turn. Absent when both sides were silent. */
   output?: [string, string]
   timing?: TraceTurnTiming
-  traces?: TurnTrace[]
+  /** Per-player trace events. Index 0 owns player 0's events; index 1 player 1. */
+  traces?: [TurnTrace[], TurnTrace[]]
 }
 
 export interface TraceTurnTiming {
@@ -86,7 +87,7 @@ export interface TraceTurnTiming {
 
 export interface TurnTrace<M = unknown> {
   type: string
-  meta?: M
+  data?: M
 }
 
 export interface PacMeta {
