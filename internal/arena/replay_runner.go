@@ -127,6 +127,9 @@ func RunReplay(
 			handlePlayerCommands(players, referee)
 		}
 
+		if rsp, ok := referee.(RawScoresProvider); ok {
+			tt.Score = rsp.RawScores()
+		}
 		if decorator, ok := referee.(TraceTurnDecorator); ok {
 			if state := decorator.DecorateTraceTurn(turn, players); len(state) > 0 {
 				tt.State = state

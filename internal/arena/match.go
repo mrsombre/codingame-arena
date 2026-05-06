@@ -187,6 +187,9 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		}
 
 		if tracing {
+			if rsp, ok := referee.(RawScoresProvider); ok {
+				traceTurns[len(traceTurns)-1].Score = rsp.RawScores()
+			}
 			if decorator, ok := referee.(TraceTurnDecorator); ok {
 				if state := decorator.DecorateTraceTurn(turn, players); len(state) > 0 {
 					traceTurns[len(traceTurns)-1].State = state

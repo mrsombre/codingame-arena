@@ -113,7 +113,6 @@ func TestDecorateTraceTurnAddsDecisionTraces(t *testing.T) {
 	require.NotNil(t, state.SunDirection)
 	assert.Equal(t, 4, *state.SunDirection)
 	assert.Equal(t, []int{8, 6}, state.Sun)
-	assert.Equal(t, []int{3, 5}, state.Score)
 	require.NotNil(t, state.DayActionIndex)
 	assert.Equal(t, 2, *state.DayActionIndex)
 	assert.Equal(t, [][][3]int{

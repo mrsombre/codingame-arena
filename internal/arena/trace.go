@@ -208,6 +208,10 @@ type TraceTurn struct {
 	GameInput []string         `json:"game_input,omitempty"`
 	Output    [2]string        `json:"output,omitzero"`
 	Timing    *TraceTurnTiming `json:"timing,omitempty"`
+	// Score carries the per-player raw score going into this turn, sampled
+	// from RawScoresProvider before PerformGameUpdate. Zero values when the
+	// referee doesn't implement RawScoresProvider.
+	Score [2]int `json:"score"`
 	// Traces partitions per-turn structured events by player: Traces[0] is
 	// everything player 0 owned this turn, Traces[1] is everything player 1
 	// owned. Cross-owner events (e.g. spring2020 COLLIDE_ENEMY, winter2026
