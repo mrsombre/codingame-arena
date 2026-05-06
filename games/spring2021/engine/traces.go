@@ -33,6 +33,7 @@ type TraceTurnState struct {
 	Phase            string     `json:"phase,omitempty"`
 	DayActionIndex   *int       `json:"day_action_index,omitempty"`
 	SunDirection     *int       `json:"sun_direction,omitempty"`
+	Nutrients        *int       `json:"nutrients,omitempty"`
 	Sun              []int      `json:"sun,omitempty"`
 	Trees            [][][3]int `json:"trees,omitempty"`
 	SeedConflictCell *int       `json:"seed_conflict_cell,omitempty"`
@@ -73,6 +74,7 @@ func (g *Game) DecorateTraceTurn(_ int, _ []arena.Player) json.RawMessage {
 		Day:          new(g.Round),
 		Phase:        phaseLabel(g.CurrentFrameType),
 		SunDirection: new(g.Sun.Orientation),
+		Nutrients:    new(g.Nutrients),
 		Sun:          g.traceSun(),
 		Trees:        g.traceTrees(),
 	}

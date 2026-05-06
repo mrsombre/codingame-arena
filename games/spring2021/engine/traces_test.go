@@ -96,6 +96,7 @@ func TestDecorateTraceTurnAddsDecisionTraces(t *testing.T) {
 	g.Round = 4
 	g.Sun.SetOrientation(g.Round)
 	g.DayActionIndex = 2
+	g.Nutrients = 17
 	g.CurrentFrameType = FrameActions
 	g.NextFrameType = FrameActions
 	g.placeTree(p0, 1, TREE_SEED)
@@ -112,6 +113,8 @@ func TestDecorateTraceTurnAddsDecisionTraces(t *testing.T) {
 	assert.Equal(t, "actions", state.Phase)
 	require.NotNil(t, state.SunDirection)
 	assert.Equal(t, 4, *state.SunDirection)
+	require.NotNil(t, state.Nutrients)
+	assert.Equal(t, 17, *state.Nutrients)
 	assert.Equal(t, []int{8, 6}, state.Sun)
 	require.NotNil(t, state.DayActionIndex)
 	assert.Equal(t, 2, *state.DayActionIndex)
