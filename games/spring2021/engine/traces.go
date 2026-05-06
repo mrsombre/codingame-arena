@@ -36,16 +36,18 @@ type TraceTurnState struct {
 	Phase            string     `json:"phase,omitempty"`
 	SunDirection     *int       `json:"sun_direction,omitempty"`
 	Sun              []int      `json:"sun,omitempty"`
-	Score            []int      `json:"score,omitempty"`
 	Trees            [][][3]int `json:"trees,omitempty"`
 	SeedConflictCell *int       `json:"seed_conflict_cell,omitempty"`
 	DayActionIndex   *int       `json:"day_action_index,omitempty"`
 }
 
-// GatherData is the data for GATHER events: how many sun points the owning
-// player just collected this gathering phase.
+// GatherData is the data for GATHER events: one event per tree that gathered
+// sun this phase. Cell is the tree's cell index; Sun is the points it gave
+// (equal to its size when not under a spooky shadow). Events are ordered by
+// cell id ascending (TreeOrder traversal).
 type GatherData struct {
-	Sun int `json:"sun"`
+	Cell int `json:"cell"`
+	Sun  int `json:"sun"`
 }
 
 // GrowData is the data for GROW events: the cell index of the tree the
@@ -79,7 +81,6 @@ func (g *Game) DecorateTraceTurn(_ int, _ []arena.Player) json.RawMessage {
 		Phase:        phaseLabel(g.CurrentFrameType),
 		SunDirection: new(g.Sun.Orientation),
 		Sun:          g.traceSun(),
-		Score:        g.traceScore(),
 		Trees:        g.traceTrees(),
 	}
 	if g.seedConflictCell != nil {
@@ -136,18 +137,6 @@ func (g *Game) traceSun() []int {
 			continue
 		}
 		values[idx] = player.GetSun()
-	}
-	return values
-}
-
-func (g *Game) traceScore() []int {
-	values := make([]int, tracePlayerCount(g))
-	for _, player := range g.Players {
-		idx := player.GetIndex()
-		if idx < 0 || idx >= len(values) {
-			continue
-		}
-		values[idx] = player.GetScore()
 	}
 	return values
 }

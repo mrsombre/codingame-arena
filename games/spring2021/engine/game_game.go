@@ -629,13 +629,13 @@ func (g *Game) giveSun() {
 		if !has || shadow < tree.Size {
 			tree.Owner.AddSun(tree.Size)
 			given[tree.Owner.GetIndex()] += tree.Size
+			g.tracePlayer(tree.Owner.GetIndex(), arena.MakeTurnTrace(TraceGather, GatherData{Cell: idx, Sun: tree.Size}))
 		}
 	}
 	for _, p := range g.Players {
 		v := given[p.GetIndex()]
 		if v > 0 {
 			g.Summary.AddGather(p, v)
-			g.tracePlayer(p.GetIndex(), arena.MakeTurnTrace(TraceGather, GatherData{Sun: v}))
 		}
 	}
 }
