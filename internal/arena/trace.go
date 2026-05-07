@@ -216,7 +216,15 @@ type TraceTurn struct {
 	Turn      int              `json:"turn"`
 	GameInput []string         `json:"game_input,omitempty"`
 	Output    [2]string        `json:"output,omitzero"`
-	Timing    *TraceTurnTiming `json:"timing,omitempty"`
+	// IsOutputTurn[i] records whether side i was prompted for output this
+	// turn (i.e., the runner asked the bot for a command). Independent of
+	// game-specific phase rules: false on engine-only frames (Spring 2021
+	// GATHERING/SUN_MOVE, post-end frames) and on turns where the side was
+	// already deactivated or the engine flagged it skipped (e.g., spring2021
+	// IsWaiting). Lets analyzers and the runner identify the first turn a
+	// bot was actually asked to act, regardless of the game's frame model.
+	IsOutputTurn [2]bool          `json:"is_output_turn,omitzero"`
+	Timing       *TraceTurnTiming `json:"timing,omitempty"`
 	// Score carries the per-player raw score going into this turn, sampled
 	// from RawScoresProvider before PerformGameUpdate. Zero values when the
 	// referee doesn't implement RawScoresProvider.

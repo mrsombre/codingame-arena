@@ -16,11 +16,14 @@ func newEndReasonScenario(t *testing.T) (*Referee, []arena.Player) {
 	return r, players
 }
 
-func TestEndReasonTimeoutStartOnTurnZero(t *testing.T) {
+// Spring 2021's loop turn 0 is the GATHERING phase (engine-only no-op for
+// players); the first prompted turn is loop turn 1. A timeout on that first
+// prompt must classify as TIMEOUT_START even though the raw turn index is 1.
+func TestEndReasonTimeoutStartOnFirstOutputTurn(t *testing.T) {
 	r, players := newEndReasonScenario(t)
 	r.Game.Players[0].Deactivate("Timeout!")
 
-	got := r.EndReason(0, players, [2]int{0, -1})
+	got := r.EndReason(1, players, [2]int{1, -1}, [2]int{1, 1})
 	assert.Equal(t, arena.EndReasonTimeoutStart, got)
 }
 
@@ -28,7 +31,7 @@ func TestEndReasonTimeoutOnLaterTurn(t *testing.T) {
 	r, players := newEndReasonScenario(t)
 	r.Game.Players[1].Deactivate("Timeout!")
 
-	got := r.EndReason(42, players, [2]int{-1, 42})
+	got := r.EndReason(42, players, [2]int{-1, 42}, [2]int{1, 1})
 	assert.Equal(t, arena.EndReasonTimeout, got)
 }
 
@@ -36,7 +39,7 @@ func TestEndReasonInvalidForBadCommand(t *testing.T) {
 	r, players := newEndReasonScenario(t)
 	r.Game.Players[0].Deactivate("invalid input")
 
-	got := r.EndReason(5, players, [2]int{5, -1})
+	got := r.EndReason(5, players, [2]int{5, -1}, [2]int{1, 1})
 	assert.Equal(t, arena.EndReasonInvalid, got)
 }
 
@@ -44,7 +47,7 @@ func TestEndReasonScoreWhenRoundCapReached(t *testing.T) {
 	r, players := newEndReasonScenario(t)
 	r.Game.Round = r.Game.MAX_ROUNDS
 
-	got := r.EndReason(99, players, [2]int{-1, -1})
+	got := r.EndReason(99, players, [2]int{-1, -1}, [2]int{1, 1})
 	assert.Equal(t, arena.EndReasonScore, got)
 }
 
@@ -52,7 +55,7 @@ func TestEndReasonTurnsOutWhenRoundCapNotReached(t *testing.T) {
 	r, players := newEndReasonScenario(t)
 	r.Game.Round = 5
 
-	got := r.EndReason(MaxTurns, players, [2]int{-1, -1})
+	got := r.EndReason(MaxTurns, players, [2]int{-1, -1}, [2]int{1, 1})
 	assert.Equal(t, arena.EndReasonTurnsOut, got)
 }
 

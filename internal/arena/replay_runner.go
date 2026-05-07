@@ -78,6 +78,11 @@ func RunReplay(
 
 	var traceTurns []TraceTurn
 	deactivationTurns := [2]int{-1, -1}
+	// firstOutputTurns[i] is the loop turn index of the first turn side i was
+	// prompted for output (-1 if never prompted). See match.go for the
+	// rationale; convert paths use the same value so EndReason classification
+	// matches what self-play would produce on an equivalent match.
+	firstOutputTurns := [2]int{-1, -1}
 	turn := 0
 	for ; !referee.Ended() && turn < maxTurns; turn++ {
 		referee.ResetGameTurnData()
@@ -92,6 +97,22 @@ func RunReplay(
 		liveTurn := referee.ActivePlayers(players) >= 2
 		if reporter, ok := referee.(GameOverFrameReporter); ok && reporter.InGameOverFrame() {
 			liveTurn = false
+		}
+
+		// outputTurn[i] mirrors the gating used in the inner Execute loop below:
+		// true iff side i would be prompted this turn. See match.go for the
+		// rationale.
+		wasDeactivated := [2]bool{players[0].IsDeactivated(), players[1].IsDeactivated()}
+		outputTurn := [2]bool{}
+		if liveTurn {
+			for i, player := range players {
+				outputTurn[i] = !wasDeactivated[i] && !referee.ShouldSkipPlayerTurn(player)
+			}
+		}
+		for i := range outputTurn {
+			if outputTurn[i] && firstOutputTurns[i] == -1 {
+				firstOutputTurns[i] = turn
+			}
 		}
 
 		playerOutputs := [2]string{}
@@ -117,10 +138,11 @@ func RunReplay(
 		}
 
 		tt := TraceTurn{
-			Turn:      turn,
-			GameInput: turnInput,
-			Output:    playerOutputs,
-			Timing:    &TraceTurnTiming{Response: [2]float64{}},
+			Turn:         turn,
+			GameInput:    turnInput,
+			Output:       playerOutputs,
+			IsOutputTurn: outputTurn,
+			Timing:       &TraceTurnTiming{Response: [2]float64{}},
 		}
 
 		if liveTurn {
@@ -187,7 +209,7 @@ func RunReplay(
 
 	var endReason string
 	if erp, ok := referee.(EndReasonProvider); ok {
-		endReason = erp.EndReason(turn, players, deactivationTurns)
+		endReason = erp.EndReason(turn, players, deactivationTurns, firstOutputTurns)
 	}
 
 	return TraceMatch{

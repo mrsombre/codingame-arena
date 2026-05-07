@@ -106,11 +106,18 @@ type LeagueResolver interface {
 }
 
 // EndReasonProvider returns a categorized reason for why the match ended.
-// turn is the final loop turn; deactivationTurns[i] is the turn player i
-// was deactivated (or -1). Optional — if Referee implements this, match
-// stamps the value onto the trace as "end_reason".
+// turn is the final loop turn; deactivationTurns[i] is the turn player i was
+// deactivated (or -1); firstOutputTurns[i] is the turn player i was first
+// prompted for output (or -1 if never prompted — only possible when the bot
+// was deactivated before any output turn or the match never reached one).
+// Implementations should use deactivationTurns[i] == firstOutputTurns[i] to
+// distinguish TIMEOUT_START (timed out on first prompt) from TIMEOUT (timed
+// out later) — this is independent of the game's frame model, so games with
+// non-decision leading frames (e.g., Spring 2021 GATHERING) classify
+// correctly. Optional — if Referee implements this, match stamps the value
+// onto the trace as "end_reason".
 type EndReasonProvider interface {
-	EndReason(turn int, players []Player, deactivationTurns [2]int) string
+	EndReason(turn int, players []Player, deactivationTurns, firstOutputTurns [2]int) string
 }
 
 // GameOverFrameReporter signals that the engine has detected game-over and

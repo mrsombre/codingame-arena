@@ -183,14 +183,17 @@ func (r *Referee) RawScores() [2]int {
 //
 // "Timeout!" is the literal deactivation message used by both the arena
 // runner (on no output) and CommandManager.ParseCommands (on empty input).
-func (r *Referee) EndReason(_ int, players []arena.Player, deactivationTurns [2]int) string {
+// TIMEOUT_START fires when the deactivation lands on the player's first
+// prompted turn — for Spring 2021 that is loop turn 1 (after the leading
+// GATHERING phase), not 0.
+func (r *Referee) EndReason(_ int, players []arena.Player, deactivationTurns, firstOutputTurns [2]int) string {
 	for i, p := range players {
 		if !p.IsDeactivated() {
 			continue
 		}
 		reason := p.DeactivationReason()
 		switch {
-		case reason == "Timeout!" && deactivationTurns[i] == 0:
+		case reason == "Timeout!" && deactivationTurns[i] == firstOutputTurns[i]:
 			return arena.EndReasonTimeoutStart
 		case reason == "Timeout!":
 			return arena.EndReasonTimeout

@@ -81,6 +81,12 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	turn := 0
 	var badCommands []BadCommandInfo
 	deactivationTurns := [2]int{-1, -1}
+	// firstOutputTurns[i] is the loop turn index of the first turn side i was
+	// prompted for output (-1 if never prompted). Lets EndReason classify
+	// TIMEOUT_START as "deactivated on first output turn" without depending on
+	// game-specific frame numbering — Spring 2021's first output turn is loop
+	// turn 1 (after GATHERING), Spring 2020's is loop turn 0.
+	firstOutputTurns := [2]int{-1, -1}
 	tracing := runner.Options.TraceSink != nil
 	var traceTurns []TraceTurn
 
@@ -101,6 +107,22 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		}
 
 		wasDeactivated := [2]bool{players[0].IsDeactivated(), players[1].IsDeactivated()}
+		// outputTurn[i] mirrors the gating used in the inner Execute loop below:
+		// true iff side i would be prompted this turn. Captured up front so the
+		// trace records the prompt regardless of whether Execute later
+		// deactivates the side (an empty-output Timeout still counts as an
+		// output turn — the bot was asked, just failed to answer).
+		outputTurn := [2]bool{}
+		if liveTurn {
+			for i, player := range players {
+				outputTurn[i] = !wasDeactivated[i] && !referee.ShouldSkipPlayerTurn(player)
+			}
+		}
+		for i := range outputTurn {
+			if outputTurn[i] && firstOutputTurns[i] == -1 {
+				firstOutputTurns[i] = turn
+			}
+		}
 		playerOutputs := [2]string{}
 		var turnInput []string
 		// Blue is our bot identity from --blue; after seed-driven swap, blue
@@ -162,10 +184,11 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				}
 			}
 			traceTurns = append(traceTurns, TraceTurn{
-				Turn:      turn,
-				GameInput: turnInput,
-				Output:    playerOutputs,
-				Timing:    turnTiming,
+				Turn:         turn,
+				GameInput:    turnInput,
+				Output:       playerOutputs,
+				IsOutputTurn: outputTurn,
+				Timing:       turnTiming,
 			})
 		}
 
@@ -305,7 +328,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		}
 		var endReason string
 		if erp, ok := referee.(EndReasonProvider); ok {
-			endReason = erp.EndReason(turn, players, deactivationTurns)
+			endReason = erp.EndReason(turn, players, deactivationTurns, firstOutputTurns)
 		}
 		traceMatch := TraceMatch{
 			MatchID:     simulationID,

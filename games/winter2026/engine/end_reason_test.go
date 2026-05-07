@@ -20,11 +20,11 @@ func newEndReasonScenario(t *testing.T) (*Referee, []arena.Player) {
 	return r, players
 }
 
-func TestEndReasonTimeoutStartOnTurnZero(t *testing.T) {
+func TestEndReasonTimeoutStartOnFirstOutputTurn(t *testing.T) {
 	r, players := newEndReasonScenario(t)
 	r.Game.Players[0].Deactivate("Timeout!")
 
-	got := r.EndReason(0, players, [2]int{0, -1})
+	got := r.EndReason(0, players, [2]int{0, -1}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonTimeoutStart, got)
 }
 
@@ -32,7 +32,7 @@ func TestEndReasonTimeoutOnLaterTurn(t *testing.T) {
 	r, players := newEndReasonScenario(t)
 	r.Game.Players[1].Deactivate("Timeout!")
 
-	got := r.EndReason(42, players, [2]int{-1, 42})
+	got := r.EndReason(42, players, [2]int{-1, 42}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonTimeout, got)
 }
 
@@ -40,7 +40,7 @@ func TestEndReasonInvalidForBadCommand(t *testing.T) {
 	r, players := newEndReasonScenario(t)
 	r.Game.Players[0].Deactivate(`Expected MESSAGE text; got "DANCE"`)
 
-	got := r.EndReason(5, players, [2]int{5, -1})
+	got := r.EndReason(5, players, [2]int{5, -1}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonInvalid, got)
 }
 
@@ -50,7 +50,7 @@ func TestEndReasonEliminatedWhenAllBirdsDead(t *testing.T) {
 		b.Alive = false
 	}
 
-	got := r.EndReason(20, players, [2]int{-1, -1})
+	got := r.EndReason(20, players, [2]int{-1, -1}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonEliminated, got)
 }
 
@@ -58,7 +58,7 @@ func TestEndReasonScoreWhenAllApplesConsumed(t *testing.T) {
 	r, players := newEndReasonScenario(t)
 	r.Game.Grid.Apples = nil
 
-	got := r.EndReason(15, players, [2]int{-1, -1})
+	got := r.EndReason(15, players, [2]int{-1, -1}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonScore, got)
 }
 
@@ -66,6 +66,6 @@ func TestEndReasonTurnsOutWhenCapHit(t *testing.T) {
 	r, players := newEndReasonScenario(t)
 	// Both players still active, apples remain, both birds alive → IsGameOver
 	// is false. Loop must have exited via turn cap.
-	got := r.EndReason(200, players, [2]int{-1, -1})
+	got := r.EndReason(200, players, [2]int{-1, -1}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonTurnsOut, got)
 }
