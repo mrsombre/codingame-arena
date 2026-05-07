@@ -12,10 +12,11 @@ import (
 const TraceAnalysisNoSide = -1
 
 type TraceAnalysisEndReasonSpec struct {
-	Key      string
-	Label    string
-	ShowZero bool
-	ShowBlue bool
+	Key         string
+	Label       string
+	ShowZero    bool
+	ShowBlue    bool
+	ListMatches bool
 }
 
 func StandardTraceEndReasons() []TraceAnalysisEndReasonSpec {
@@ -24,9 +25,9 @@ func StandardTraceEndReasons() []TraceAnalysisEndReasonSpec {
 		{Key: EndReasonScore, Label: EndReasonScore},
 		{Key: EndReasonScoreEarly, Label: EndReasonScoreEarly},
 		{Key: EndReasonEliminated, Label: EndReasonEliminated, ShowBlue: true},
-		{Key: EndReasonTimeoutStart, Label: EndReasonTimeoutStart, ShowZero: true, ShowBlue: true},
-		{Key: EndReasonTimeout, Label: EndReasonTimeout, ShowZero: true, ShowBlue: true},
-		{Key: EndReasonInvalid, Label: EndReasonInvalid, ShowZero: true, ShowBlue: true},
+		{Key: EndReasonTimeoutStart, Label: EndReasonTimeoutStart, ShowZero: true, ShowBlue: true, ListMatches: true},
+		{Key: EndReasonTimeout, Label: EndReasonTimeout, ShowZero: true, ShowBlue: true, ListMatches: true},
+		{Key: EndReasonInvalid, Label: EndReasonInvalid, ShowZero: true, ShowBlue: true, ListMatches: true},
 	}
 }
 
@@ -43,6 +44,7 @@ func AnalyzeTraceFiles(input TraceAnalysisInput, metricAnalyzer TraceMetricAnaly
 		endReasonSpecs:      StandardTraceEndReasons(),
 		endReasonCounts:     make(map[string]int),
 		endReasonBlueCounts: make(map[string]int),
+		endReasonFiles:      make(map[string][]string),
 		metricSpecs:         specs,
 		winnerA:             make(map[string]traceAnalysisMetricAggregate),
 		winnerB:             make(map[string]traceAnalysisMetricAggregate),
@@ -188,6 +190,7 @@ type traceAnalysisReport struct {
 
 	endReasonCounts     map[string]int
 	endReasonBlueCounts map[string]int
+	endReasonFiles      map[string][]string
 
 	metricSpecs []TraceMetricSpec
 	winnerA     map[string]traceAnalysisMetricAggregate
@@ -259,6 +262,9 @@ func (r *traceAnalysisReport) add(file TraceFile, stats TraceMetricStats) {
 		r.endReasonCounts[trace.EndReason]++
 		if TraceEndReasonSide(trace, winner) == blueSide {
 			r.endReasonBlueCounts[trace.EndReason]++
+		}
+		if r.endReasonListsMatches(trace.EndReason) {
+			r.endReasonFiles[trace.EndReason] = append(r.endReasonFiles[trace.EndReason], file.Name)
 		}
 	}
 
@@ -519,12 +525,40 @@ func (r *traceAnalysisReport) writeEndReasons(w io.Writer) error {
 		if row.count > 0 && row.spec.ShowBlue && r.files > 0 {
 			line += fmt.Sprintf("  (blue %.1f%%)", percent(row.blueCount, row.count))
 		}
+		if row.count > 0 && row.spec.ListMatches {
+			if ids := traceShortIDList(r.endReasonFiles[row.key]); ids != "" {
+				line += "  " + ids
+			}
+		}
 		if _, err := fmt.Fprintln(w, line); err != nil {
 			return err
 		}
 	}
 	_, err := fmt.Fprintln(w)
 	return err
+}
+
+func (r *traceAnalysisReport) endReasonListsMatches(key string) bool {
+	for _, spec := range r.endReasonSpecs {
+		if spec.Key == key {
+			return spec.ListMatches
+		}
+	}
+	return false
+}
+
+// traceShortIDList renders trace filenames as a comma-separated list of bare
+// match IDs, matching the WORST section's stripped-prefix style. Returns an
+// empty string when no files are supplied so callers can omit the suffix.
+func traceShortIDList(files []string) string {
+	if len(files) == 0 {
+		return ""
+	}
+	ids := make([]string, len(files))
+	for i, name := range files {
+		ids[i] = worstTraceID(name)
+	}
+	return strings.Join(ids, ", ")
 }
 
 type traceAnalysisEndReasonRow struct {

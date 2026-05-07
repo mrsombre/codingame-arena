@@ -90,19 +90,19 @@ func TestAnalysisReportSummarizesGenericMatchStats(t *testing.T) {
 
 func TestAnalysisReportEndReasonsAttributeBlueFault(t *testing.T) {
 	files := []TraceFile{
-		{Trace: TraceMatch{
+		{Name: "replay-100.json", Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
 			EndReason:   EndReasonTimeout,
 			Disqualified: [2]bool{true, false},
 			Scores:      [2]TraceScore{0, 5}, Ranks: [2]int{1, 0},
 		}},
-		{Trace: TraceMatch{
+		{Name: "replay-200.json", Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
 			EndReason:   EndReasonInvalid,
 			Disqualified: [2]bool{false, true},
 			Scores:      [2]TraceScore{6, 0}, Ranks: [2]int{0, 1},
 		}},
-		{Trace: TraceMatch{
+		{Name: "replay-300.json", Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
 			EndReason: EndReasonScore,
 			Scores:    [2]TraceScore{10, 4}, Ranks: [2]int{0, 1},
@@ -113,9 +113,37 @@ func TestAnalysisReportEndReasonsAttributeBlueFault(t *testing.T) {
 
 	assert.Contains(t, text, "END REASONS")
 	assert.Contains(t, text, "SCORE")
-	assert.Contains(t, text, "TIMEOUT         33.3%  (blue 100.0%)")
-	assert.Contains(t, text, "INVALID         33.3%  (blue 0.0%)")
+	assert.Contains(t, text, "TIMEOUT         33.3%  (blue 100.0%)  100")
+	assert.Contains(t, text, "INVALID         33.3%  (blue 0.0%)  200")
 	assert.Contains(t, text, "TIMEOUT_START    0.0%")
+}
+
+func TestAnalysisReportEndReasonsListAllIncidentMatchIDs(t *testing.T) {
+	files := []TraceFile{
+		{Name: "replay-101.json", Trace: TraceMatch{
+			Blue: "us", Players: [2]string{"us", "rival"},
+			EndReason: EndReasonTimeout,
+			Scores:    [2]TraceScore{0, 5}, Ranks: [2]int{1, 0},
+		}},
+		{Name: "replay-102.json", Trace: TraceMatch{
+			Blue: "us", Players: [2]string{"us", "rival"},
+			EndReason: EndReasonTimeout,
+			Scores:    [2]TraceScore{0, 7}, Ranks: [2]int{1, 0},
+		}},
+		// ELIMINATED is not in the ListMatches set — its row must stay
+		// quiet even though it carries blue-side attribution, so noisy
+		// per-match elimination games don't bloat the END REASONS block.
+		{Name: "replay-103.json", Trace: TraceMatch{
+			Blue: "us", Players: [2]string{"us", "rival"},
+			EndReason: EndReasonEliminated,
+			Scores:    [2]TraceScore{0, 4}, Ranks: [2]int{1, 0},
+		}},
+	}
+
+	text := runTestAnalysis(t, files, nil)
+
+	assert.Contains(t, text, "TIMEOUT         66.7%  (blue 100.0%)  101, 102")
+	assert.NotContains(t, text, "ELIMINATED      33.3%  (blue 100.0%)  103")
 }
 
 func TestAnalysisReportAggregatesMetricKinds(t *testing.T) {
