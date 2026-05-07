@@ -58,7 +58,7 @@ func TestAnalysisReportSummarizesGenericMatchStats(t *testing.T) {
 		{Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
 			EndReason:   EndReasonTimeout,
-			Deactivated: [2]bool{true, false},
+			Disqualified: [2]bool{true, false},
 			Scores:      [2]TraceScore{0, 7}, Ranks: [2]int{1, 0},
 			Turns: testTurns(1),
 		}},
@@ -93,13 +93,13 @@ func TestAnalysisReportEndReasonsAttributeBlueFault(t *testing.T) {
 		{Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
 			EndReason:   EndReasonTimeout,
-			Deactivated: [2]bool{true, false},
+			Disqualified: [2]bool{true, false},
 			Scores:      [2]TraceScore{0, 5}, Ranks: [2]int{1, 0},
 		}},
 		{Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
 			EndReason:   EndReasonInvalid,
-			Deactivated: [2]bool{false, true},
+			Disqualified: [2]bool{false, true},
 			Scores:      [2]TraceScore{6, 0}, Ranks: [2]int{0, 1},
 		}},
 		{Trace: TraceMatch{

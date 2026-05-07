@@ -31,11 +31,15 @@ func (s TraceScore) MarshalJSON() ([]byte, error) {
 // Everything is reported from the in-match side perspective (index 0 = left
 // side of the map, index 1 = right). Players[i] is the bot basename that
 // played on side i; Scores[i] is that side's raw pre-OnEnd score and
-// FinalScores[i] is the post-OnEnd value matching CodinGame's gameResult.
-// Scores convention; Ranks encodes the winner CodinGame-style (0 = first
-// place, [0,0] = draw). Random side-swap is intentionally not recorded — the
-// bot→side mapping here is ground truth for downstream trace consumers
-// (e.g., training).
+// FinalScores[i] is the post-OnEnd value. For self-play traces both fields
+// hold engine truth. For replay-converted traces the convention only differs
+// when the match is disqualified: Scores keeps the engine's count and
+// FinalScores is overwritten with CodinGame's gameResult.scores so the
+// trace's outcome matches the official replay; the Disqualified[i] flag
+// marks which side(s) CodinGame deactivated. Ranks encodes the winner
+// CodinGame-style (0 = first place, [0,0] = draw). Random side-swap is
+// intentionally not recorded — the bot→side mapping here is ground truth
+// for downstream trace consumers (e.g., training).
 //
 // Blue is the bot/agent name analyze treats as "us". It is required on every
 // trace: self-play sets it to the basename of --blue (which always equals one
@@ -61,17 +65,22 @@ type TraceMatch struct {
 	// EndReason* constants for shared values. Empty when the referee doesn't
 	// implement EndReasonProvider.
 	EndReason string `json:"end_reason,omitempty"`
-	// Deactivated[i] is true when side I was deactivated (timeout / bad
+	// Disqualified[i] is true when side i was deactivated (timeout / bad
 	// command) during the match. Used by analyzers to attribute fault end
-	// reasons to a specific side.
-	Deactivated [2]bool `json:"deactivated,omitzero"`
+	// reasons to a specific side; the verifier uses it to short-circuit
+	// score and turn-count checks for replays where CodinGame's record is
+	// known to diverge from a clean simulation.
+	Disqualified [2]bool `json:"disqualified,omitzero"`
 	// Scores carry the raw pre-OnEnd value reported by RawScoresProvider
 	// (intrinsic in-game count, e.g., spring2021 tree segments before the sun
-	// bonus). Deactivated sides are reported as -1 to match CG.
+	// bonus). Always engine truth; disqualified sides keep their actual
+	// accumulated value here.
 	Scores [2]TraceScore `json:"scores"`
-	// FinalScores carries the post-OnEnd value (with bonuses, tiebreakers,
-	// -1 for DQ) — the same number CG records in gameResult.scores. This is
-	// the authoritative outcome for win/loss; Scores is the analytical raw.
+	// FinalScores carries the post-OnEnd value (with bonuses and tiebreakers
+	// applied). For self-play traces this is engine truth. For replay-
+	// converted traces the trace inherits CodinGame's gameResult.scores
+	// when the match was disqualified; otherwise it equals the engine's
+	// post-OnEnd value (which matches CG for clean matches).
 	FinalScores [2]TraceScore `json:"final_scores"`
 	Ranks       [2]int        `json:"ranks"`
 	Players     [2]string     `json:"players"`

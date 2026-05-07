@@ -2,13 +2,13 @@
 .vscode
 .DS_Store
 
+**/skills
+
 /bin/
+/data/
 /tmp/
 
 replays/
 traces/
 
 arena.yml
-db.sqlite3
-
-**/skills

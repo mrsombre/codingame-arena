@@ -138,11 +138,11 @@ func TraceWinner(trace TraceMatch) int {
 // to, or -1 when the reason is not side-specific or cannot be attributed.
 func TraceEndReasonSide(trace TraceMatch, winner int) int {
 	switch {
-	case trace.Deactivated[0] && !trace.Deactivated[1]:
+	case trace.Disqualified[0] && !trace.Disqualified[1]:
 		return 0
-	case trace.Deactivated[1] && !trace.Deactivated[0]:
+	case trace.Disqualified[1] && !trace.Disqualified[0]:
 		return 1
-	case trace.Deactivated[0] && trace.Deactivated[1]:
+	case trace.Disqualified[0] && trace.Disqualified[1]:
 		return TraceAnalysisNoSide
 	}
 

@@ -172,23 +172,18 @@ func RunReplay(
 		rawTraceScores = rawScores
 	}
 	finalTraceScores := finalScores
-	deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
-	// Match CG's gameResult.scores convention: a deactivated side's score is
-	// reported as -1 even when its raw in-game count was higher. Without this
-	// the trace would show a live count for a player who never finished the
-	// match, disagreeing with the replay JSON for the same field.
-	for i := range deactivated {
-		if deactivated[i] {
-			rawTraceScores[i] = -1
-			finalTraceScores[i] = -1
-		}
-	}
-	// Ranks derive from finalScores (post-OnEnd) so a deactivated side never
-	// records as drawing against the survivor and tie-break adjustments the
-	// engine performs in OnEnd are reflected. convert overrides this with the
-	// replay's gameResult.ranks for replay traces, which carries CG-side
-	// tiebreakers the engine doesn't model.
-	winner := TraceWinnerFromScores(finalScores, deactivated)
+	disqualified := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
+	// Trace keeps engine truth in both Scores and FinalScores. Disqualified
+	// flags which side(s) the engine deactivated; convert.go later
+	// overwrites FinalScores with CG's gameResult.scores when a replay
+	// match was disqualified, since CG's value is authoritative there.
+	//
+	// Ranks derive from finalScores (post-OnEnd) so a disqualified side
+	// never records as drawing against the survivor and tie-break
+	// adjustments the engine performs in OnEnd are reflected. convert
+	// overrides this with the replay's gameResult.ranks for replay traces,
+	// which carries CG-side tiebreakers the engine doesn't model.
+	winner := TraceWinnerFromScores(finalScores, disqualified)
 
 	var endReason string
 	if erp, ok := referee.(EndReasonProvider); ok {
@@ -201,7 +196,7 @@ func RunReplay(
 		PuzzleID:    factory.PuzzleID(),
 		Seed:        seed,
 		EndReason:   endReason,
-		Deactivated: deactivated,
+		Disqualified: disqualified,
 		Scores:      [2]TraceScore{TraceScore(rawTraceScores[0]), TraceScore(rawTraceScores[1])},
 		FinalScores: [2]TraceScore{TraceScore(finalTraceScores[0]), TraceScore(finalTraceScores[1])},
 		Ranks:       RanksFromWinner(winner),

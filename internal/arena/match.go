@@ -276,15 +276,14 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				traceWinner = 1 - traceWinner
 			}
 		}
-		deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
-		// Match CG's gameResult.scores convention: a deactivated side's
-		// score is reported as -1, replacing the raw or post-OnEnd count.
-		for i := range deactivated {
-			if deactivated[i] {
-				rawTraceScores[i] = -1
-				finalTraceScores[i] = -1
-			}
-		}
+		disqualified := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
+		// Self-play traces stay in engine-truth units: Scores/FinalScores
+		// carry the engine's actual accumulated values for both sides, and
+		// Disqualified[i] flags whether the engine deactivated that side.
+		// Replay-converted traces (see convert.go) further overwrite
+		// FinalScores with CG's gameResult.scores when the match was
+		// disqualified, since CG's record is the authoritative outcome
+		// there.
 		stats := [2]playerTimingStats{controllers[0].TimingStats(), controllers[1].TimingStats()}
 		traceTiming := &TraceTiming{
 			FirstResponse: [2]float64{
@@ -317,7 +316,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			League:      league,
 			CreatedAt:   time.Now().UTC().Format(time.RFC3339),
 			EndReason:   endReason,
-			Deactivated: deactivated,
+			Disqualified: disqualified,
 			Scores:      [2]TraceScore{TraceScore(rawTraceScores[0]), TraceScore(rawTraceScores[1])},
 			FinalScores: [2]TraceScore{TraceScore(finalTraceScores[0]), TraceScore(finalTraceScores[1])},
 			Ranks:       RanksFromWinner(traceWinner),

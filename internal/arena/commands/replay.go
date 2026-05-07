@@ -331,6 +331,8 @@ func writeAutoConvertProgress(stdout io.Writer, current, total int, r convertRes
 	switch r.Outcome {
 	case convertOutcomeSaved:
 		_, _ = fmt.Fprintf(stdout, "[%d/%d] trace %d (%s)\n", current, total, r.Target.ID, r.Detail)
+	case convertOutcomeSavedMismatch:
+		_, _ = fmt.Fprintf(stdout, "[%d/%d] trace %d MISMATCH (%s)\n", current, total, r.Target.ID, r.Detail)
 	case convertOutcomeSkippedExisting, convertOutcomeSkippedPuzzle, convertOutcomeSkippedMismatch:
 		_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (%s)\n", current, total, r.Target.ID, r.Detail)
 	case convertOutcomeFailed:
@@ -340,8 +342,8 @@ func writeAutoConvertProgress(stdout io.Writer, current, total int, r convertRes
 
 func writeAutoConvertSummary(stdout io.Writer, traceDir string, results []convertResult) error {
 	s := summarizeConvertResults(results)
-	_, err := fmt.Fprintf(stdout, "traces: %d saved, %d skipped-existing, %d skipped-puzzle, %d skipped-mismatch, %d failed (out=%s)\n",
-		s.Saved, s.SkippedExisting, s.SkippedPuzzle, s.SkippedMismatch, s.Failed, traceDir)
+	_, err := fmt.Fprintf(stdout, "traces: %d saved, %d saved-mismatch, %d skipped-existing, %d skipped-puzzle, %d skipped-mismatch, %d failed (out=%s)\n",
+		s.Saved, s.SavedMismatch, s.SkippedExisting, s.SkippedPuzzle, s.SkippedMismatch, s.Failed, traceDir)
 	return err
 }
 
