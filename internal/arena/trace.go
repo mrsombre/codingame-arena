@@ -48,19 +48,20 @@ func (s TraceScore) MarshalJSON() ([]byte, error) {
 // locate our side by scanning Players[i] == Blue (so seed-driven side swaps
 // still resolve correctly).
 type TraceMatch struct {
-	TraceID  int64  `json:"trace_id,omitempty"`
-	MatchID  int    `json:"match_id"`
-	Type     string `json:"type,omitempty"`
-	GameID   string `json:"gameId,omitempty"`
-	PuzzleID int    `json:"puzzleId,omitempty"`
-	Seed     int64  `json:"seed,string"`
-	Blue     string `json:"blue,omitempty"`
-	League   int    `json:"league,omitempty"`
 	// CreatedAt is the RFC 3339 timestamp, the trace was produced. For
 	// self-play traces it's stamped at match completion; for replay traces
 	// it's copied from the source replay's fetched_at so analyze can sort
 	// converted replays chronologically without re-reading the JSON.
-	CreatedAt string `json:"created_at,omitempty"`
+	CreatedAt string    `json:"created_at,omitempty"`
+	Type      string    `json:"type,omitempty"`
+	PuzzleID  int       `json:"puzzleId,omitempty"`
+	GameID    string    `json:"gameId,omitempty"`
+	TraceID   int64     `json:"trace_id,omitempty"`
+	MatchID   int       `json:"match_id"`
+	Players   [2]string `json:"players"`
+	Blue      string    `json:"blue,omitempty"`
+	League    int       `json:"league,omitempty"`
+	Seed      int64     `json:"seed,string"`
 	// EndReason categorizes how the match terminated. Game-specific; see the
 	// EndReason* constants for shared values. Empty when the referee doesn't
 	// implement EndReasonProvider.
@@ -83,14 +84,13 @@ type TraceMatch struct {
 	// post-OnEnd value (which matches CG for clean matches).
 	FinalScores [2]TraceScore `json:"final_scores"`
 	Ranks       [2]int        `json:"ranks"`
-	Players     [2]string     `json:"players"`
 	Timing      *TraceTiming  `json:"timing,omitempty"`
-	Turns       []TraceTurn   `json:"turns"`
 	// MainTurns is the count of player-decision trace turns. Excludes
 	// non-decision phase turns (Spring 2021 GATHERING/SUN_MOVE) and
 	// post-end frames (Spring 2020 gameOverFrame). Populated going forward
 	// only; older trace files load with 0 ("unknown").
-	MainTurns int `json:"main_turns,omitempty"`
+	MainTurns int         `json:"main_turns,omitempty"`
+	Turns     []TraceTurn `json:"turns"`
 }
 
 // Shared EndReason values. Games may use these or add their own.
