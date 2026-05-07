@@ -23,6 +23,7 @@ const (
 	TraceSeed     = "SEED"
 	TraceComplete = "COMPLETE"
 	TraceWait     = "WAIT"
+	TraceDebug    = "DEBUG"
 )
 
 // TraceTurnState is the spring2021-owned per-turn payload written into
@@ -67,6 +68,15 @@ type SeedData struct {
 type CompleteData struct {
 	Cell   int `json:"cell"`
 	Points int `json:"points"`
+}
+
+// DebugData is the data for DEBUG events: the trailing free-text "message"
+// the player appended to their command (e.g. "GL HF" in "WAIT GL HF").
+// CommandManager extracts it via the optional message group on each action
+// regex; Player.Reset clears it at turn start, so a non-empty Value reflects
+// the message sent on the same turn the surrounding action trace was emitted.
+type DebugData struct {
+	Value string `json:"value"`
 }
 
 func (g *Game) DecorateTraceTurn(_ int, _ []arena.Player) json.RawMessage {

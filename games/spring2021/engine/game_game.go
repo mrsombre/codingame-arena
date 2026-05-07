@@ -825,6 +825,9 @@ func (g *Game) performActionUpdate() {
 			g.Summary.AddError(fmt.Sprintf("%s: %s", player.NicknameToken(), err.Error()))
 			player.SetWaiting(true)
 		}
+		if player.HasMessage {
+			g.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceDebug, DebugData{Value: player.Message}))
+		}
 	}
 
 	if g.seedsAreConflicting() {

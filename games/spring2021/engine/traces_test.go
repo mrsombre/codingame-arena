@@ -85,6 +85,28 @@ func TestTraceWaitEmitsWhenPlayerWaits(t *testing.T) {
 	assert.True(t, p0.IsWaiting())
 }
 
+// CommandManager parses "WAIT GL HF" as action=WAIT plus message="GL HF" and
+// stamps it on the player. performActionUpdate emits a DEBUG trace alongside
+// the action's own trace so trace consumers see the trailing chat text.
+func TestTraceDebugEmitsAfterActionWhenPlayerSendsMessage(t *testing.T) {
+	g := newScenario(4)
+	p0 := g.Players[0]
+	p1 := g.Players[1]
+
+	runActionTurn(g, func() {
+		p0.SetAction(NewWaitAction())
+		p0.SetMessage("GL HF")
+		p1.SetAction(NewWaitAction())
+	})
+
+	require.Equal(t, []string{TraceWait, TraceDebug}, traceTypes(g.traces[0]))
+	assert.Equal(t, []string{TraceWait}, traceTypes(g.traces[1]))
+
+	data, err := arena.DecodeData[DebugData](g.traces[0][1])
+	require.NoError(t, err)
+	assert.Equal(t, "GL HF", data.Value)
+}
+
 func TestDecorateTraceTurnAddsDecisionTraces(t *testing.T) {
 	g := newScenario(4)
 	p0 := g.Players[0]
