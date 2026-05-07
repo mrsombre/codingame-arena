@@ -214,7 +214,7 @@ func RunReplay(
 
 	return TraceMatch{
 		MatchID:     0,
-		GameID:      factory.Name(),
+		PuzzleName:  factory.Name(),
 		PuzzleID:    factory.PuzzleID(),
 		Seed:        seed,
 		EndReason:   endReason,

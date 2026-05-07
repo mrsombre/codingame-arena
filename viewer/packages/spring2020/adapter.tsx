@@ -38,7 +38,7 @@ function parseMoves(turn: TraceTurn): MoveRow[] {
 }
 
 function frameFromTurn(turn: TraceTurn, fallback: FrameData | undefined): FrameData {
-  if (turn.game_input) return parseFrameLines(turn.game_input)
+  if (turn.gameInput) return parseFrameLines(turn.gameInput)
   if (fallback) return fallback
   throw new Error(`turn ${turn.turn} has no frame input`)
 }
@@ -64,7 +64,7 @@ export const spring2020Adapter: GameViewerAdapter<MapData, FrameData, TraceTurn,
   ],
   parseSerializeResponse,
   buildTimeline: (_mapData, trace) => {
-    const totalMainTurns = trace.turns.filter((turn) => turn.game_input).length
+    const totalMainTurns = trace.turns.filter((turn) => turn.gameInput).length
     const frames: FrameData[] = []
     const turns: (TraceTurn | null)[] = []
     const meta: SpringTurnMeta[] = []
@@ -81,8 +81,8 @@ export const spring2020Adapter: GameViewerAdapter<MapData, FrameData, TraceTurn,
         const source = trace.turns[i] ?? previous
         frames.push(frameFromTurn(source, frames[frames.length - 1]))
         turns.push(previous)
-        if (previous.game_input) mainCount++
-        meta.push({ mainTurn: mainCount, totalMainTurns, isSpeedTurn: !previous.game_input })
+        if (previous.gameInput) mainCount++
+        meta.push({ mainTurn: mainCount, totalMainTurns, isSpeedTurn: !previous.gameInput })
       }
     }
 
@@ -116,7 +116,7 @@ export const spring2020Adapter: GameViewerAdapter<MapData, FrameData, TraceTurn,
   turnMarker: (context) => (turnContext(context).isSpeedTurn ? <ZapIcon className="size-3 text-yellow-400" /> : null),
   formatRunStatus: ({ actualSeed, mapData, trace, run }) => {
     const winner = formatWinner(run.winner)
-    const mainTurns = trace.turns.filter((turn) => turn.game_input).length
+    const mainTurns = trace.turns.filter((turn) => turn.gameInput).length
     const ttfo = run.ttfo_ms ?? [0, 0]
     const aot = run.aot_ms ?? [0, 0]
     return (

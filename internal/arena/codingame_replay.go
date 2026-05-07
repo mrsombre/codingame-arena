@@ -25,20 +25,32 @@ const (
 // use the default CodinGameReplayFrame; games that do can declare their own
 // struct and pass it as F.
 //
-// Blue, League, Source, FetchedAt, and Leaderboard are arena-only annotations
-// (not part of the upstream CodinGame body): Blue is the username of the
-// player we are playing for, League is the league level the replay belongs
-// to, Source records which `arena replay` subcommand produced the file
-// ("get" or "leaderboard"), FetchedAt is the RFC 3339 download timestamp,
-// and Leaderboard carries the player's rank/division at fetch time
-// (populated only when downloaded via `replay leaderboard`).
+// Blue, League, Source, FetchedAt, ReplayID, Players, and Leaderboard are
+// arena-only annotations (not part of the upstream CodinGame body): Blue is
+// the username of the player we are playing for, League is the league level
+// the replay belongs to, Source records which `arena replay` subcommand
+// produced the file ("get" or "leaderboard"), FetchedAt is the RFC 3339
+// download timestamp, ReplayID mirrors gameResult.gameId at the top level
+// for convenience, Players mirrors the [left, right] display names extracted
+// from gameResult.agents, and Leaderboard carries the player's rank/division
+// at fetch time (populated only when downloaded via `replay leaderboard`).
 type CodinGameReplay[F any] struct {
-	PuzzleID      int                      `json:"puzzleId"`
-	QuestionTitle string                   `json:"questionTitle"`
-	Blue          string                   `json:"blue,omitempty"`
-	League        int                      `json:"league,omitempty"`
-	Source        string                   `json:"source,omitempty"`
-	FetchedAt     string                   `json:"fetched_at,omitempty"`
+	PuzzleID      int    `json:"puzzleId"`
+	QuestionTitle string `json:"questionTitle"`
+	Blue          string `json:"blue,omitempty"`
+	League        int    `json:"league,omitempty"`
+	Source        string `json:"source,omitempty"`
+	FetchedAt     string `json:"fetchedAt,omitempty"`
+	// ReplayID mirrors GameResult.GameID at the top level so the saved file
+	// shows the canonical replay id alongside the other annotation metadata
+	// without consumers having to dig into gameResult. PrepareReplay writes
+	// it from gameResult.gameId; readers may use either field.
+	ReplayID int64 `json:"replayId,omitempty"`
+	// Players mirrors the [left, right] display names extracted from
+	// gameResult.agents (codingamer.pseudo, falling back to arenaboss.nickname
+	// for boss matches) so consumers can read the participants without walking
+	// the agents list. Written by PrepareReplay; readers may use either field.
+	Players [2]string `json:"players,omitzero"`
 	// Seed is the referee seed promoted to the top level by PrepareReplay so
 	// callers don't need to re-parse refereeInput. Encoded as a JSON string
 	// because seeds routinely exceed JS Number precision.
@@ -508,9 +520,15 @@ func PrepareReplay(body []byte, ann ReplayAnnotations) ([]byte, error) {
 		return nil, err
 	}
 	if !ann.FetchedAt.IsZero() {
-		if err := setRaw(top, "fetched_at", ann.FetchedAt.UTC().Format(time.RFC3339)); err != nil {
+		if err := setRaw(top, "fetchedAt", ann.FetchedAt.UTC().Format(time.RFC3339)); err != nil {
 			return nil, err
 		}
+	}
+	if err := promoteReplayID(top); err != nil {
+		return nil, err
+	}
+	if err := promoteReplayPlayers(top); err != nil {
+		return nil, err
 	}
 	if ann.Leaderboard != nil {
 		if err := setRaw(top, "leaderboard", ann.Leaderboard); err != nil {
@@ -586,11 +604,13 @@ func replayPuzzleIDIsBlank(top map[string]json.RawMessage) bool {
 // alphabetically, scattering metadata across the file.
 var (
 	replayHeadKeys = []string{
-		"fetched_at",
+		"fetchedAt",
 		"source",
 		"puzzleId",
 		"puzzleTitle",
 		"questionTitle",
+		"replayId",
+		"players",
 		"blue",
 		"leaderboard",
 		"league",
@@ -644,6 +664,61 @@ func marshalReplayTop(top map[string]json.RawMessage) ([]byte, error) {
 
 	out = append(out, '}')
 	return out, nil
+}
+
+// promoteReplayPlayers reads gameResult.agents and mirrors the per-side
+// display names as a top-level "players" field so consumers can read the
+// participants without walking the agents list. Names follow the same
+// resolution rule as ReplayPlayerNames (codingamer.pseudo, then
+// arenaboss.nickname). Silent no-op if gameResult is missing/malformed,
+// agents is empty, or both names resolved blank.
+func promoteReplayPlayers(top map[string]json.RawMessage) error {
+	var gameResult struct {
+		Agents []CodinGameReplayAgent `json:"agents"`
+	}
+	if err := json.Unmarshal(top["gameResult"], &gameResult); err != nil {
+		return nil
+	}
+	if len(gameResult.Agents) == 0 {
+		return nil
+	}
+	var names [2]string
+	for _, a := range gameResult.Agents {
+		if a.Index < 0 || a.Index > 1 {
+			continue
+		}
+		if name := replayAgentName(a); name != "" {
+			names[a.Index] = name
+		}
+	}
+	if names[0] == "" && names[1] == "" {
+		return nil
+	}
+	return setRaw(top, "players", names)
+}
+
+// promoteReplayID reads gameResult.gameId and mirrors it as a top-level
+// "replayId" field so the canonical replay id sits next to the other
+// annotation metadata. The source field in gameResult is left in place so
+// the upstream CG payload remains untouched. Silent no-op if gameResult is
+// absent or gameId is missing/zero.
+func promoteReplayID(top map[string]json.RawMessage) error {
+	var gameResult map[string]json.RawMessage
+	if err := json.Unmarshal(top["gameResult"], &gameResult); err != nil {
+		return nil
+	}
+	raw, ok := gameResult["gameId"]
+	if !ok {
+		return nil
+	}
+	var gameID int64
+	if err := json.Unmarshal(raw, &gameID); err != nil {
+		return nil
+	}
+	if gameID == 0 {
+		return nil
+	}
+	return setRaw(top, "replayId", gameID)
 }
 
 // promoteReplaySeed reads gameResult.refereeInput, lifts the seed to the

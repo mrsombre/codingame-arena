@@ -31,7 +31,7 @@ Static metadata + game construction. One factory per game, registered in
 
 | Method               | Purpose                                                          |
 | -------------------- | ---------------------------------------------------------------- |
-| `Name()`             | Internal identifier (e.g. `"spring2021"`). Used as `trace.GameID`.|
+| `Name()`             | Internal identifier (e.g. `"spring2021"`). Used as `trace.PuzzleName`.|
 | `PuzzleID()`         | CodinGame numeric puzzle ID. Used to gate `arena replay` convert.|
 | `PuzzleTitle()`      | Human-readable puzzle title.                                     |
 | `LeaderboardSlug()`  | URL slug under `/multiplayer/bot-programming/<slug>`.            |
@@ -110,7 +110,7 @@ consumer falls back to a sensible default.
 
 | Interface                | Methods                                   | Effect when implemented |
 | ------------------------ | ----------------------------------------- | ----------------------- |
-| `EndReasonProvider`      | `EndReason(turn, players, deactTurns) string` | Trace records `end_reason` (TIMEOUT / SCORE / TURNS_OUT / …). Empty otherwise. |
+| `EndReasonProvider`      | `EndReason(turn, players, deactTurns) string` | Trace records `endReason` (TIMEOUT / SCORE / TURNS_OUT / …). Empty otherwise. |
 | `RawScoresProvider`      | `RawScores() [2]int`                      | `trace.Scores` records the pre-OnEnd raw values. Without it, `trace.Scores` falls back to the post-OnEnd value (same as `trace.FinalScores`). Required when OnEnd modifies scores (tiebreakers, bonuses) so analyzers can see the intrinsic in-game count separately from CG's final number. |
 | `MetricsProvider`        | `Metrics() []arena.Metric`                | Per-match summary metrics (e.g. apples remaining, pellets remaining) attached to live-run results. |
 | `TurnTraceProvider`      | `TurnTraces(turn, players) []TurnTrace`   | Per-turn structured event stream attached to each `TraceTurn.Traces`. Drained after `PerformGameUpdate`. |

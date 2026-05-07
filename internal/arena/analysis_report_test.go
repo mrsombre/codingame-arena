@@ -29,7 +29,7 @@ func (a testMetricAnalyzer) AnalyzeTraceMetrics(trace TraceMatch) (TraceMetricSt
 func runTestAnalysis(t *testing.T, files []TraceFile, analyzer TraceMetricAnalyzer) string {
 	t.Helper()
 	report, err := AnalyzeTraceFiles(
-		TraceAnalysisInput{TraceDir: "traces", GameID: "test", Files: files},
+		TraceAnalysisInput{TraceDir: "traces", PuzzleName: "test", Files: files},
 		analyzer,
 	)
 	require.NoError(t, err)
@@ -318,7 +318,7 @@ func TestAnalysisReportRejectsPerTurnMetricAboveTurnCount(t *testing.T) {
 		},
 	}
 
-	_, err := AnalyzeTraceFiles(TraceAnalysisInput{TraceDir: "traces", GameID: "test", Files: files}, analyzer)
+	_, err := AnalyzeTraceFiles(TraceAnalysisInput{TraceDir: "traces", PuzzleName: "test", Files: files}, analyzer)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "count 3 exceeds turns 2")
 }

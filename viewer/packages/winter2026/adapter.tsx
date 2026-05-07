@@ -152,12 +152,12 @@ export const winter2026Adapter: GameViewerAdapter<MapData, FrameData, TraceTurn>
     const frames: FrameData[] = []
     const turns: (TraceTurn | null)[] = []
     const initialTurn = trace.turns[0]
-    const initialInput = initialTurn?.game_input
+    const initialInput = initialTurn?.gameInput
     if (initialTurn && initialInput) {
       frames.push(parseFrameLines(initialInput))
       turns.push(null)
       for (let i = 1; i <= trace.turns.length; i++) {
-        const source = trace.turns[i]?.game_input ?? trace.turns[i - 1]?.game_input ?? initialInput
+        const source = trace.turns[i]?.gameInput ?? trace.turns[i - 1]?.gameInput ?? initialInput
         frames.push(parseFrameLines(source))
         turns.push(trace.turns[i - 1] ?? null)
       }

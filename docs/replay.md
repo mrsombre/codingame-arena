@@ -81,7 +81,7 @@ done: 2 saved, 0 skipped-existing, 0 skipped-puzzle, 0 failed (out=./replays)
 traces: 1 saved, 1 saved-mismatch, 0 skipped-existing, 0 skipped-mismatch, 0 failed (out=./traces)
 ```
 
-The progress line's `scores` is the post-OnEnd value matching CG's `gameResult.scores` (the verifier's only score check). The trace file additionally stores the raw pre-OnEnd value as `scores` and the post-OnEnd value as `final_scores`; the two diverge whenever `OnEnd()` adjusts the raw in-game count — e.g. spring2021 adds `floor(sun/3)` to each player on game end.
+The progress line's `scores` is the post-OnEnd value matching CG's `gameResult.scores` (the verifier's only score check). The trace file additionally stores the raw pre-OnEnd value as `scores` and the post-OnEnd value as `finalScores`; the two diverge whenever `OnEnd()` adjusts the raw in-game count — e.g. spring2021 adds `floor(sun/3)` to each player on game end.
 
 Leaderboard mode also prints resolution steps before downloading:
 
@@ -101,17 +101,19 @@ Top-level keys are emitted in this fixed order — annotation metadata first, th
 
 | # | Field           | Source                                          | Description                                                                |
 |---|-----------------|-------------------------------------------------|----------------------------------------------------------------------------|
-| 1 | `fetched_at`    | RFC 3339 timestamp at download time             | Lets `analyze` filter cohorts chronologically                              |
+| 1 | `fetchedAt`     | RFC 3339 timestamp at download time             | Lets `analyze` filter cohorts chronologically                              |
 | 2 | `source`        | `get` or `leaderboard`                          | Which mode produced this file (no IDs → `leaderboard`, IDs → `get`)        |
 | 3 | `puzzleId`      | CG API; backfilled from `factory.PuzzleID()` when CG returned 0 | Canonical CodinGame puzzle id; gates cross-game replay rejection |
 | 4 | `puzzleTitle`   | CG API; backfilled from `factory.PuzzleTitle()` when CG returned 0 | Two-element array as CG's API emits it                          |
 | 5 | `questionTitle` | CG API                                          | Full match title (e.g. `Spring Challenge 2021 - Level 4`); `league` is parsed from it |
-| 6 | `blue`          | `<username>` argument                           | Player we are playing for (the analyze "us" side)                          |
-| 7 | `leaderboard`   | leaderboard mode only                           | `{rank, division, score}` of the player at fetch time                      |
-| 8 | `league`        | parsed from `questionTitle` (e.g. `Level 3` → 3) | League level the match was played at                                      |
-| 9 | `seed`          | extracted from `gameResult.refereeInput`        | Match RNG seed; JSON-string-encoded int64. Replaces `refereeInput`.        |
-| 10| `gameResult`    | upstream CG payload (viewer-only fields stripped, `frames` hoisted out) | Agents, scores, ranks, gameId                              |
-| 11| `frames`        | hoisted from `gameResult.frames`                | Per-turn engine output (the bulky payload, kept last so the metadata stays grouped at the top of the file) |
+| 6 | `replayId`      | mirror of `gameResult.gameId`                   | Canonical replay/match id, hoisted to the top level for convenience        |
+| 7 | `players`       | `gameResult.agents[].codingamer.pseudo` (or `arenaboss.nickname` for boss matches) | `[left, right]` display names, indexed by agent `index`         |
+| 8 | `blue`          | `<username>` argument                           | Player we are playing for (the analyze "us" side)                          |
+| 9 | `leaderboard`   | leaderboard mode only                           | `{rank, division, score}` of the player at fetch time                      |
+| 10| `league`        | parsed from `questionTitle` (e.g. `Level 3` → 3) | League level the match was played at                                      |
+| 11| `seed`          | extracted from `gameResult.refereeInput`        | Match RNG seed; JSON-string-encoded int64. Replaces `refereeInput`.        |
+| 12| `gameResult`    | upstream CG payload (viewer-only fields stripped, `frames` hoisted out) | Agents, scores, ranks, gameId                              |
+| 13| `frames`        | hoisted from `gameResult.frames`                | Per-turn engine output (the bulky payload, kept last so the metadata stays grouped at the top of the file) |
 
 `league` and `leaderboard.division` are deliberately separate: the former is the level a given match was played at, the latter is where the player currently sits on the ladder (Wood / Bronze / Silver / Gold / Legend, indexed from 0).
 
@@ -121,7 +123,7 @@ For replays saved before the seed-promotion change, `refereeInput` is still pres
 
 ```json
 {
-  "fetched_at": "2026-05-07T09:06:10Z",
+  "fetchedAt": "2026-05-07T09:06:10Z",
   "source": "get",
   "puzzleId": 730,
   "puzzleTitle": [
@@ -129,6 +131,8 @@ For replays saved before the seed-promotion change, `refereeInput` is still pres
     "Spring Challenge 2021"
   ],
   "questionTitle": "Spring Challenge 2021 - Level 4",
+  "replayId": 886403710,
+  "players": ["mrsombre", "MiyazaBoss"],
   "blue": "mrsombre",
   "league": 4,
   "seed": "-4436915910920504000",

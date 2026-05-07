@@ -19,7 +19,7 @@ func TestLoadAnalyzeTraceFilesSkipsNonTraceJSON(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
 	writeAnalyzeTestFile(t, traceDir, "note.json", `{"hello": "world"}`)
 	writeAnalyzeTestFile(t, traceDir, "trace-2-0.json", `{
-  "gameId": "test-game",
+  "puzzleName": "test-game",
   "seed": "2",
   "blue": "us",
   "players": ["us", "rival"],
@@ -28,7 +28,7 @@ func TestLoadAnalyzeTraceFilesSkipsNonTraceJSON(t *testing.T) {
   "turns": [{"turn": 0, "output": ["WAIT", "WAIT"]}]
 }`)
 	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{
-  "gameId": "test-game",
+  "puzzleName": "test-game",
   "seed": "1",
   "blue": "us",
   "players": ["us", "rival"],
@@ -42,12 +42,12 @@ func TestLoadAnalyzeTraceFilesSkipsNonTraceJSON(t *testing.T) {
 	require.Len(t, files, 2)
 	assert.Equal(t, "trace-1-0.json", files[0].Name)
 	assert.Equal(t, "trace-2-0.json", files[1].Name)
-	assert.Equal(t, "test-game", files[0].Trace.GameID)
+	assert.Equal(t, "test-game", files[0].Trace.PuzzleName)
 }
 
 func TestLoadAnalyzeTraceFilesRequiresBlueSide(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
-	writeAnalyzeTestFile(t, traceDir, "trace-missing-blue.json", `{"gameId": "test-game", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+	writeAnalyzeTestFile(t, traceDir, "trace-missing-blue.json", `{"puzzleName": "test-game", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
 
 	_, err := loadAnalyzeTraceFiles(traceDir)
 
@@ -57,7 +57,7 @@ func TestLoadAnalyzeTraceFilesRequiresBlueSide(t *testing.T) {
 
 func TestLoadAnalyzeTraceFilesRejectsUnknownBlueSide(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
-	writeAnalyzeTestFile(t, traceDir, "trace-bad-blue.json", `{"gameId": "test-game", "blue": "missing", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+	writeAnalyzeTestFile(t, traceDir, "trace-bad-blue.json", `{"puzzleName": "test-game", "blue": "missing", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
 
 	_, err := loadAnalyzeTraceFiles(traceDir)
 
@@ -68,7 +68,7 @@ func TestLoadAnalyzeTraceFilesRejectsUnknownBlueSide(t *testing.T) {
 func TestResolveAnalyzeGameInfersSingleGame(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
 	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{
-  "gameId": "test-game",
+  "puzzleName": "test-game",
   "seed": "1",
   "blue": "us",
   "players": ["us", "rival"],
@@ -87,8 +87,8 @@ func TestResolveAnalyzeGameInfersSingleGame(t *testing.T) {
 
 func TestResolveAnalyzeGameRequiresExplicitGameForMixedTraces(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
-	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{"gameId": "test-game-a", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
-	writeAnalyzeTestFile(t, traceDir, "trace-2-0.json", `{"gameId": "test-game-b", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{"puzzleName": "test-game-a", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+	writeAnalyzeTestFile(t, traceDir, "trace-2-0.json", `{"puzzleName": "test-game-b", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
 
 	files, err := loadAnalyzeTraceFiles(traceDir)
 	require.NoError(t, err)
@@ -106,8 +106,8 @@ func TestAnalyzeUsesGameFlagToFilterTraceFiles(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
 	gameA := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_a"
 	gameB := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_b"
-	writeAnalyzeTestFile(t, traceDir, "trace-a.json", fmt.Sprintf(`{"type": "trace-a", "gameId": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameA))
-	writeAnalyzeTestFile(t, traceDir, "trace-b.json", fmt.Sprintf(`{"type": "trace-b", "gameId": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameB))
+	writeAnalyzeTestFile(t, traceDir, "trace-a.json", fmt.Sprintf(`{"type": "trace-a", "puzzleName": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameA))
+	writeAnalyzeTestFile(t, traceDir, "trace-b.json", fmt.Sprintf(`{"type": "trace-b", "puzzleName": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameB))
 
 	factory := &recordingAnalyzeFactory{name: gameA}
 	arena.Register(factory)
@@ -125,8 +125,8 @@ func TestBuildTraceAnalysisInputFiltersSelectedGame(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
 	gameA := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_a"
 	gameB := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_b"
-	writeAnalyzeTestFile(t, traceDir, "trace-a.json", fmt.Sprintf(`{"type": "trace-a", "gameId": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameA))
-	writeAnalyzeTestFile(t, traceDir, "trace-b.json", fmt.Sprintf(`{"type": "trace-b", "gameId": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameB))
+	writeAnalyzeTestFile(t, traceDir, "trace-a.json", fmt.Sprintf(`{"type": "trace-a", "puzzleName": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameA))
+	writeAnalyzeTestFile(t, traceDir, "trace-b.json", fmt.Sprintf(`{"type": "trace-b", "puzzleName": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameB))
 	factory := &recordingAnalyzeFactory{name: gameB}
 	arena.Register(factory)
 
@@ -134,7 +134,7 @@ func TestBuildTraceAnalysisInputFiltersSelectedGame(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, analyzer)
-	assert.Equal(t, gameB, input.GameID)
+	assert.Equal(t, gameB, input.PuzzleName)
 	require.Len(t, input.Files, 1)
 	assert.Equal(t, "trace-b.json", input.Files[0].Name)
 	assert.Equal(t, traceDir, input.TraceDir)
@@ -142,7 +142,7 @@ func TestBuildTraceAnalysisInputFiltersSelectedGame(t *testing.T) {
 
 func TestBuildTraceAnalysisInputRejectsUnknownGame(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
-	writeAnalyzeTestFile(t, traceDir, "trace.json", `{"gameId": "missing-game", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+	writeAnalyzeTestFile(t, traceDir, "trace.json", `{"puzzleName": "missing-game", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
 
 	_, _, err := buildTraceAnalysisInput(traceDir, "missing-game")
 

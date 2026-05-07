@@ -332,7 +332,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		}
 		traceMatch := TraceMatch{
 			MatchID:     simulationID,
-			GameID:      runner.Factory.Name(),
+			PuzzleName:  runner.Factory.Name(),
 			PuzzleID:    runner.Factory.PuzzleID(),
 			Seed:        seed,
 			Blue:        filepath.Base(runner.Options.BlueBotBin),

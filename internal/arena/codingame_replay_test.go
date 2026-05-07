@@ -35,6 +35,7 @@ func TestPrepareReplay_StripsViewerOnlyFields(t *testing.T) {
 		"    \"Winter\"\n" +
 		"  ],\n" +
 		"  \"questionTitle\": \"Winter Challenge\",\n" +
+		"  \"replayId\": 42,\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
 		"  },\n" +
@@ -61,6 +62,7 @@ func TestPrepareReplay_PromotesSeedAndDropsRefereeInput(t *testing.T) {
 	}
 
 	want := "{\n" +
+		"  \"replayId\": 42,\n" +
 		"  \"seed\": \"6978185030065794000\",\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
@@ -82,6 +84,7 @@ func TestPrepareReplay_KeepsRefereeInputWhenSeedMissing(t *testing.T) {
 	}
 
 	want := "{\n" +
+		"  \"replayId\": 42,\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42,\n" +
 		"    \"refereeInput\": \"max-turns=200\"\n" +
@@ -103,6 +106,7 @@ func TestPrepareReplay_RemovesFrameViewOnly(t *testing.T) {
 	}
 
 	want := "{\n" +
+		"  \"replayId\": 42,\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
 		"  },\n" +
@@ -135,6 +139,7 @@ func TestPrepareReplay_PrettyPrintsWithoutViewer(t *testing.T) {
 
 	want := "{\n" +
 		"  \"puzzleId\": 1,\n" +
+		"  \"replayId\": 42,\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
 		"  }\n" +
@@ -156,6 +161,7 @@ func TestPrepareReplay_AddsBlueAndLeagueFields(t *testing.T) {
 
 	want := "{\n" +
 		"  \"puzzleId\": 1,\n" +
+		"  \"replayId\": 42,\n" +
 		"  \"blue\": \"mrsombre\",\n" +
 		"  \"league\": 4,\n" +
 		"  \"gameResult\": {\n" +
@@ -182,9 +188,10 @@ func TestPrepareReplay_AddsSourceAndFetchedAt(t *testing.T) {
 	}
 
 	want := "{\n" +
-		"  \"fetched_at\": \"2026-04-29T11:23:45Z\",\n" +
+		"  \"fetchedAt\": \"2026-04-29T11:23:45Z\",\n" +
 		"  \"source\": \"get\",\n" +
 		"  \"puzzleId\": 1,\n" +
+		"  \"replayId\": 42,\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
 		"  }\n" +
@@ -215,6 +222,7 @@ func TestPrepareReplay_OverridesPuzzleIDAndTitle(t *testing.T) {
 		"  \"puzzleId\": 13771,\n" +
 		"  \"puzzleTitle\": \"TestGame - Winter Challenge 2026\",\n" +
 		"  \"questionTitle\": \"TestGame level4\",\n" +
+		"  \"replayId\": 42,\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
 		"  }\n" +
@@ -243,6 +251,7 @@ func TestPrepareReplay_PreservesNonZeroSourcePuzzleID(t *testing.T) {
 
 	want := "{\n" +
 		"  \"puzzleId\": 99999,\n" +
+		"  \"replayId\": 42,\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
 		"  }\n" +
@@ -279,6 +288,78 @@ func TestPeekReplayPuzzleID(t *testing.T) {
 	}
 }
 
+func TestPrepareReplay_PromotesPlayersFromAgents(t *testing.T) {
+	t.Parallel()
+
+	t.Run("two codingamers", func(t *testing.T) {
+		t.Parallel()
+		body := []byte(`{"puzzleId":1,"gameResult":{"gameId":42,"agents":[` +
+			`{"index":0,"codingamer":{"pseudo":"mrsombre"}},` +
+			`{"index":1,"codingamer":{"pseudo":"ymoukhli"}}` +
+			`]}}`)
+
+		got, err := PrepareReplay(body, ReplayAnnotations{})
+		if err != nil {
+			t.Fatalf("PrepareReplay() error = %v", err)
+		}
+
+		var top map[string]json.RawMessage
+		if err := json.Unmarshal(got, &top); err != nil {
+			t.Fatalf("unmarshal output: %v", err)
+		}
+		var players [2]string
+		if err := json.Unmarshal(top["players"], &players); err != nil {
+			t.Fatalf("decode players: %v", err)
+		}
+		if players != [2]string{"mrsombre", "ymoukhli"} {
+			t.Fatalf("players = %v, want [mrsombre ymoukhli]", players)
+		}
+	})
+
+	t.Run("falls back to arenaboss nickname", func(t *testing.T) {
+		t.Parallel()
+		body := []byte(`{"puzzleId":1,"gameResult":{"gameId":42,"agents":[` +
+			`{"index":0,"codingamer":{"pseudo":"mrsombre"}},` +
+			`{"index":1,"arenaboss":{"nickname":"MiyazaBoss"}}` +
+			`]}}`)
+
+		got, err := PrepareReplay(body, ReplayAnnotations{})
+		if err != nil {
+			t.Fatalf("PrepareReplay() error = %v", err)
+		}
+
+		var top map[string]json.RawMessage
+		if err := json.Unmarshal(got, &top); err != nil {
+			t.Fatalf("unmarshal output: %v", err)
+		}
+		var players [2]string
+		if err := json.Unmarshal(top["players"], &players); err != nil {
+			t.Fatalf("decode players: %v", err)
+		}
+		if players != [2]string{"mrsombre", "MiyazaBoss"} {
+			t.Fatalf("players = %v, want [mrsombre MiyazaBoss]", players)
+		}
+	})
+
+	t.Run("skips when agents missing", func(t *testing.T) {
+		t.Parallel()
+		body := []byte(`{"puzzleId":1,"gameResult":{"gameId":42}}`)
+
+		got, err := PrepareReplay(body, ReplayAnnotations{})
+		if err != nil {
+			t.Fatalf("PrepareReplay() error = %v", err)
+		}
+
+		var top map[string]json.RawMessage
+		if err := json.Unmarshal(got, &top); err != nil {
+			t.Fatalf("unmarshal output: %v", err)
+		}
+		if _, ok := top["players"]; ok {
+			t.Fatalf("players should be omitted when agents missing, got %s", string(got))
+		}
+	})
+}
+
 func TestPrepareReplay_AddsLeaderboardInfo(t *testing.T) {
 	t.Parallel()
 
@@ -299,6 +380,7 @@ func TestPrepareReplay_AddsLeaderboardInfo(t *testing.T) {
 	want := "{\n" +
 		"  \"source\": \"leaderboard\",\n" +
 		"  \"puzzleId\": 1,\n" +
+		"  \"replayId\": 42,\n" +
 		"  \"leaderboard\": {\n" +
 		"    \"rank\": 210,\n" +
 		"    \"division\": 3,\n" +

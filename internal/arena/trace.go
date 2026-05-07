@@ -50,22 +50,22 @@ func (s TraceScore) MarshalJSON() ([]byte, error) {
 type TraceMatch struct {
 	// CreatedAt is the RFC 3339 timestamp, the trace was produced. For
 	// self-play traces it's stamped at match completion; for replay traces
-	// it's copied from the source replay's fetched_at so analyze can sort
+	// it's copied from the source replay's fetchedAt so analyze can sort
 	// converted replays chronologically without re-reading the JSON.
-	CreatedAt string    `json:"created_at,omitempty"`
-	Type      string    `json:"type,omitempty"`
-	PuzzleID  int       `json:"puzzleId,omitempty"`
-	GameID    string    `json:"gameId,omitempty"`
-	TraceID   int64     `json:"trace_id,omitempty"`
-	MatchID   int       `json:"match_id"`
-	Players   [2]string `json:"players"`
-	Blue      string    `json:"blue,omitempty"`
-	League    int       `json:"league,omitempty"`
-	Seed      int64     `json:"seed,string"`
+	CreatedAt  string    `json:"createdAt,omitempty"`
+	Type       string    `json:"type,omitempty"`
+	PuzzleID   int       `json:"puzzleId,omitempty"`
+	PuzzleName string    `json:"puzzleName,omitempty"`
+	TraceID    int64     `json:"traceId,omitempty"`
+	MatchID    int       `json:"matchId"`
+	Players    [2]string `json:"players"`
+	Blue       string    `json:"blue,omitempty"`
+	League     int       `json:"league,omitempty"`
+	Seed       int64     `json:"seed,string"`
 	// EndReason categorizes how the match terminated. Game-specific; see the
 	// EndReason* constants for shared values. Empty when the referee doesn't
 	// implement EndReasonProvider.
-	EndReason string `json:"end_reason,omitempty"`
+	EndReason string `json:"endReason,omitempty"`
 	// Disqualified[i] is true when side i was deactivated (timeout / bad
 	// command) during the match. Used by analyzers to attribute fault end
 	// reasons to a specific side; the verifier uses it to short-circuit
@@ -82,14 +82,14 @@ type TraceMatch struct {
 	// converted traces the trace inherits CodinGame's gameResult.scores
 	// when the match was disqualified; otherwise it equals the engine's
 	// post-OnEnd value (which matches CG for clean matches).
-	FinalScores [2]TraceScore `json:"final_scores"`
+	FinalScores [2]TraceScore `json:"finalScores"`
 	Ranks       [2]int        `json:"ranks"`
 	Timing      *TraceTiming  `json:"timing,omitempty"`
 	// MainTurns is the count of player-decision trace turns. Excludes
 	// non-decision phase turns (Spring 2021 GATHERING/SUN_MOVE) and
 	// post-end frames (Spring 2020 gameOverFrame). Populated going forward
 	// only; older trace files load with 0 ("unknown").
-	MainTurns int         `json:"main_turns,omitempty"`
+	MainTurns int         `json:"mainTurns,omitempty"`
 	Turns     []TraceTurn `json:"turns"`
 }
 
@@ -191,9 +191,9 @@ func TraceWinnerFromScores(scores [2]int, deactivated [2]bool) int {
 // not representative of steady-state). ResponseAverage and ResponseMedian
 // summarize the remaining turns and intentionally exclude turn 0.
 type TraceTiming struct {
-	FirstResponse   [2]float64 `json:"first_response"`
-	ResponseAverage [2]float64 `json:"response_average"`
-	ResponseMedian  [2]float64 `json:"response_median"`
+	FirstResponse   [2]float64 `json:"firstResponse"`
+	ResponseAverage [2]float64 `json:"responseAverage"`
+	ResponseMedian  [2]float64 `json:"responseMedian"`
 }
 
 // TraceTurn captures one turn of the game state for replay/debug.
@@ -214,7 +214,7 @@ type TraceTiming struct {
 // info downstream consumers need.
 type TraceTurn struct {
 	Turn      int              `json:"turn"`
-	GameInput []string         `json:"game_input,omitempty"`
+	GameInput []string         `json:"gameInput,omitempty"`
 	Output    [2]string        `json:"output,omitzero"`
 	// IsOutputTurn[i] records whether side i was prompted for output this
 	// turn (i.e., the runner asked the bot for a command). Independent of
@@ -223,7 +223,7 @@ type TraceTurn struct {
 	// already deactivated or the engine flagged it skipped (e.g., spring2021
 	// IsWaiting). Lets analyzers and the runner identify the first turn a
 	// bot was actually asked to act, regardless of the game's frame model.
-	IsOutputTurn [2]bool          `json:"is_output_turn,omitzero"`
+	IsOutputTurn [2]bool          `json:"isOutputTurn,omitzero"`
 	Timing       *TraceTurnTiming `json:"timing,omitempty"`
 	// Score carries the per-player raw score going into this turn, sampled
 	// from RawScoresProvider before PerformGameUpdate. Zero values when the
@@ -285,7 +285,7 @@ func NewFixedTraceWriter(path string, traceID int64) *TraceWriter {
 }
 
 // WriteMatch writes a single match trace as a JSON file:
-// <dir>/trace-<trace_id>-<match_id>.json or <dir>/replay-<trace_id>.json
+// <dir>/trace-<traceId>-<matchId>.json or <dir>/replay-<traceId>.json
 func (w *TraceWriter) WriteMatch(match TraceMatch) error {
 	if w == nil {
 		return nil

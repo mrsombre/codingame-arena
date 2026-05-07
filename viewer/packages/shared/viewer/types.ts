@@ -6,9 +6,9 @@ export interface LeagueOption {
 }
 
 export interface TraceTiming {
-  first_response: [number, number]
-  response_average: [number, number]
-  response_median: [number, number]
+  firstResponse: [number, number]
+  responseAverage: [number, number]
+  responseMedian: [number, number]
 }
 
 export interface TraceTurnTiming {
@@ -22,7 +22,7 @@ export interface TurnTrace<M = unknown> {
 
 export interface TraceTurnBase {
   turn: number
-  game_input?: string[]
+  gameInput?: string[]
   output?: [string, string]
   timing?: TraceTurnTiming
   /**
@@ -33,7 +33,7 @@ export interface TraceTurnBase {
 }
 
 export interface TraceMatchBase<TTurn extends TraceTurnBase = TraceTurnBase> {
-  match_id: number
+  matchId: number
   seed: string
   ranks: [number, number]
   scores: [number, number]

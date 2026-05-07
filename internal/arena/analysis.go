@@ -11,9 +11,9 @@ type TraceFile struct {
 // TraceAnalysisInput is the generic input passed from the CLI to the shared
 // trace analyzer.
 type TraceAnalysisInput struct {
-	TraceDir string
-	Files    []TraceFile
-	GameID   string
+	TraceDir   string
+	Files      []TraceFile
+	PuzzleName string
 }
 
 // TraceAnalysis is an arena-rendered analysis report.

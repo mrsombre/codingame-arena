@@ -39,7 +39,7 @@ func AnalyzeTraceFiles(input TraceAnalysisInput, metricAnalyzer TraceMetricAnaly
 
 	report := &traceAnalysisReport{
 		traceDir:            input.TraceDir,
-		gameID:              input.GameID,
+		puzzleName:          input.PuzzleName,
 		files:               len(input.Files),
 		endReasonSpecs:      StandardTraceEndReasons(),
 		endReasonCounts:     make(map[string]int),
@@ -161,9 +161,9 @@ func TraceEndReasonSide(trace TraceMatch, winner int) int {
 }
 
 type traceAnalysisReport struct {
-	traceDir string
-	gameID   string
-	files    int
+	traceDir   string
+	puzzleName string
+	files      int
 
 	decided int
 	draws   int
@@ -320,7 +320,7 @@ func traceMetricSample(kind TraceMetricKind, value, turns int) (float64, bool) {
 }
 
 func (r *traceAnalysisReport) Write(w io.Writer) error {
-	title := r.gameID
+	title := r.puzzleName
 	if title == "" {
 		title = "Trace"
 	}

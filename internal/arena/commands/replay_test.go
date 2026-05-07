@@ -43,7 +43,7 @@ func TestDownloadReplaySavesPreparedBody(t *testing.T) {
 	assert.JSONEq(t, `"us"`, string(top["blue"]))
 	assert.JSONEq(t, `"get"`, string(top["source"]))
 	assert.JSONEq(t, `"7"`, string(top["seed"]))
-	assert.Contains(t, string(top["fetched_at"]), "2023-")
+	assert.Contains(t, string(top["fetchedAt"]), "2023-")
 }
 
 func TestDownloadReplayMarksFetchErrorAsFailed(t *testing.T) {

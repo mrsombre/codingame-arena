@@ -115,7 +115,7 @@ type LeagueResolver interface {
 // out later) — this is independent of the game's frame model, so games with
 // non-decision leading frames (e.g., Spring 2021 GATHERING) classify
 // correctly. Optional — if Referee implements this, match stamps the value
-// onto the trace as "end_reason".
+// onto the trace as "endReason".
 type EndReasonProvider interface {
 	EndReason(turn int, players []Player, deactivationTurns, firstOutputTurns [2]int) string
 }

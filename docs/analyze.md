@@ -19,14 +19,14 @@ bin/arena analyze --game=winter2026 --trace-dir=./traces/experiment-A
 | Flag          | Default    | Description                                                                    |
 |---------------|------------|--------------------------------------------------------------------------------|
 | `--trace-dir` | `./traces` | Directory to scan for trace JSON files                                         |
-| `--game`      | inferred   | Active game (or set in `arena.yml`); inferred when all traces share a `gameId` |
+| `--game`      | inferred   | Active game (or set in `arena.yml`); inferred when all traces share a `puzzleName` |
 
 If `--game` is omitted and the trace dir contains traces from multiple games, the command exits with an error listing the games it found. Pass `--game` to disambiguate.
 
 ## How it works
 
 1. Read every `*.json` file in `--trace-dir`; ignore non-trace JSON.
-2. Filter to traces whose `gameId` matches `--game` (or the inferred game).
+2. Filter to traces whose `puzzleName` matches `--game` (or the inferred game).
 3. Render generic multiplayer facts: win/draw split, side wins, blue-side results, turns, scores, timing, and end reasons.
 4. If the game implements trace metrics, ask it to interpret opaque `turns[].traces` and return per-side metric counts.
 5. Arena aggregates those metrics as either average counts per match or average per-match turn rates.
