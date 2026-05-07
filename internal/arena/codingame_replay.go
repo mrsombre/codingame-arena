@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -61,22 +62,55 @@ type ReplayLeaderboardInfo struct {
 // saved replays (written before the top-level Seed field existed) can still
 // be re-read; PrepareReplay strips it from new files once the seed is
 // promoted to the top level.
+//
+// New saved replays carry frames at the top level (see PrepareReplay) — the
+// nested Frames field is still populated by CodinGameReplay.UnmarshalJSON so
+// internal callers can keep reading replay.GameResult.Frames regardless of
+// which on-disk shape produced the file.
 type CodinGameReplayResult[F any] struct {
 	GameID       int64                  `json:"gameId"`
 	RefereeInput string                 `json:"refereeInput,omitempty"`
 	Scores       []float64              `json:"scores"`
 	Ranks        []int                  `json:"ranks"`
 	Agents       []CodinGameReplayAgent `json:"agents"`
-	Frames       []F                    `json:"frames"`
+	Frames       []F                    `json:"frames,omitempty"`
+}
+
+// UnmarshalJSON unifies the two on-disk replay shapes: new files carry
+// `frames` at the top level (lifted by PrepareReplay so the bulky payload
+// sits at the end of the file); legacy files keep them under
+// `gameResult.frames`. Either way, they end up in GameResult.Frames so the
+// rest of the codebase only reads from one place.
+func (r *CodinGameReplay[F]) UnmarshalJSON(data []byte) error {
+	type plain CodinGameReplay[F]
+	var p plain
+	if err := json.Unmarshal(data, &p); err != nil {
+		return err
+	}
+
+	var probe struct {
+		Frames json.RawMessage `json:"frames"`
+	}
+	if err := json.Unmarshal(data, &probe); err == nil && len(probe.Frames) > 0 {
+		var frames []F
+		if err := json.Unmarshal(probe.Frames, &frames); err != nil {
+			return err
+		}
+		p.GameResult.Frames = frames
+	}
+
+	*r = CodinGameReplay[F](p)
+	return nil
 }
 
 // CodinGameReplayAgent is one entry in gameResult.agents.
 type CodinGameReplayAgent struct {
-	Index      int                 `json:"index"`
-	AgentID    int64               `json:"agentId"`
-	Score      float64             `json:"score"`
-	Valid      bool                `json:"valid"`
-	CodinGamer CodinGameReplayUser `json:"codingamer"`
+	Index      int                  `json:"index"`
+	AgentID    int64                `json:"agentId"`
+	Score      float64              `json:"score"`
+	Valid      bool                 `json:"valid"`
+	CodinGamer CodinGameReplayUser  `json:"codingamer"`
+	ArenaBoss  *CodinGameReplayBoss `json:"arenaboss,omitempty"`
 }
 
 // CodinGameReplayUser is gameResult.agents[i].codingamer.
@@ -84,6 +118,12 @@ type CodinGameReplayUser struct {
 	UserID int64  `json:"userId"`
 	Pseudo string `json:"pseudo"`
 	Avatar int64  `json:"avatar"`
+}
+
+// CodinGameReplayBoss is gameResult.agents[i].arenaboss — present instead of
+// `codingamer` when the opponent is the league boss bot.
+type CodinGameReplayBoss struct {
+	Nickname string `json:"nickname"`
 }
 
 // CodinGameReplayFrame is the default frame shape: the fields every CodinGame
@@ -370,21 +410,31 @@ func hasTrailingEngineFrame(replay CodinGameReplay[CodinGameReplayFrame]) bool {
 }
 
 // ReplayPlayerNames extracts player display names from replay agent metadata.
+// Boss matches carry the opponent under `arenaboss.nickname` instead of
+// `codingamer.pseudo`, so fall back to that when the pseudo is empty.
 func ReplayPlayerNames(replay CodinGameReplay[CodinGameReplayFrame]) [2]string {
 	names := [2]string{"left", "right"}
 	for _, a := range replay.GameResult.Agents {
-		switch a.Index {
-		case 0:
-			if pseudo := strings.TrimSpace(a.CodinGamer.Pseudo); pseudo != "" {
-				names[0] = pseudo
-			}
-		case 1:
-			if pseudo := strings.TrimSpace(a.CodinGamer.Pseudo); pseudo != "" {
-				names[1] = pseudo
-			}
+		if a.Index != 0 && a.Index != 1 {
+			continue
+		}
+		if name := replayAgentName(a); name != "" {
+			names[a.Index] = name
 		}
 	}
 	return names
+}
+
+func replayAgentName(a CodinGameReplayAgent) string {
+	if pseudo := strings.TrimSpace(a.CodinGamer.Pseudo); pseudo != "" {
+		return pseudo
+	}
+	if a.ArenaBoss != nil {
+		if nickname := strings.TrimSpace(a.ArenaBoss.Nickname); nickname != "" {
+			return nickname
+		}
+	}
+	return ""
 }
 
 // ReplayAnnotations carries the arena-only metadata written into a saved
@@ -528,33 +578,70 @@ func replayPuzzleIDIsBlank(top map[string]json.RawMessage) bool {
 	return pid == 0
 }
 
-// marshalReplayTop emits the top-level replay object with `gameResult`
-// pinned at the end. Go's default map marshaling sorts keys alphabetically,
-// which buries `gameResult` (the bulky frames payload) in the middle of the
-// file; floating it last keeps the readable annotations grouped at the top.
+// marshalReplayTop emits the top-level replay object with a stable,
+// human-readable field order: arena-annotation keys first (in the explicit
+// sequence below), then any unrecognized keys alphabetically, then
+// `gameResult` and `frames` last (so the bulky payloads sit at the end).
+// Go's default map marshaling would otherwise sort everything
+// alphabetically, scattering metadata across the file.
+var (
+	replayHeadKeys = []string{
+		"fetched_at",
+		"source",
+		"puzzleId",
+		"puzzleTitle",
+		"questionTitle",
+		"blue",
+		"leaderboard",
+		"league",
+		"seed",
+	}
+	replayTrailingKeys = []string{"gameResult", "frames"}
+)
+
 func marshalReplayTop(top map[string]json.RawMessage) ([]byte, error) {
-	gameResult, hasGameResult := top["gameResult"]
-	if hasGameResult {
-		delete(top, "gameResult")
-		defer func() { top["gameResult"] = gameResult }()
+	pinned := make(map[string]struct{}, len(replayHeadKeys)+len(replayTrailingKeys))
+	for _, key := range replayHeadKeys {
+		pinned[key] = struct{}{}
 	}
-	rest, err := json.Marshal(top)
-	if err != nil {
-		return nil, err
+	for _, key := range replayTrailingKeys {
+		pinned[key] = struct{}{}
 	}
-	if !hasGameResult {
-		return rest, nil
+
+	middle := make([]string, 0, len(top))
+	for key := range top {
+		if _, ok := pinned[key]; ok {
+			continue
+		}
+		middle = append(middle, key)
 	}
-	if len(rest) < 2 || rest[0] != '{' || rest[len(rest)-1] != '}' {
-		return rest, nil
+	sort.Strings(middle)
+
+	out := make([]byte, 0, 1024)
+	out = append(out, '{')
+	sep := false
+
+	write := func(keys []string) {
+		for _, key := range keys {
+			v, ok := top[key]
+			if !ok {
+				continue
+			}
+			if sep {
+				out = append(out, ',')
+			}
+			out = append(out, '"')
+			out = append(out, key...)
+			out = append(out, `":`...)
+			out = append(out, v...)
+			sep = true
+		}
 	}
-	out := make([]byte, 0, len(rest)+len(gameResult)+16)
-	out = append(out, rest[:len(rest)-1]...)
-	if len(rest) > 2 {
-		out = append(out, ',')
-	}
-	out = append(out, `"gameResult":`...)
-	out = append(out, gameResult...)
+
+	write(replayHeadKeys)
+	write(middle)
+	write(replayTrailingKeys)
+
 	out = append(out, '}')
 	return out, nil
 }
@@ -591,7 +678,9 @@ func promoteReplaySeed(top map[string]json.RawMessage) error {
 }
 
 // stripReplayInner removes viewer-only fields nested under gameResult and
-// inside each frame. Silent no-op if gameResult or frames are absent.
+// inside each frame, and hoists `frames` from gameResult to the top level
+// so the bulky per-turn payload sits at the very end of the file (see
+// marshalReplayTop). Silent no-op if gameResult or frames are absent.
 func stripReplayInner(top map[string]json.RawMessage) error {
 	var gameResult map[string]json.RawMessage
 	if err := json.Unmarshal(top["gameResult"], &gameResult); err != nil {
@@ -603,6 +692,11 @@ func stripReplayInner(top map[string]json.RawMessage) error {
 
 	if err := stripReplayFrames(gameResult); err != nil {
 		return err
+	}
+
+	if frames, ok := gameResult["frames"]; ok {
+		delete(gameResult, "frames")
+		top["frames"] = frames
 	}
 
 	var err error

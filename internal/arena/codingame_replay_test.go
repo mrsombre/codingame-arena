@@ -1,6 +1,7 @@
 package arena
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -35,14 +36,14 @@ func TestPrepareReplay_StripsViewerOnlyFields(t *testing.T) {
 		"  ],\n" +
 		"  \"questionTitle\": \"Winter Challenge\",\n" +
 		"  \"gameResult\": {\n" +
-		"    \"frames\": [\n" +
-		"      {\n" +
-		"        \"agentId\": 0,\n" +
-		"        \"stdout\": \"MOVE\"\n" +
-		"      }\n" +
-		"    ],\n" +
 		"    \"gameId\": 42\n" +
-		"  }\n" +
+		"  },\n" +
+		"  \"frames\": [\n" +
+		"    {\n" +
+		"      \"agentId\": 0,\n" +
+		"      \"stdout\": \"MOVE\"\n" +
+		"    }\n" +
+		"  ]\n" +
 		"}\n"
 	if string(got) != want {
 		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
@@ -103,19 +104,19 @@ func TestPrepareReplay_RemovesFrameViewOnly(t *testing.T) {
 
 	want := "{\n" +
 		"  \"gameResult\": {\n" +
-		"    \"frames\": [\n" +
-		"      {\n" +
-		"        \"agentId\": 0,\n" +
-		"        \"stdout\": \"MOVE\"\n" +
-		"      },\n" +
-		"      {\n" +
-		"        \"agentId\": 1,\n" +
-		"        \"summary\": \"ok\"\n" +
-		"      },\n" +
-		"      \"raw\"\n" +
-		"    ],\n" +
 		"    \"gameId\": 42\n" +
-		"  }\n" +
+		"  },\n" +
+		"  \"frames\": [\n" +
+		"    {\n" +
+		"      \"agentId\": 0,\n" +
+		"      \"stdout\": \"MOVE\"\n" +
+		"    },\n" +
+		"    {\n" +
+		"      \"agentId\": 1,\n" +
+		"      \"summary\": \"ok\"\n" +
+		"    },\n" +
+		"    \"raw\"\n" +
+		"  ]\n" +
 		"}\n"
 	if string(got) != want {
 		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
@@ -154,9 +155,9 @@ func TestPrepareReplay_AddsBlueAndLeagueFields(t *testing.T) {
 	}
 
 	want := "{\n" +
+		"  \"puzzleId\": 1,\n" +
 		"  \"blue\": \"mrsombre\",\n" +
 		"  \"league\": 4,\n" +
-		"  \"puzzleId\": 1,\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
 		"  }\n" +
@@ -182,8 +183,8 @@ func TestPrepareReplay_AddsSourceAndFetchedAt(t *testing.T) {
 
 	want := "{\n" +
 		"  \"fetched_at\": \"2026-04-29T11:23:45Z\",\n" +
-		"  \"puzzleId\": 1,\n" +
 		"  \"source\": \"get\",\n" +
+		"  \"puzzleId\": 1,\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
 		"  }\n" +
@@ -296,13 +297,13 @@ func TestPrepareReplay_AddsLeaderboardInfo(t *testing.T) {
 	}
 
 	want := "{\n" +
+		"  \"source\": \"leaderboard\",\n" +
+		"  \"puzzleId\": 1,\n" +
 		"  \"leaderboard\": {\n" +
 		"    \"rank\": 210,\n" +
 		"    \"division\": 3,\n" +
 		"    \"score\": 18.95\n" +
 		"  },\n" +
-		"  \"puzzleId\": 1,\n" +
-		"  \"source\": \"leaderboard\",\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
 		"  }\n" +
@@ -336,6 +337,56 @@ func TestParseReplayLeague(t *testing.T) {
 	if got := ParseReplayLeague("Winter Challenge"); got != 0 {
 		t.Fatalf("ParseReplayLeague() = %d, want 0", got)
 	}
+}
+
+func TestCodinGameReplayUnmarshalAcceptsBothFrameLocations(t *testing.T) {
+	t.Parallel()
+
+	t.Run("new format: frames at top level", func(t *testing.T) {
+		t.Parallel()
+		body := []byte(`{
+			"puzzleId":1,
+			"gameResult":{"gameId":42},
+			"frames":[{"agentId":0,"stdout":"MOVE"}]
+		}`)
+		var replay CodinGameReplay[CodinGameReplayFrame]
+		if err := json.Unmarshal(body, &replay); err != nil {
+			t.Fatalf("Unmarshal() error = %v", err)
+		}
+		if got := replay.GameResult.Frames; len(got) != 1 || got[0].Stdout != "MOVE" {
+			t.Fatalf("GameResult.Frames = %#v, want one MOVE frame", got)
+		}
+	})
+
+	t.Run("legacy format: frames inside gameResult", func(t *testing.T) {
+		t.Parallel()
+		body := []byte(`{
+			"puzzleId":1,
+			"gameResult":{"gameId":42,"frames":[{"agentId":1,"stdout":"WAIT"}]}
+		}`)
+		var replay CodinGameReplay[CodinGameReplayFrame]
+		if err := json.Unmarshal(body, &replay); err != nil {
+			t.Fatalf("Unmarshal() error = %v", err)
+		}
+		if got := replay.GameResult.Frames; len(got) != 1 || got[0].Stdout != "WAIT" {
+			t.Fatalf("GameResult.Frames = %#v, want one WAIT frame", got)
+		}
+	})
+
+	t.Run("top-level frames take precedence over nested", func(t *testing.T) {
+		t.Parallel()
+		body := []byte(`{
+			"gameResult":{"frames":[{"agentId":0,"stdout":"OLD"}]},
+			"frames":[{"agentId":0,"stdout":"NEW"}]
+		}`)
+		var replay CodinGameReplay[CodinGameReplayFrame]
+		if err := json.Unmarshal(body, &replay); err != nil {
+			t.Fatalf("Unmarshal() error = %v", err)
+		}
+		if got := replay.GameResult.Frames; len(got) != 1 || got[0].Stdout != "NEW" {
+			t.Fatalf("GameResult.Frames = %#v, want NEW frame", got)
+		}
+	})
 }
 
 func TestReplayMovesFromFramesAndTurnCount(t *testing.T) {
@@ -677,18 +728,44 @@ func TestExtractReplayOutcome(t *testing.T) {
 func TestReplayPlayerNames(t *testing.T) {
 	t.Parallel()
 
-	replay := CodinGameReplay[CodinGameReplayFrame]{
-		GameResult: CodinGameReplayResult[CodinGameReplayFrame]{
-			Agents: []CodinGameReplayAgent{
+	tests := []struct {
+		name   string
+		agents []CodinGameReplayAgent
+		want   [2]string
+	}{
+		{
+			name: "two_pseudos",
+			agents: []CodinGameReplayAgent{
 				{Index: 0, CodinGamer: CodinGameReplayUser{Pseudo: "Alpha"}},
 				{Index: 1, CodinGamer: CodinGameReplayUser{Pseudo: "Beta"}},
 			},
+			want: [2]string{"Alpha", "Beta"},
+		},
+		{
+			name: "boss_opponent",
+			agents: []CodinGameReplayAgent{
+				{Index: 0, CodinGamer: CodinGameReplayUser{Pseudo: "Alpha"}},
+				{Index: 1, ArenaBoss: &CodinGameReplayBoss{Nickname: "MiyazaBoss"}},
+			},
+			want: [2]string{"Alpha", "MiyazaBoss"},
+		},
+		{
+			name:   "missing_metadata_falls_back",
+			agents: []CodinGameReplayAgent{{Index: 0}, {Index: 1}},
+			want:   [2]string{"left", "right"},
 		},
 	}
 
-	got := ReplayPlayerNames(replay)
-	want := [2]string{"Alpha", "Beta"}
-	if got != want {
-		t.Fatalf("ReplayPlayerNames() = %#v, want %#v", got, want)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			replay := CodinGameReplay[CodinGameReplayFrame]{
+				GameResult: CodinGameReplayResult[CodinGameReplayFrame]{Agents: tc.agents},
+			}
+			got := ReplayPlayerNames(replay)
+			if got != tc.want {
+				t.Fatalf("ReplayPlayerNames() = %#v, want %#v", got, tc.want)
+			}
+		})
 	}
 }

@@ -64,14 +64,18 @@ type replayBatchConfig struct {
 func ReplayUsage(fs *pflag.FlagSet) string {
 	return arena.CommandUsage(
 		"replay <username> [<id|url>[,<id|url>...]]",
-		"Download raw replay JSON from codingame.com and convert each freshly-"+
-			"saved file into a verified arena trace. With no IDs, downloads "+
-			"every replay from <username>'s last battles list on the active "+
-			"game's leaderboard. With one or more IDs (or replay URLs), "+
-			"downloads only those games. <username> is the player we are "+
-			"playing for; it is recorded as the top-level \"blue\" field in "+
-			"every saved replay. Already-downloaded replays are skipped (use "+
-			"-f to re-download and re-convert).",
+		"Download raw replay JSON from codingame.com. Each freshly-saved "+
+			"replay is auto-converted to a verified arena trace written to "+
+			"--trace-dir under the same id (replays/<id>.json → "+
+			"traces/replay-<id>.json) — this is not a separate convert "+
+			"command. With no IDs, downloads every replay from <username>'s "+
+			"last battles list on the active game's leaderboard. With one or "+
+			"more IDs (or replay URLs), downloads only those games. "+
+			"<username> is the player we are playing for; it is recorded as "+
+			"the top-level \"blue\" field in every saved replay. By default, "+
+			"replays already on disk are skipped (and so is their conversion "+
+			"step). Pass -f/--force to re-download the replay and re-convert "+
+			"the trace, overwriting both files in place under the same id.",
 		fs,
 		"",
 	)
