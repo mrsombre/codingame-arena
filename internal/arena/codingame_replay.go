@@ -469,24 +469,94 @@ func PrepareReplay(body []byte, ann ReplayAnnotations) ([]byte, error) {
 	}
 	// CG's API occasionally returns puzzleId=0 and omits puzzleTitle for some
 	// games (observed for game IDs 882653023, 882783026, 882785040 in the
-	// winter2026 leaderboard pull). Override with the canonical values from
-	// the factory so convert doesn't have to recover after the fact.
-	if ann.PuzzleID != 0 {
+	// winter2026 leaderboard pull). Fill in the canonical values from the
+	// factory ONLY when the source field is missing or zero — preserving any
+	// non-zero source value lets the caller flag wrong-puzzle replays via
+	// PeekReplayPuzzleID instead of silently rewriting them.
+	if ann.PuzzleID != 0 && replayPuzzleIDIsBlank(top) {
 		if err := setRaw(top, "puzzleId", ann.PuzzleID); err != nil {
 			return nil, err
 		}
-	}
-	if ann.PuzzleTitle != "" {
-		if err := setRaw(top, "puzzleTitle", ann.PuzzleTitle); err != nil {
-			return nil, err
+		if ann.PuzzleTitle != "" {
+			if err := setRaw(top, "puzzleTitle", ann.PuzzleTitle); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	body, err := json.Marshal(top)
+	body, err := marshalReplayTop(top)
 	if err != nil {
 		return nil, err
 	}
 	return prettyJSON(body)
+}
+
+// PeekReplayPuzzleID returns the source puzzleId from a raw CodinGame replay
+// body without mutating it. ok is false when the field is missing or its
+// value isn't a parseable integer; the caller should treat that as
+// "unknown" rather than zero.
+func PeekReplayPuzzleID(body []byte) (int, bool) {
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(body, &top); err != nil {
+		return 0, false
+	}
+	raw, ok := top["puzzleId"]
+	if !ok {
+		return 0, false
+	}
+	var pid int
+	if err := json.Unmarshal(raw, &pid); err != nil {
+		return 0, false
+	}
+	return pid, true
+}
+
+// replayPuzzleIDIsBlank reports whether the parsed top-level map has a
+// missing or zero "puzzleId" field — the only conditions under which
+// PrepareReplay layers in the factory's canonical puzzleId. Anything else
+// (a real, non-zero ID) is preserved so the caller can detect and reject
+// cross-game replays.
+func replayPuzzleIDIsBlank(top map[string]json.RawMessage) bool {
+	raw, ok := top["puzzleId"]
+	if !ok {
+		return true
+	}
+	var pid int
+	if err := json.Unmarshal(raw, &pid); err != nil {
+		return true
+	}
+	return pid == 0
+}
+
+// marshalReplayTop emits the top-level replay object with `gameResult`
+// pinned at the end. Go's default map marshaling sorts keys alphabetically,
+// which buries `gameResult` (the bulky frames payload) in the middle of the
+// file; floating it last keeps the readable annotations grouped at the top.
+func marshalReplayTop(top map[string]json.RawMessage) ([]byte, error) {
+	gameResult, hasGameResult := top["gameResult"]
+	if hasGameResult {
+		delete(top, "gameResult")
+		defer func() { top["gameResult"] = gameResult }()
+	}
+	rest, err := json.Marshal(top)
+	if err != nil {
+		return nil, err
+	}
+	if !hasGameResult {
+		return rest, nil
+	}
+	if len(rest) < 2 || rest[0] != '{' || rest[len(rest)-1] != '}' {
+		return rest, nil
+	}
+	out := make([]byte, 0, len(rest)+len(gameResult)+16)
+	out = append(out, rest[:len(rest)-1]...)
+	if len(rest) > 2 {
+		out = append(out, ',')
+	}
+	out = append(out, `"gameResult":`...)
+	out = append(out, gameResult...)
+	out = append(out, '}')
+	return out, nil
 }
 
 // promoteReplaySeed reads gameResult.refereeInput, lifts the seed to the

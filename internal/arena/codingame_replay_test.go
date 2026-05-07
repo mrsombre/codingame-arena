@@ -29,6 +29,11 @@ func TestPrepareReplay_StripsViewerOnlyFields(t *testing.T) {
 	}
 
 	want := "{\n" +
+		"  \"puzzleId\": 1,\n" +
+		"  \"puzzleTitle\": [\n" +
+		"    \"Winter\"\n" +
+		"  ],\n" +
+		"  \"questionTitle\": \"Winter Challenge\",\n" +
 		"  \"gameResult\": {\n" +
 		"    \"frames\": [\n" +
 		"      {\n" +
@@ -37,12 +42,7 @@ func TestPrepareReplay_StripsViewerOnlyFields(t *testing.T) {
 		"      }\n" +
 		"    ],\n" +
 		"    \"gameId\": 42\n" +
-		"  },\n" +
-		"  \"puzzleId\": 1,\n" +
-		"  \"puzzleTitle\": [\n" +
-		"    \"Winter\"\n" +
-		"  ],\n" +
-		"  \"questionTitle\": \"Winter Challenge\"\n" +
+		"  }\n" +
 		"}\n"
 	if string(got) != want {
 		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
@@ -60,10 +60,10 @@ func TestPrepareReplay_PromotesSeedAndDropsRefereeInput(t *testing.T) {
 	}
 
 	want := "{\n" +
+		"  \"seed\": \"6978185030065794000\",\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
-		"  },\n" +
-		"  \"seed\": \"6978185030065794000\"\n" +
+		"  }\n" +
 		"}\n"
 	if string(got) != want {
 		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
@@ -133,10 +133,10 @@ func TestPrepareReplay_PrettyPrintsWithoutViewer(t *testing.T) {
 	}
 
 	want := "{\n" +
+		"  \"puzzleId\": 1,\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
-		"  },\n" +
-		"  \"puzzleId\": 1\n" +
+		"  }\n" +
 		"}\n"
 	if string(got) != want {
 		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
@@ -155,11 +155,11 @@ func TestPrepareReplay_AddsBlueAndLeagueFields(t *testing.T) {
 
 	want := "{\n" +
 		"  \"blue\": \"mrsombre\",\n" +
+		"  \"league\": 4,\n" +
+		"  \"puzzleId\": 1,\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
-		"  },\n" +
-		"  \"league\": 4,\n" +
-		"  \"puzzleId\": 1\n" +
+		"  }\n" +
 		"}\n"
 	if string(got) != want {
 		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
@@ -182,11 +182,11 @@ func TestPrepareReplay_AddsSourceAndFetchedAt(t *testing.T) {
 
 	want := "{\n" +
 		"  \"fetched_at\": \"2026-04-29T11:23:45Z\",\n" +
+		"  \"puzzleId\": 1,\n" +
+		"  \"source\": \"get\",\n" +
 		"  \"gameResult\": {\n" +
 		"    \"gameId\": 42\n" +
-		"  },\n" +
-		"  \"puzzleId\": 1,\n" +
-		"  \"source\": \"get\"\n" +
+		"  }\n" +
 		"}\n"
 	if string(got) != want {
 		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
@@ -211,15 +211,70 @@ func TestPrepareReplay_OverridesPuzzleIDAndTitle(t *testing.T) {
 	}
 
 	want := "{\n" +
-		"  \"gameResult\": {\n" +
-		"    \"gameId\": 42\n" +
-		"  },\n" +
 		"  \"puzzleId\": 13771,\n" +
 		"  \"puzzleTitle\": \"TestGame - Winter Challenge 2026\",\n" +
-		"  \"questionTitle\": \"TestGame level4\"\n" +
+		"  \"questionTitle\": \"TestGame level4\",\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42\n" +
+		"  }\n" +
 		"}\n"
 	if string(got) != want {
 		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
+func TestPrepareReplay_PreservesNonZeroSourcePuzzleID(t *testing.T) {
+	t.Parallel()
+
+	// Source declares its own real puzzleId. The annotations carry the
+	// factory's expected ID, but PrepareReplay must NOT silently rewrite
+	// the source value — keeping it intact lets the caller (downloadReplay)
+	// detect the cross-game mismatch and reject the file before save.
+	body := []byte(`{"puzzleId":99999,"gameResult":{"gameId":42}}`)
+
+	got, err := PrepareReplay(body, ReplayAnnotations{
+		PuzzleID:    13771,
+		PuzzleTitle: "TestGame - Winter Challenge 2026",
+	})
+	if err != nil {
+		t.Fatalf("PrepareReplay() error = %v", err)
+	}
+
+	want := "{\n" +
+		"  \"puzzleId\": 99999,\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42\n" +
+		"  }\n" +
+		"}\n"
+	if string(got) != want {
+		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
+func TestPeekReplayPuzzleID(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		body    string
+		want    int
+		wantOK  bool
+	}{
+		{"present non-zero", `{"puzzleId":42,"gameResult":{}}`, 42, true},
+		{"present zero", `{"puzzleId":0,"gameResult":{}}`, 0, true},
+		{"missing", `{"gameResult":{}}`, 0, false},
+		{"unparseable", `{"puzzleId":"forty-two"}`, 0, false},
+		{"malformed", `not json`, 0, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := PeekReplayPuzzleID([]byte(tc.body))
+			if got != tc.want || ok != tc.wantOK {
+				t.Fatalf("PeekReplayPuzzleID(%q) = (%d, %v), want (%d, %v)",
+					tc.body, got, ok, tc.want, tc.wantOK)
+			}
+		})
 	}
 }
 
@@ -241,16 +296,16 @@ func TestPrepareReplay_AddsLeaderboardInfo(t *testing.T) {
 	}
 
 	want := "{\n" +
-		"  \"gameResult\": {\n" +
-		"    \"gameId\": 42\n" +
-		"  },\n" +
 		"  \"leaderboard\": {\n" +
 		"    \"rank\": 210,\n" +
 		"    \"division\": 3,\n" +
 		"    \"score\": 18.95\n" +
 		"  },\n" +
 		"  \"puzzleId\": 1,\n" +
-		"  \"source\": \"leaderboard\"\n" +
+		"  \"source\": \"leaderboard\",\n" +
+		"  \"gameResult\": {\n" +
+		"    \"gameId\": 42\n" +
+		"  }\n" +
 		"}\n"
 	if string(got) != want {
 		t.Fatalf("PrepareReplay() mismatch\nwant:\n%s\ngot:\n%s", want, string(got))

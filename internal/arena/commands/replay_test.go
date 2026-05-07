@@ -164,9 +164,10 @@ func TestSummarizeDownloadResultsAggregatesOutcomes(t *testing.T) {
 		{Outcome: downloadOutcomeSaved},
 		{Outcome: downloadOutcomeSaved},
 		{Outcome: downloadOutcomeSkippedExisting},
+		{Outcome: downloadOutcomeSkippedPuzzle},
 		{Outcome: downloadOutcomeFailed},
 	})
-	assert.Equal(t, downloadSummary{Total: 4, Saved: 2, Skipped: 1, Failed: 1}, got)
+	assert.Equal(t, downloadSummary{Total: 5, Saved: 2, SkippedExisting: 1, SkippedPuzzle: 1, Failed: 1}, got)
 }
 
 func TestWriteDownloadProgressFormatsByOutcome(t *testing.T) {
@@ -176,7 +177,8 @@ func TestWriteDownloadProgressFormatsByOutcome(t *testing.T) {
 		want string
 	}{
 		{"saved", downloadResult{ID: 42, Outcome: downloadOutcomeSaved, Detail: "1024 bytes"}, "[1/3] save 42 (1024 bytes)\n"},
-		{"skipped", downloadResult{ID: 7, Outcome: downloadOutcomeSkippedExisting, Detail: "exists"}, "[1/3] skip 7 (exists)\n"},
+		{"skipped-existing", downloadResult{ID: 7, Outcome: downloadOutcomeSkippedExisting, Detail: "exists"}, "[1/3] skip 7 (exists)\n"},
+		{"skipped-puzzle", downloadResult{ID: 8, Outcome: downloadOutcomeSkippedPuzzle, Detail: "puzzleId 99 != 42"}, "[1/3] skip 8 (puzzleId 99 != 42)\n"},
 		{"failed", downloadResult{ID: 9, Outcome: downloadOutcomeFailed, Detail: "HTTP 500"}, "[1/3] fail 9: HTTP 500\n"},
 	}
 	for _, tc := range cases {
@@ -193,9 +195,35 @@ func TestWriteDownloadSummaryFormat(t *testing.T) {
 	require.NoError(t, writeDownloadSummary(&buf, "./tmp/replays", []downloadResult{
 		{Outcome: downloadOutcomeSaved},
 		{Outcome: downloadOutcomeSkippedExisting},
+		{Outcome: downloadOutcomeSkippedPuzzle},
 		{Outcome: downloadOutcomeFailed},
 	}))
-	assert.Equal(t, "done: 1 saved, 1 skipped, 1 failed (out=./tmp/replays)\n", buf.String())
+	assert.Equal(t, "done: 1 saved, 1 skipped-existing, 1 skipped-puzzle, 1 failed (out=./tmp/replays)\n", buf.String())
+}
+
+func TestDownloadReplaySkipsCrossGamePuzzleID(t *testing.T) {
+	dir := makeReplayTestDir(t)
+	cfg := replayBatchConfig{
+		OutDir: dir,
+		Annotations: arena.ReplayAnnotations{
+			Blue:     "us",
+			PuzzleID: 42,
+		},
+	}
+	// Source body declares a different puzzleId — must not be saved, since
+	// silently rewriting the field would let cross-game replays slip into a
+	// per-game replays/ directory under the wrong name.
+	fetcher := &fakeReplayFetcher{
+		responses: map[int64][]byte{77: []byte(`{"puzzleId":99,"gameResult":{"refereeInput":"seed=7"}}`)},
+	}
+
+	result, err := downloadReplay(fetcher, cfg, 77, time.Unix(1700000000, 0).UTC())
+	require.NoError(t, err)
+	assert.Equal(t, downloadOutcomeSkippedPuzzle, result.Outcome)
+	assert.Equal(t, "puzzleId 99 != 42", result.Detail)
+
+	_, statErr := os.Stat(replayFilePath(dir, 77))
+	assert.True(t, os.IsNotExist(statErr))
 }
 
 func makeReplayTestDir(t *testing.T) string {
