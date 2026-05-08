@@ -38,6 +38,14 @@ export interface TraceMatchBase<TTurn extends TraceTurnBase = TraceTurnBase> {
   ranks: [number, number]
   scores: [number, number]
   players: [string, string]
+  /**
+   * Static global-info lines blue's bot received on stdin at match start —
+   * same shape Referee.GlobalInfoFor produces. Carries seed-derived facts
+   * that don't change between turns (board topology, richness map, starting
+   * unit identities). Format is game-specific; consumers parse the lines per
+   * the game's input schema.
+   */
+  setup?: string[]
   timing?: TraceTiming
   turns: TTurn[]
 }

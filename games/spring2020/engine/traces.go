@@ -4,6 +4,10 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
+// SerializeTraceFrameInfo (defined in serializer.go) is the no-fog god-mode
+// view used by TraceFrameInfoProducer. The Referee.TraceFrameInfo method
+// (game_referee.go) wires it into the arena trace path.
+
 // Trace types emitted per turn, attached to trace output for replay viewers
 // and analyzers. Each type has a typed payload defined below; the wire
 // shape is `{"type": <const>, "data": {...}}`.

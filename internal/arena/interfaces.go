@@ -88,6 +88,31 @@ type TraceTurnDecorator interface {
 	DecorateTraceTurn(turn int, players []Player) json.RawMessage
 }
 
+// TraceGlobalInfoProducer returns the global-info lines to record on the
+// trace's setup field. Optional — when implemented, the runner uses it
+// instead of falling back to Referee.GlobalInfoFor(players[0]).
+//
+// Use this when the standard per-side serializer leaks side-specific state
+// (e.g., fog-of-war filters, player-index headers) that an analyzer wants
+// to skip. Implementations should produce a side-agnostic / god-mode view
+// describing the full game state.
+type TraceGlobalInfoProducer interface {
+	TraceGlobalInfo() []string
+}
+
+// TraceFrameInfoProducer returns the per-turn frame-info lines to record
+// on each TraceTurn.GameInput. Optional — when implemented, the runner
+// uses it instead of falling back to Referee.FrameInfoFor(players[0]).
+//
+// Use this for fog-of-war games (e.g., Spring 2020) so the trace records
+// every entity's state every turn rather than blue's filtered view.
+// Implementations should produce a side-agnostic / god-mode view from a
+// canonical perspective (typically side 0 with all visibility filters
+// disabled).
+type TraceFrameInfoProducer interface {
+	TraceFrameInfo() []string
+}
+
 // RawScoresProvider returns per-player raw scores before any end-of-game
 // tiebreaker adjustments run. Used by the trace writer so match traces record
 // the engine's intrinsic scoring state rather than the adjusted value the

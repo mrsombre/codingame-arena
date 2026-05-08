@@ -193,6 +193,14 @@ func (r *Referee) ActivePlayers(players []arena.Player) int {
 // optional arena interfaces for per-turn opaque traces, pre-adjustment scores,
 // and per-match metrics.
 
+// TraceFrameInfo returns a no-fog-of-war frame-info view for the trace, so
+// analyzers see every pacman and pellet each turn rather than blue's
+// filtered stdin view. Bots still receive the fog-filtered FrameInfoFor
+// output during the live match.
+func (r *Referee) TraceFrameInfo() []string {
+	return SerializeTraceFrameInfo(r.Game)
+}
+
 // TurnTraces returns per-player copies of this turn's accumulated game traces.
 func (r *Referee) TurnTraces(_ int, _ []arena.Player) [2][]arena.TurnTrace {
 	var out [2][]arena.TurnTrace

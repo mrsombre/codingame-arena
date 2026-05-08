@@ -23,22 +23,19 @@ type ReplayMoves struct {
 // and TraceMatch.FinalScores carries the post-OnEnd value matching CG's
 // gameResult.scores; both have -1 substituted for any deactivated side.
 //
-// botNames are copied into TraceMatch.Players (basename applied). blueSide
-// (0 or 1) is the in-match side whose FrameInfoFor lines are recorded as
-// each turn's GameInput; values outside [0,1] fall back to side 0. maxTurns
-// of 0 defaults to factory.MaxTurns().
+// botNames are copied into TraceMatch.Players (basename applied). maxTurns
+// of 0 defaults to factory.MaxTurns(). Setup and per-turn GameInput are
+// captured from a canonical side-agnostic view (god-mode for games that
+// implement TraceGlobalInfoProducer / TraceFrameInfoProducer; otherwise
+// players[0]'s perspective).
 func RunReplay(
 	factory GameFactory,
 	seed int64,
 	gameOptions *viper.Viper,
 	moves ReplayMoves,
 	botNames [2]string,
-	blueSide int,
 	maxTurns int,
 ) (TraceMatch, [2]int) {
-	if blueSide != 0 && blueSide != 1 {
-		blueSide = 0
-	}
 	referee, players := factory.NewGame(seed, gameOptions)
 	referee.Init(players)
 
@@ -70,11 +67,15 @@ func RunReplay(
 		})
 	}
 
+	// Send each side its own per-side global info (respects fog-of-war /
+	// player-index headers), then capture the trace's setup lines from a
+	// canonical side-agnostic view independent of who's playing where.
 	for _, player := range players {
 		for _, line := range referee.GlobalInfoFor(player) {
 			player.SendInputLine(line)
 		}
 	}
+	traceSetup := captureTraceGlobalInfo(referee, players)
 
 	var traceTurns []TraceTurn
 	deactivationTurns := [2]int{-1, -1}
@@ -119,16 +120,20 @@ func RunReplay(
 		var turnInput []string
 
 		if liveTurn {
+			// Capture trace's gameInput once per live turn from a canonical
+			// side-agnostic view (god-mode if the referee implements
+			// TraceFrameInfoProducer, otherwise players[0]'s perspective).
+			// Done before bots are sent their per-side fog-filtered input.
+			if outputTurn[0] || outputTurn[1] {
+				turnInput = captureTraceFrameInfo(referee, players)
+			}
+
 			for _, player := range players {
 				if player.IsDeactivated() || referee.ShouldSkipPlayerTurn(player) {
 					continue
 				}
-				lines := referee.FrameInfoFor(player)
-				for _, line := range lines {
+				for _, line := range referee.FrameInfoFor(player) {
 					player.SendInputLine(line)
-				}
-				if player.GetIndex() == blueSide {
-					turnInput = append([]string(nil), lines...)
 				}
 				_ = player.Execute()
 				if outs := player.GetOutputs(); len(outs) > 0 {
@@ -222,6 +227,7 @@ func RunReplay(
 		Scores:      [2]TraceScore{TraceScore(rawTraceScores[0]), TraceScore(rawTraceScores[1])},
 		FinalScores: [2]TraceScore{TraceScore(finalTraceScores[0]), TraceScore(finalTraceScores[1])},
 		Ranks:       RanksFromWinner(winner),
+		Setup:       traceSetup,
 		Players:     [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
 		Timing:      &TraceTiming{},
 		Turns:       traceTurns,

@@ -99,6 +99,27 @@ func TestTraceWriterWritesReplayFile(t *testing.T) {
 	assert.Equal(t, TraceTypeReplay, got.Type)
 }
 
+// Setup carries the raw global-info lines blue's bot received on stdin —
+// game-specific format, captured verbatim. Verify the field round-trips
+// through the trace file.
+func TestTraceWriterPreservesSetup(t *testing.T) {
+	dir := t.TempDir()
+	writer := NewTraceWriter(dir, 1)
+
+	match := TraceMatch{
+		MatchID: 7,
+		Setup:   []string{"37", "0 3 1 2 3 4 5 6", "1 0 7 8 2 0 6 18"},
+	}
+	require.NoError(t, writer.WriteMatch(match))
+
+	data, err := os.ReadFile(filepath.Join(dir, "trace-1-7.json"))
+	require.NoError(t, err)
+
+	var got TraceMatch
+	require.NoError(t, json.Unmarshal(data, &got))
+	assert.Equal(t, match.Setup, got.Setup)
+}
+
 func TestTraceWriterNilIsNoop(t *testing.T) {
 	var writer *TraceWriter
 	assert.NoError(t, writer.WriteMatch(TraceMatch{}))

@@ -84,6 +84,16 @@ type TraceMatch struct {
 	// post-OnEnd value (which matches CG for clean matches).
 	FinalScores [2]TraceScore `json:"finalScores"`
 	Ranks       [2]int        `json:"ranks"`
+	// Setup is the static "global info" the referee sent to bots' stdin at
+	// match start (one entry per line, same shape Referee.GlobalInfoFor
+	// produces). Indexed from match side 0's perspective — same convention
+	// as the rest of the trace (players, scores, turns[].traces). Games
+	// with side-specific input (fog-of-war filters, player-index headers)
+	// can opt into a side-agnostic god-mode view by implementing
+	// TraceGlobalInfoProducer; otherwise the runner falls back to
+	// GlobalInfoFor(players[0]). Format is game-specific — see each game's
+	// trace.md for the line schema.
+	Setup       []string      `json:"setup,omitempty"`
 	Timing      *TraceTiming  `json:"timing,omitempty"`
 	// MainTurns is the count of player-decision trace turns. Excludes
 	// non-decision phase turns (Spring 2021 GATHERING/SUN_MOVE) and
@@ -185,6 +195,32 @@ func TraceWinnerFromScores(scores [2]int, deactivated [2]bool) int {
 	}
 }
 
+// captureTraceGlobalInfo returns the global-info lines to store on the
+// trace. Prefers a TraceGlobalInfoProducer override (god-mode / side-agnostic
+// view); otherwise falls back to players[0]'s perspective so the trace input
+// matches the rest of its match-side-0 indexing.
+func captureTraceGlobalInfo(referee Referee, players []Player) []string {
+	if p, ok := referee.(TraceGlobalInfoProducer); ok {
+		return p.TraceGlobalInfo()
+	}
+	if len(players) == 0 {
+		return nil
+	}
+	return referee.GlobalInfoFor(players[0])
+}
+
+// captureTraceFrameInfo returns the per-turn frame-info lines to store on
+// the trace. Same fallback semantics as captureTraceGlobalInfo.
+func captureTraceFrameInfo(referee Referee, players []Player) []string {
+	if p, ok := referee.(TraceFrameInfoProducer); ok {
+		return p.TraceFrameInfo()
+	}
+	if len(players) == 0 {
+		return nil
+	}
+	return referee.FrameInfoFor(players[0])
+}
+
 // TraceTiming aggregates per-side response timings in milliseconds.
 //
 // FirstResponse is the turn-0 latency (typically dominated by bot startup and
@@ -198,11 +234,15 @@ type TraceTiming struct {
 
 // TraceTurn captures one turn of the game state for replay/debug.
 //
-// GameInput is the stdin lines the engine fed the blue side this turn (the
-// user's bot — see TraceMatch.Blue). For symmetric-input games it equals
-// what either side received; for fog-of-war games it is blue's perspective
-// only. Absent on turns where blue did not execute (deactivated, skipped,
-// or game-over frame).
+// GameInput is the per-turn frame-info lines for the trace, recorded from
+// match side 0's perspective (same indexing convention as the rest of the
+// trace: players, scores, traces). Symmetric-input games yield the same
+// lines either side would have received. Fog-of-war games can opt into a
+// side-agnostic god-mode view by implementing TraceFrameInfoProducer so
+// the trace records every entity each turn rather than the filtered view
+// blue's bot saw on stdin; otherwise the runner falls back to
+// FrameInfoFor(players[0]). Absent on turns where neither side was
+// prompted (game-over frame, both sides deactivated/skipped).
 //
 // Output[i] is the raw stdout the side-i bot emitted this turn (empty when
 // the side was deactivated or skipped). Indexed [left, right] in match-side

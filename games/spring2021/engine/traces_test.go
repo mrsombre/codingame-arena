@@ -140,9 +140,9 @@ func TestDecorateTraceTurnAddsDecisionTraces(t *testing.T) {
 	assert.Equal(t, []int{8, 6}, state.Sun)
 	require.NotNil(t, state.DayActionIndex)
 	assert.Equal(t, 2, *state.DayActionIndex)
-	assert.Equal(t, [][][3]int{
-		{{1, TREE_SEED, RICHNESS_LUSH}, {24, TREE_SMALL, RICHNESS_POOR}},
-		{{7, TREE_MEDIUM, RICHNESS_OK}, {19, TREE_TALL, RICHNESS_POOR}},
+	assert.Equal(t, [][][4]int{
+		{{1, RICHNESS_LUSH, TREE_SEED, 0}, {24, RICHNESS_POOR, TREE_SMALL, 0}},
+		{{7, RICHNESS_OK, TREE_MEDIUM, 0}, {19, RICHNESS_POOR, TREE_TALL, 0}},
 	}, state.Trees)
 }
 

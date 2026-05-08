@@ -54,7 +54,10 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	}
 	defer cleanup()
 
-	// Send global info.
+	tracing := runner.Options.TraceSink != nil
+
+	// Send global info to each side's stdin (each receives its own
+	// per-side view — fog-of-war / player-index headers respected).
 	for _, player := range players {
 		lines := referee.GlobalInfoFor(player)
 		for _, line := range lines {
@@ -66,6 +69,15 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				fmt.Fprintln(os.Stderr, line)
 			}
 		}
+	}
+
+	// Capture the trace's setup lines from a canonical side-agnostic view
+	// (god-mode if the referee implements TraceGlobalInfoProducer, otherwise
+	// players[0]'s perspective). Independent of what bots actually received
+	// so analyzers see full state regardless of fog-of-war.
+	var traceSetup []string
+	if tracing {
+		traceSetup = captureTraceGlobalInfo(referee, players)
 	}
 
 	// Flush global info to subprocess stdin immediately so the bot can begin
@@ -87,7 +99,6 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	// game-specific frame numbering — Spring 2021's first output turn is loop
 	// turn 1 (after GATHERING), Spring 2020's is loop turn 0.
 	firstOutputTurns := [2]int{-1, -1}
-	tracing := runner.Options.TraceSink != nil
 	var traceTurns []TraceTurn
 
 	for turn = 0; !referee.Ended() && turn < maxTurns; turn++ {
@@ -125,17 +136,19 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		}
 		playerOutputs := [2]string{}
 		var turnInput []string
-		// Blue is our bot identity from --blue; after seed-driven swap, blue
-		// plays the right side. Capturing only blue's view keeps traces compact;
-		// for symmetric-input games either side would yield the same lines.
-		blueSideIndex := 0
-		if bluePlaysRight {
-			blueSideIndex = 1
-		}
 
 		if liveTurn {
 			for _, controller := range controllers {
 				controller.BeginTurn()
+			}
+
+			// Capture the trace's gameInput once per live turn — independent of
+			// which sides will be prompted below, and side-agnostic (god-mode
+			// when the referee implements TraceFrameInfoProducer; otherwise
+			// players[0]'s perspective). Done before any FrameInfoFor send so
+			// the snapshot reflects the state bots are about to act on.
+			if tracing && (outputTurn[0] || outputTurn[1]) {
+				turnInput = captureTraceFrameInfo(referee, players)
 			}
 
 			for _, player := range players {
@@ -145,9 +158,6 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				lines := referee.FrameInfoFor(player)
 				for _, line := range lines {
 					player.SendInputLine(line)
-				}
-				if tracing && player.GetIndex() == blueSideIndex {
-					turnInput = append([]string(nil), lines...)
 				}
 				if runner.Options.Debug {
 					side := "left"
@@ -343,6 +353,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			Scores:      [2]TraceScore{TraceScore(rawTraceScores[0]), TraceScore(rawTraceScores[1])},
 			FinalScores: [2]TraceScore{TraceScore(finalTraceScores[0]), TraceScore(finalTraceScores[1])},
 			Ranks:       RanksFromWinner(traceWinner),
+			Setup:       traceSetup,
 			Players:     [2]string{filepath.Base(sideOptions.BlueBotBin), filepath.Base(sideOptions.RedBotBin)},
 			Timing:      traceTiming,
 			Turns:       traceTurns,

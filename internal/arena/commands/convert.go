@@ -219,14 +219,19 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		return arena.TraceMatch{}, league, fmt.Errorf("%w: replay missing blue (re-fetch with `arena replay` so the username is recorded)", errReplayPrep)
 	}
 	botNames := arena.ReplayPlayerNames(replay)
-	blueSide := -1
-	for i, name := range botNames {
+	// Validate that the recorded blue username actually appears in the
+	// replay's players list — convert refuses to write a trace where blue
+	// can't be located. (The trace's gameInput is no longer captured from
+	// blue's side, but we still want the early error so downstream
+	// analyzers don't load a trace whose Blue field doesn't resolve.)
+	blueFound := false
+	for _, name := range botNames {
 		if name == replay.Blue {
-			blueSide = i
+			blueFound = true
 			break
 		}
 	}
-	if blueSide == -1 {
+	if !blueFound {
 		return arena.TraceMatch{}, league, fmt.Errorf("%w: blue %q not found in players %v", errReplayPrep, replay.Blue, botNames)
 	}
 
@@ -236,7 +241,6 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		gameOptions,
 		arena.ReplayMovesFromFrames(replay),
 		botNames,
-		blueSide,
 		0,
 	)
 

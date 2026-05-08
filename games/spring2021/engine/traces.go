@@ -36,7 +36,7 @@ type TraceTurnState struct {
 	SunDirection     *int       `json:"sun_direction,omitempty"`
 	Nutrients        *int       `json:"nutrients,omitempty"`
 	Sun              []int      `json:"sun,omitempty"`
-	Trees            [][][3]int `json:"trees,omitempty"`
+	Trees            [][][4]int `json:"trees,omitempty"`
 	SeedConflictCell *int       `json:"seed_conflict_cell,omitempty"`
 }
 
@@ -134,11 +134,15 @@ func (g *Game) traceSun() []int {
 	return values
 }
 
-// traceTrees returns the per-player tree list as [cell_id, size, richness]
-// triples. Outer index = player index; the inner list is ordered by cell id
-// ascending (TreeOrder traversal).
-func (g *Game) traceTrees() [][][3]int {
-	trees := make([][][3]int, tracePlayerCount(g))
+// traceTrees returns the per-player tree list as
+// [cell_id, richness, size, isDormant] tuples. The leading pair is static
+// (cell identity + soil quality) and the trailing pair is mutable (current
+// growth stage + whether the tree was acted on this day). isDormant is 1 when
+// the tree cannot be acted on again until the next day, 0 otherwise. Outer
+// index = player index; the inner list is ordered by cell id ascending
+// (TreeOrder traversal).
+func (g *Game) traceTrees() [][][4]int {
+	trees := make([][][4]int, tracePlayerCount(g))
 	if g.Board == nil {
 		return trees
 	}
@@ -152,7 +156,11 @@ func (g *Game) traceTrees() [][][3]int {
 		if cell == nil {
 			continue
 		}
-		trees[player] = append(trees[player], [3]int{idx, tree.Size, cell.GetRichness()})
+		dormant := 0
+		if tree.Dormant {
+			dormant = 1
+		}
+		trees[player] = append(trees[player], [4]int{idx, cell.GetRichness(), tree.Size, dormant})
 	}
 	return trees
 }

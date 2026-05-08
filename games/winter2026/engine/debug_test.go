@@ -87,12 +87,8 @@ func TestDebug_InspectReplay(t *testing.T) {
 	}
 	moves := arena.ReplayMovesFromFrames(replay)
 	names := arena.ReplayPlayerNames(replay)
-	blueSide := 0
-	if replay.Blue != "" && names[1] == replay.Blue {
-		blueSide = 1
-	}
 
-	trace, finalScores := arena.RunReplay(NewFactory(), seed, gameOptions, moves, names, blueSide, 0)
+	trace, finalScores := arena.RunReplay(NewFactory(), seed, gameOptions, moves, names, 0)
 
 	t.Logf("engine final: %d vs %d (raw=%d vs %d), turns=%d",
 		finalScores[0], finalScores[1], int(trace.Scores[0]), int(trace.Scores[1]), len(trace.Turns))

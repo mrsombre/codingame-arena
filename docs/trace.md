@@ -57,9 +57,10 @@ Fields appear in the JSON in this order. Side-indexed arrays (`players`, `scores
 | 13 | `scores`       | `[2]float`  | Raw pre-`OnEnd` score (intrinsic in-game count, e.g. spring2021 tree segments before the sun bonus). Always engine truth. |
 | 14 | `finalScores`  | `[2]float`  | Post-`OnEnd` score (with bonuses and tiebreakers). Self-play: engine truth. Replay (DQ): inherited from CG's `gameResult.scores` so the trace matches the official replay. |
 | 15 | `ranks`        | `[2]int`    | CodinGame-style ranks: `0` = first place, `[0,0]` = draw. For replays, normalized from CG's `gameResult.ranks`. |
-| 16 | `timing`       | object      | Aggregate response timings in milliseconds (see below). Omitted on replay traces (no live bot to time).       |
-| 17 | `mainTurns`    | int         | Count of player-decision turns. Excludes non-decision phase frames (spring2021 GATHERING/SUN_MOVE) and post-end frames (spring2020 gameOverFrame). `0` on legacy traces written before this field existed. |
-| 18 | `turns`        | array       | Per-turn entries (see below).                                                                                 |
+| 16 | `setup`        | `[]string`  | The static global-info lines for the trace, recorded from match side 0's perspective (same indexing convention as `players`, `scores`, `traces`). Same shape `Referee.GlobalInfoFor` produces; for symmetric-input games either side would yield identical lines. Games with side-specific input (fog-of-war filters, player-index headers) can opt into a side-agnostic god-mode view by implementing `TraceGlobalInfoProducer`. Format is game-specific — see each game's `trace.md` for the line schema. |
+| 17 | `timing`       | object      | Aggregate response timings in milliseconds (see below). Omitted on replay traces (no live bot to time).       |
+| 18 | `mainTurns`    | int         | Count of player-decision turns. Excludes non-decision phase frames (spring2021 GATHERING/SUN_MOVE) and post-end frames (spring2020 gameOverFrame). `0` on legacy traces written before this field existed. |
+| 19 | `turns`        | array       | Per-turn entries (see below).                                                                                 |
 
 Score values are always emitted with at least one fractional digit (`127` → `127.0`) so the file shape matches CodinGame's replay encoding.
 
@@ -76,7 +77,7 @@ Score values are always emitted with at least one fractional digit (`127` → `1
 | Field           | Type         | Description                                                                                                   |
 |-----------------|--------------|---------------------------------------------------------------------------------------------------------------|
 | `turn`          | int          | Turn number, starting at `0`.                                                                                 |
-| `gameInput`     | `[]string`   | Lines the engine fed **blue's** stdin this turn. Symmetric-input games: identical for both sides. Fog-of-war games: blue's perspective only. Absent on turns where blue did not execute. |
+| `gameInput`     | `[]string`   | Per-turn frame-info lines for the trace, recorded from match side 0's perspective. Symmetric-input games: identical to either side's stdin. Fog-of-war games can opt into a god-mode view via `TraceFrameInfoProducer` (Spring 2020 does this) so the trace records every entity each turn rather than the filtered view bots saw on stdin. Absent on turns where neither side was prompted (game-over frame, both sides skipped). |
 | `output`        | `[2]string`  | Raw stdout each side emitted this turn. Empty when the side was deactivated or skipped. Omitted when both sides were silent. |
 | `isOutputTurn`  | `[2]bool`    | Side `i` was prompted for output this turn. `false` on engine-only frames (spring2021 GATHERING/SUN_MOVE, post-end frames) and on skipped/deactivated sides. Lets analyzers find the first turn a bot was actually asked to act. |
 | `timing`        | object       | `{ "response": [2]float }` — per-side response time in milliseconds. `0` when the side did not execute.       |

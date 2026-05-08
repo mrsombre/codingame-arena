@@ -46,6 +46,41 @@ func decodeMeta[T any](t *testing.T, tr arena.TurnTrace) T {
 	return v
 }
 
+// SerializeTraceFrameInfo must include every pacman and pellet on the
+// board, regardless of fog-of-war visibility — that's the whole point of
+// the trace variant. The grid uses two parallel corridors separated by a
+// solid wall row so each pac's cone-of-sight cannot reach the other; the
+// fog-aware serializer must hide the opponent, the trace variant must not.
+func TestSerializeTraceFrameInfoIncludesAllPacsAndPelletsUnderFog(t *testing.T) {
+	g := newScenario(4, []string{
+		"#######",
+		"#.....#",
+		"#######",
+		"#.....#",
+		"#######",
+	}, false)
+	require.True(t, g.Config.FOG_OF_WAR, "league 4 enables fog of war")
+
+	pacMine := spawn(g, 0, 0, TypeRock, Coord{X: 1, Y: 1})
+	pacOpp := spawn(g, 1, 0, TypePaper, Coord{X: 1, Y: 3})
+
+	// Sanity check: standard FrameInfoFor under fog hides the opponent's pac
+	// from side 0's perspective (separated by a wall row).
+	fogLines := SerializeFrameInfoFor(g.Players[0], g)
+	require.NotContains(t, fogLines, PacmanLine(g.Players[0], pacOpp), "fog should hide opponent across walls")
+
+	// Trace variant must include both pacs and the full pellet count.
+	traceLines := SerializeTraceFrameInfo(g)
+	assert.Contains(t, traceLines, PacmanLine(g.Players[0], pacMine), "trace lists own pac")
+	assert.Contains(t, traceLines, PacmanLine(g.Players[0], pacOpp), "trace lists opponent pac despite fog")
+
+	// Pellet count line: line 0 = scores, line 1 = pac count, then 2 pac
+	// rows, then the pellet count line. Trace variant must report ALL
+	// pellets/cherries on the board (10 in this 5×7 grid: 5 per corridor).
+	require.GreaterOrEqual(t, len(traceLines), 5)
+	assert.Equal(t, "10", traceLines[4], "trace pellet count covers both corridors")
+}
+
 func TestTraceEatPelletValueOne(t *testing.T) {
 	g := newScenario(4, []string{
 		"#######",
