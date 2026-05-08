@@ -5,3 +5,4 @@
 3. Create a viewer for spring2021.
 4. JSONL direct trace format for NN training.
 5. Capture stderr from bots into traces.
+6. Add number of matches played report every 1000 matches.

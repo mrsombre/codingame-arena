@@ -131,6 +131,12 @@ func (g *Game) ResetGameTurnData() {
 	for _, p := range g.Players {
 		p.Reset()
 	}
+	// Trace buffer is cleared at turn start (before command parsing emits
+	// MOVE/WAIT/MARK and before PerformGameUpdate emits EAT/HIT_*/DEAD/
+	// DEAD_FALL) so command and event traces from the same turn share the
+	// slice. The runner harvests this slice via TurnTraces() after
+	// PerformGameUpdate.
+	g.traces = [2][]arena.TurnTrace{}
 }
 
 /*
@@ -465,7 +471,6 @@ public void performGameUpdate(int turn) {
 
 func (g *Game) PerformGameUpdate(turn int) {
 	g.Turn = turn
-	g.traces = [2][]arena.TurnTrace{}
 	g.DoMoves()
 	g.DoEats()
 	g.DoBeheadings()

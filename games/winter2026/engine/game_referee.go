@@ -3,6 +3,8 @@
 package engine
 
 import (
+	"encoding/json"
+
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
@@ -24,7 +26,7 @@ type Referee struct {
 func NewReferee(game *Game) *Referee {
 	return &Referee{
 		Game:           game,
-		CommandManager: NewCommandManager(&game.summary),
+		CommandManager: NewCommandManager(&game.summary, game),
 	}
 }
 
@@ -140,6 +142,13 @@ func (r *Referee) ActivePlayers(players []arena.Player) int {
 		}
 	}
 	return active
+}
+
+// DecorateTraceTurn delegates to Game.DecorateTraceTurn for the per-turn
+// state payload. The arena runner type-asserts on the Referee, so the
+// method must live here even though Game owns the data.
+func (r *Referee) DecorateTraceTurn(turn int, players []arena.Player) json.RawMessage {
+	return r.Game.DecorateTraceTurn(turn, players)
 }
 
 func (r *Referee) TurnTraces(_ int, _ []arena.Player) [2][]arena.TurnTrace {
