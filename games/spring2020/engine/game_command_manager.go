@@ -151,7 +151,9 @@ func (m *CommandManager) ParseCommands(player *Player, lines []string) {
 			continue
 		}
 		if match := PlayerWaitPattern.FindStringSubmatch(cmd); match != nil {
-			_ = match
+			if msg := strings.TrimSpace(match[2]); msg != "" {
+				pac.SetMessage(msg)
+			}
 			continue
 		}
 

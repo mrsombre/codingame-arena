@@ -34,7 +34,7 @@ func (f *Factory) TraceMetricSpecs() []arena.TraceMetricSpec {
 			Description:    "Pacs killed (scored) per match in RPS collisions",
 			HigherIsBetter: true},
 		{Key: TraceSwitch, Label: TraceSwitch, Kind: arena.TraceMetricPerMatchCount,
-			Description: "SWITCH ability activations per match (type change; shares 10-turn cooldown with SPEED)"},
+			Description: "SWITCH commands per match (type-change request; shares 10-turn cooldown with SPEED — counts even when blocked by cooldown)"},
 		{Key: springMetricEatSuper, Label: springMetricEatSuper, Kind: arena.TraceMetricPerMatchCount,
 			Description:    "Super-pellets eaten per match (worth 10 points each; usually 4 spawn per map)",
 			HigherIsBetter: true},

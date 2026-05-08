@@ -428,6 +428,7 @@ Java's referee would have left on the grid.
 // PerformGameUpdate runs one full main turn including any speed sub-steps.
 func (g *Game) PerformGameUpdate() {
 	g.traces = [2][]arena.TurnTrace{}
+	g.emitCommandTraces()
 	g.ExecutePacmenAbilities()
 	g.UpdateAbilityModifiers()
 	g.ProcessPacmenIntent()
@@ -505,11 +506,9 @@ func (g *Game) ExecutePacmenAbilities() {
 		switch ability {
 		case AbilitySetRock, AbilitySetPaper, AbilitySetScissors:
 			pac.Type = PacTypeFromAbility(ability)
-			g.tracePlayer(pac.Owner.Index, arena.MakeTurnTrace(TraceSwitch, SwitchMeta{Pac: pac.ID, Type: pac.Type.Name()}))
 		case AbilitySpeed:
 			pac.Speed = g.Config.SPEED_BOOST
 			pac.AbilityDuration = g.Config.ABILITY_DURATION
-			g.tracePlayer(pac.Owner.Index, arena.MakeTurnTrace(TraceSpeed, PacMeta{Pac: pac.ID}))
 		}
 		pac.AbilityCooldown = g.Config.ABILITY_COOLDOWN
 	}

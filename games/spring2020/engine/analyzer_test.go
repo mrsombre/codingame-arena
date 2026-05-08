@@ -23,7 +23,7 @@ func TestAnalyzeSpringTraceMetricsAttributesAndCollapsesPerTurnMetrics(t *testin
 					{
 						arena.MakeTurnTrace(TraceEat, EatMeta{Pac: 0, Coord: [2]int{1, 1}, Cost: 1}),
 						arena.MakeTurnTrace(TraceKilled, KilledMeta{Pac: 2, Coord: [2]int{3, 1}, Killer: 1}),
-						arena.MakeTurnTrace(TraceSpeed, PacMeta{Pac: 0}),
+						arena.MakeTurnTrace(TraceSpeed, SpeedMeta{Pac: 0}),
 					},
 					{
 						arena.MakeTurnTrace(TraceEat, EatMeta{Pac: 1, Coord: [2]int{2, 1}, Cost: 10}),

@@ -3,6 +3,8 @@
 package engine
 
 import (
+	"encoding/json"
+
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
@@ -199,6 +201,12 @@ func (r *Referee) ActivePlayers(players []arena.Player) int {
 // output during the live match.
 func (r *Referee) TraceFrameInfo() []string {
 	return SerializeTraceFrameInfo(r.Game)
+}
+
+// DecorateTraceTurn delegates to Game.DecorateTraceTurn for the per-turn
+// TraceTurnState payload (pellet counts + per-side pac roster).
+func (r *Referee) DecorateTraceTurn(turn int, players []arena.Player) json.RawMessage {
+	return r.Game.DecorateTraceTurn(turn, players)
 }
 
 // TurnTraces returns per-player copies of this turn's accumulated game traces.
