@@ -27,6 +27,7 @@ type downloadOutcome int
 const (
 	downloadOutcomeSaved downloadOutcome = iota
 	downloadOutcomeSkippedExisting
+	downloadOutcomeSkippedPuzzle
 	downloadOutcomeFailed
 )
 
@@ -37,10 +38,11 @@ type downloadResult struct {
 }
 
 type downloadSummary struct {
-	Total   int
-	Saved   int
-	Skipped int
-	Failed  int
+	Total           int
+	Saved           int
+	SkippedExisting int
+	SkippedPuzzle   int
+	Failed          int
 }
 
 // replayBatchConfig bundles the knobs the download + auto-convert loop needs.
@@ -62,14 +64,18 @@ type replayBatchConfig struct {
 func ReplayUsage(fs *pflag.FlagSet) string {
 	return arena.CommandUsage(
 		"replay <username> [<id|url>[,<id|url>...]]",
-		"Download raw replay JSON from codingame.com and convert each freshly-"+
-			"saved file into a verified arena trace. With no IDs, downloads "+
-			"every replay from <username>'s last battles list on the active "+
-			"game's leaderboard. With one or more IDs (or replay URLs), "+
-			"downloads only those games. <username> is the player we are "+
-			"playing for; it is recorded as the top-level \"blue\" field in "+
-			"every saved replay. Already-downloaded replays are skipped (use "+
-			"-f to re-download and re-convert).",
+		"Download raw replay JSON from codingame.com. Each freshly-saved "+
+			"replay is auto-converted to a verified arena trace written to "+
+			"--trace-dir under the same id (replays/<id>.json → "+
+			"traces/replay-<id>.json) — this is not a separate convert "+
+			"command. With no IDs, downloads every replay from <username>'s "+
+			"last battles list on the active game's leaderboard. With one or "+
+			"more IDs (or replay URLs), downloads only those games. "+
+			"<username> is the player we are playing for; it is recorded as "+
+			"the top-level \"blue\" field in every saved replay. By default, "+
+			"replays already on disk are skipped (and so is their conversion "+
+			"step). Pass -f/--force to re-download the replay and re-convert "+
+			"the trace, overwriting both files in place under the same id.",
 		fs,
 		"",
 	)
@@ -224,7 +230,9 @@ func runReplayDownloads(fetcher replayFetcher, cfg replayBatchConfig, stdout io.
 		writeDownloadProgress(stdout, i+1, len(ids), dl)
 		dlResults = append(dlResults, dl)
 
-		if cfg.Factory == nil || dl.Outcome == downloadOutcomeFailed {
+		if cfg.Factory == nil ||
+			dl.Outcome == downloadOutcomeFailed ||
+			dl.Outcome == downloadOutcomeSkippedPuzzle {
 			continue
 		}
 		// Convert whenever a replay file is on disk. Force-overwrite the
@@ -245,6 +253,9 @@ func runReplayDownloads(fetcher replayFetcher, cfg replayBatchConfig, stdout io.
 
 // downloadReplay handles one target. Fetch errors map to a soft failed result
 // so the batch keeps going; prepare/write errors return an error to abort.
+// A non-zero source puzzleId that disagrees with the selected game maps to
+// a soft "skipped-puzzle" result — nothing is written, since saving a
+// cross-game replay would silently pollute the per-game replays/ tree.
 func downloadReplay(fetcher replayFetcher, cfg replayBatchConfig, id int64, fetchedAt time.Time) (downloadResult, error) {
 	body, err := fetcher.FetchReplay(id)
 	if err != nil {
@@ -252,6 +263,16 @@ func downloadReplay(fetcher replayFetcher, cfg replayBatchConfig, id int64, fetc
 	}
 
 	ann := cfg.Annotations
+	if ann.PuzzleID != 0 {
+		if sourcePID, ok := arena.PeekReplayPuzzleID(body); ok && sourcePID != 0 && sourcePID != ann.PuzzleID {
+			return downloadResult{
+				ID:      id,
+				Outcome: downloadOutcomeSkippedPuzzle,
+				Detail:  fmt.Sprintf("puzzleId %d != %d", sourcePID, ann.PuzzleID),
+			}, nil
+		}
+	}
+
 	ann.FetchedAt = fetchedAt
 	body, err = arena.PrepareReplay(body, ann)
 	if err != nil {
@@ -295,7 +316,7 @@ func writeDownloadProgress(stdout io.Writer, current, total int, r downloadResul
 	switch r.Outcome {
 	case downloadOutcomeSaved:
 		_, _ = fmt.Fprintf(stdout, "[%d/%d] save %d (%s)\n", current, total, r.ID, r.Detail)
-	case downloadOutcomeSkippedExisting:
+	case downloadOutcomeSkippedExisting, downloadOutcomeSkippedPuzzle:
 		_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (%s)\n", current, total, r.ID, r.Detail)
 	case downloadOutcomeFailed:
 		_, _ = fmt.Fprintf(stdout, "[%d/%d] fail %d: %s\n", current, total, r.ID, r.Detail)
@@ -304,8 +325,8 @@ func writeDownloadProgress(stdout io.Writer, current, total int, r downloadResul
 
 func writeDownloadSummary(stdout io.Writer, outDir string, results []downloadResult) error {
 	s := summarizeDownloadResults(results)
-	_, err := fmt.Fprintf(stdout, "done: %d saved, %d skipped, %d failed (out=%s)\n",
-		s.Saved, s.Skipped, s.Failed, outDir)
+	_, err := fmt.Fprintf(stdout, "done: %d saved, %d skipped-existing, %d skipped-puzzle, %d failed (out=%s)\n",
+		s.Saved, s.SkippedExisting, s.SkippedPuzzle, s.Failed, outDir)
 	return err
 }
 
@@ -316,7 +337,9 @@ func summarizeDownloadResults(results []downloadResult) downloadSummary {
 		case downloadOutcomeSaved:
 			s.Saved++
 		case downloadOutcomeSkippedExisting:
-			s.Skipped++
+			s.SkippedExisting++
+		case downloadOutcomeSkippedPuzzle:
+			s.SkippedPuzzle++
 		case downloadOutcomeFailed:
 			s.Failed++
 		}
@@ -331,6 +354,8 @@ func writeAutoConvertProgress(stdout io.Writer, current, total int, r convertRes
 	switch r.Outcome {
 	case convertOutcomeSaved:
 		_, _ = fmt.Fprintf(stdout, "[%d/%d] trace %d (%s)\n", current, total, r.Target.ID, r.Detail)
+	case convertOutcomeSavedMismatch:
+		_, _ = fmt.Fprintf(stdout, "[%d/%d] trace %d MISMATCH (%s)\n", current, total, r.Target.ID, r.Detail)
 	case convertOutcomeSkippedExisting, convertOutcomeSkippedPuzzle, convertOutcomeSkippedMismatch:
 		_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (%s)\n", current, total, r.Target.ID, r.Detail)
 	case convertOutcomeFailed:
@@ -338,10 +363,14 @@ func writeAutoConvertProgress(stdout io.Writer, current, total int, r convertRes
 	}
 }
 
+// writeAutoConvertSummary omits the convertOutcomeSkippedPuzzle column from
+// the trace summary line — wrong-puzzle replays are now rejected at download
+// time (the download summary's skipped-puzzle counter), so the auto-convert
+// path here only ever sees files that already passed the puzzleId check.
 func writeAutoConvertSummary(stdout io.Writer, traceDir string, results []convertResult) error {
 	s := summarizeConvertResults(results)
-	_, err := fmt.Fprintf(stdout, "traces: %d saved, %d skipped-existing, %d skipped-puzzle, %d skipped-mismatch, %d failed (out=%s)\n",
-		s.Saved, s.SkippedExisting, s.SkippedPuzzle, s.SkippedMismatch, s.Failed, traceDir)
+	_, err := fmt.Fprintf(stdout, "traces: %d saved, %d saved-mismatch, %d skipped-existing, %d skipped-mismatch, %d failed (out=%s)\n",
+		s.Saved, s.SavedMismatch, s.SkippedExisting, s.SkippedMismatch, s.Failed, traceDir)
 	return err
 }
 

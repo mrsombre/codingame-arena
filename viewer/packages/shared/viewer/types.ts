@@ -6,9 +6,9 @@ export interface LeagueOption {
 }
 
 export interface TraceTiming {
-  first_response: [number, number]
-  response_average: [number, number]
-  response_median: [number, number]
+  firstResponse: [number, number]
+  responseAverage: [number, number]
+  responseMedian: [number, number]
 }
 
 export interface TraceTurnTiming {
@@ -17,23 +17,35 @@ export interface TraceTurnTiming {
 
 export interface TurnTrace<M = unknown> {
   type: string
-  meta?: M
+  data?: M
 }
 
 export interface TraceTurnBase {
   turn: number
-  game_input?: string[]
+  gameInput?: string[]
   output?: [string, string]
   timing?: TraceTurnTiming
-  traces?: TurnTrace[]
+  /**
+   * Per-player trace events for this turn. Index 0 is everything player 0
+   * owned; index 1 player 1. Cross-owner events are mirrored into both slots.
+   */
+  traces?: [TurnTrace[], TurnTrace[]]
 }
 
 export interface TraceMatchBase<TTurn extends TraceTurnBase = TraceTurnBase> {
-  match_id: number
+  matchId: number
   seed: string
   ranks: [number, number]
   scores: [number, number]
   players: [string, string]
+  /**
+   * Static global-info lines blue's bot received on stdin at match start —
+   * same shape Referee.GlobalInfoFor produces. Carries seed-derived facts
+   * that don't change between turns (board topology, richness map, starting
+   * unit identities). Format is game-specific; consumers parse the lines per
+   * the game's input schema.
+   */
+  setup?: string[]
   timing?: TraceTiming
   turns: TTurn[]
 }

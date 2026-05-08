@@ -7,9 +7,9 @@ import (
 )
 
 // Puzzle is one cached puzzle slug mapping. PrettyID is the slug found in
-// CodinGame URLs (e.g. "winter-challenge-2026-snakebyte"); LeaderboardID is
-// the internal slug used by the puzzle leaderboard endpoints
-// (e.g. "winter-challenge-2026-exotec").
+// CodinGame URLs (e.g. "<season>-<year>-<game>"); LeaderboardID is the
+// internal slug used by the puzzle leaderboard endpoints
+// (e.g. "<season>-<year>-<sponsor>").
 type Puzzle struct {
 	PrettyID      string
 	LeaderboardID string

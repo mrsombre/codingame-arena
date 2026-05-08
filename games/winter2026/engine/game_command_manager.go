@@ -5,6 +5,8 @@ package engine
 import (
 	"fmt"
 	"strings"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
 /*
@@ -19,10 +21,15 @@ public class CommandManager {
 
 type CommandManager struct {
 	summary *[]string
+	// game is the trace sink for accepted MOVE/WAIT/MARK command traces.
+	// Optional — unit tests construct CommandManager standalone and pass nil
+	// here, in which case command traces are silently dropped (the tests
+	// don't assert on them). The referee always wires a real *Game in.
+	game *Game
 }
 
-func NewCommandManager(summary *[]string) *CommandManager {
-	return &CommandManager{summary: summary}
+func NewCommandManager(summary *[]string, game *Game) *CommandManager {
+	return &CommandManager{summary: summary, game: game}
 }
 
 /*
@@ -102,10 +109,15 @@ func (m *CommandManager) ParseCommands(player *Player, lines []string) {
 			if parsed.HasMessage {
 				bird.SetMessage(parsed.Message)
 			}
+			m.traceMove(player, bird, parsed)
 		} else if parsed.IsMark() {
 			if !player.AddMark(parsed.Coord) {
 				errors = append(errors, formatError(fmt.Sprintf("$%d: Too many MARK actions this turn", player.GetIndex())))
+				continue
 			}
+			m.traceMark(player, parsed.Coord)
+		} else if parsed.Type == TypeWait {
+			m.traceWait(player)
 		}
 	}
 
@@ -166,4 +178,61 @@ func splitCommands(line string) []string {
 		commands = commands[:len(commands)-1]
 	}
 	return commands
+}
+
+// traceMove emits a MOVE command trace into the player's slot. Direction
+// is rendered as the wire-token name (UP/DOWN/LEFT/RIGHT) so analyzers
+// don't have to translate the internal NESW alias back to the bot
+// vocabulary.
+func (m *CommandManager) traceMove(player *Player, bird *Bird, parsed Action) {
+	if m.game == nil {
+		return
+	}
+	meta := MoveMeta{
+		Bird:      bird.ID,
+		Direction: directionToName(parsed.Direction),
+	}
+	if parsed.HasMessage {
+		meta.Debug = bird.Message
+	}
+	m.game.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceMove, meta))
+}
+
+// traceWait emits a bare WAIT command trace (no data). Winter 2026's WAIT
+// is a "do nothing" with no bird id and no message group, so the trace
+// carries the type alone.
+func (m *CommandManager) traceWait(player *Player) {
+	if m.game == nil {
+		return
+	}
+	m.game.tracePlayer(player.GetIndex(), arena.TurnTrace{Type: TraceWait})
+}
+
+// traceMark emits a MARK command trace per accepted MARK x y. Capped by
+// Player.AddMark at four per side per turn; the 5th+ never reaches here.
+func (m *CommandManager) traceMark(player *Player, coord Coord) {
+	if m.game == nil {
+		return
+	}
+	m.game.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceMark, MarkMeta{
+		Coord: [2]int{coord.X, coord.Y},
+	}))
+}
+
+// directionToName maps the internal Direction to the wire-token name
+// the bot used (`UP`/`DOWN`/`LEFT`/`RIGHT`). Unset or out-of-range maps
+// to the empty string, but a successfully parsed move always carries one
+// of the four cardinals.
+func directionToName(d Direction) string {
+	switch d {
+	case DirNorth:
+		return "UP"
+	case DirEast:
+		return "RIGHT"
+	case DirSouth:
+		return "DOWN"
+	case DirWest:
+		return "LEFT"
+	}
+	return ""
 }

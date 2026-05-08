@@ -10,6 +10,7 @@ For a project overview, see the [top-level README](../README.md).
 |-----------------------------|----------------------------------------------------------|
 | [`run`](run.md)             | Run one or more match simulations against a player       |
 | [`replay`](replay.md)       | Download replay JSON and convert it into trace files     |
+| [`trace`](trace.md)         | On-disk trace file format produced by `run` and `replay` |
 | [`analyze`](analyze.md)     | Aggregate trace outcomes and game-owned metrics          |
 | [`serialize`](serialize.md) | Print initial game input for the first turn of a seed    |
 | [`serve`](serve.md)         | Serve the embedded web viewer                            |

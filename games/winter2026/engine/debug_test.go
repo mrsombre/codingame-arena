@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -86,20 +87,18 @@ func TestDebug_InspectReplay(t *testing.T) {
 	}
 	moves := arena.ReplayMovesFromFrames(replay)
 	names := arena.ReplayPlayerNames(replay)
-	blueSide := 0
-	if replay.Blue != "" && names[1] == replay.Blue {
-		blueSide = 1
-	}
 
-	trace, finalScores := arena.RunReplay(NewFactory(), seed, gameOptions, moves, names, blueSide, 0)
+	trace, finalScores := arena.RunReplay(NewFactory(), seed, gameOptions, moves, names, 0)
 
 	t.Logf("engine final: %d vs %d (raw=%d vs %d), turns=%d",
 		finalScores[0], finalScores[1], int(trace.Scores[0]), int(trace.Scores[1]), len(trace.Turns))
 
 	for i, tt := range trace.Turns {
 		var events []string
-		for _, ev := range tt.Traces {
-			events = append(events, ev.Type+"("+string(ev.Meta)+")")
+		for side, slot := range tt.Traces {
+			for _, ev := range slot {
+				events = append(events, fmt.Sprintf("p%d:%s(%s)", side, ev.Type, string(ev.Data)))
+			}
 		}
 		evstr := ""
 		if len(events) > 0 {

@@ -11,9 +11,9 @@ type TraceFile struct {
 // TraceAnalysisInput is the generic input passed from the CLI to the shared
 // trace analyzer.
 type TraceAnalysisInput struct {
-	TraceDir string
-	Files    []TraceFile
-	GameID   string
+	TraceDir   string
+	Files      []TraceFile
+	PuzzleName string
 }
 
 // TraceAnalysis is an arena-rendered analysis report.
@@ -29,6 +29,15 @@ const (
 	TraceMetricPerMatchCount TraceMetricKind = "per_match_count"
 	// TraceMetricPerTurnRate is averaged as a per-match percentage of turns.
 	TraceMetricPerTurnRate TraceMetricKind = "per_turn_rate"
+	// TraceMetricPerMatchValue is a per-match scalar reported by the game (e.g.
+	// "turn of the first COMPLETE event") and aggregated as the median across
+	// matches. Median (not mean) so a side that never reaches the milestone
+	// can be excluded as a missing sample rather than skewing the central
+	// value toward MaxTurns. Value 0 is the "no sample" sentinel — that
+	// side/match is dropped from the median, so the reporting analyzer must
+	// emit a positive value (turn indices for milestone metrics are >= 1 in
+	// practice, since turn 0 is engine setup before any bot can act).
+	TraceMetricPerMatchValue TraceMetricKind = "per_match_value"
 )
 
 // TraceMetricSpec declares one game-owned metric that arena can aggregate.

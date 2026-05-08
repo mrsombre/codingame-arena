@@ -1,6 +1,8 @@
 package arena
 
 import (
+	"encoding/json"
+
 	"github.com/spf13/viper"
 )
 
@@ -46,14 +48,14 @@ type GameFactory interface {
 	Name() string
 	PuzzleID() int
 	// PuzzleTitle returns the human-readable CodinGame puzzle title
-	// (e.g. "SnakeByte - Winter Challenge 2026"). convert uses it to
-	// recover replays where the API returned puzzleId=0 but did include
-	// a puzzleTitle entry.
+	// (e.g. "<Game> - <Season> <Year>"). convert uses it to recover
+	// replays where the API returned puzzleId=0 but did include a
+	// puzzleTitle entry.
 	PuzzleTitle() string
 	// LeaderboardSlug returns the puzzle pretty-id used in the CodinGame
-	// leaderboard URL (e.g. "winter-challenge-2026-snakebyte"), so the
-	// replay command can resolve a player's last battles without the
-	// caller passing the URL on each invocation.
+	// leaderboard URL (e.g. "<season>-<year>-<game>"), so the replay
+	// command can resolve a player's last battles without the caller
+	// passing the URL on each invocation.
 	LeaderboardSlug() string
 	NewGame(seed int64, options *viper.Viper) (Referee, []Player)
 	MaxTurns() int
@@ -65,10 +67,50 @@ type MetricsProvider interface {
 	Metrics() []Metric
 }
 
-// TurnTraceProvider produces structured game traces per turn.
+// TurnTraceProvider produces structured game traces per turn, partitioned by
+// player: index 0 is everything player 0 owned this turn, index 1 player 1.
+// Cross-owner events should be mirrored into both slots.
 // Optional — if Referee also implements this, match captures traces.
 type TurnTraceProvider interface {
-	TurnTraces(turn int, players []Player) []TurnTrace
+	TurnTraces(turn int, players []Player) [2][]TurnTrace
+}
+
+// TraceTurnDecorator returns a game-owned opaque per-turn payload that the
+// arena copies into TraceTurn.State as-is. The arena never inspects it;
+// downstream consumers (game viewers, analyzers) decode the bytes back
+// into a game-specific struct. Mirrors the TurnTrace.Data pattern at the
+// per-turn level.
+//
+// Match calls it after command parsing and before PerformGameUpdate, so
+// the payload reflects the state the players saw when choosing actions.
+// Returning nil/empty bytes leaves State unset on that turn.
+type TraceTurnDecorator interface {
+	DecorateTraceTurn(turn int, players []Player) json.RawMessage
+}
+
+// TraceGlobalInfoProducer returns the global-info lines to record on the
+// trace's setup field. Optional — when implemented, the runner uses it
+// instead of falling back to Referee.GlobalInfoFor(players[0]).
+//
+// Use this when the standard per-side serializer leaks side-specific state
+// (e.g., fog-of-war filters, player-index headers) that an analyzer wants
+// to skip. Implementations should produce a side-agnostic / god-mode view
+// describing the full game state.
+type TraceGlobalInfoProducer interface {
+	TraceGlobalInfo() []string
+}
+
+// TraceFrameInfoProducer returns the per-turn frame-info lines to record
+// on each TraceTurn.GameInput. Optional — when implemented, the runner
+// uses it instead of falling back to Referee.FrameInfoFor(players[0]).
+//
+// Use this for fog-of-war games (e.g., Spring 2020) so the trace records
+// every entity's state every turn rather than blue's filtered view.
+// Implementations should produce a side-agnostic / god-mode view from a
+// canonical perspective (typically side 0 with all visibility filters
+// disabled).
+type TraceFrameInfoProducer interface {
+	TraceFrameInfo() []string
 }
 
 // RawScoresProvider returns per-player raw scores before any end-of-game
@@ -89,11 +131,18 @@ type LeagueResolver interface {
 }
 
 // EndReasonProvider returns a categorized reason for why the match ended.
-// turn is the final loop turn; deactivationTurns[i] is the turn player i
-// was deactivated (or -1). Optional — if Referee implements this, match
-// stamps the value onto the trace as "end_reason".
+// turn is the final loop turn; deactivationTurns[i] is the turn player i was
+// deactivated (or -1); firstOutputTurns[i] is the turn player i was first
+// prompted for output (or -1 if never prompted — only possible when the bot
+// was deactivated before any output turn or the match never reached one).
+// Implementations should use deactivationTurns[i] == firstOutputTurns[i] to
+// distinguish TIMEOUT_START (timed out on first prompt) from TIMEOUT (timed
+// out later) — this is independent of the game's frame model, so games with
+// non-decision leading frames (e.g., Spring 2021 GATHERING) classify
+// correctly. Optional — if Referee implements this, match stamps the value
+// onto the trace as "endReason".
 type EndReasonProvider interface {
-	EndReason(turn int, players []Player, deactivationTurns [2]int) string
+	EndReason(turn int, players []Player, deactivationTurns, firstOutputTurns [2]int) string
 }
 
 // GameOverFrameReporter signals that the engine has detected game-over and

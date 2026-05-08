@@ -34,8 +34,9 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 				GameInput: []string{"5 3 2", "apple 1 2"},
 				Output:    [2]string{"UP 0 RIGHT 1", "DOWN 0 LEFT 1"},
 				Timing:    &TraceTurnTiming{Response: [2]float64{820, 910}},
-				Traces: []TurnTrace{
-					MakeTurnTrace("eat", map[string]any{"bot": "bot0", "score": 14.5}),
+				Traces: [2][]TurnTrace{
+					{MakeTurnTrace("eat", map[string]any{"bot": "bot0", "score": 14.5})},
+					nil,
 				},
 			},
 		},
@@ -64,9 +65,10 @@ func TestTraceWriterWritesMatchFile(t *testing.T) {
 	assert.Equal(t, [2]string{"UP 0 RIGHT 1", "DOWN 0 LEFT 1"}, got.Turns[0].Output)
 	require.NotNil(t, got.Turns[0].Timing)
 	assert.Equal(t, [2]float64{820, 910}, got.Turns[0].Timing.Response)
-	require.Len(t, got.Turns[0].Traces, 1)
-	assert.Equal(t, "eat", got.Turns[0].Traces[0].Type)
-	decoded, err := DecodeMeta[map[string]any](got.Turns[0].Traces[0])
+	require.Len(t, got.Turns[0].Traces[0], 1)
+	assert.Empty(t, got.Turns[0].Traces[1])
+	assert.Equal(t, "eat", got.Turns[0].Traces[0][0].Type)
+	decoded, err := DecodeData[map[string]any](got.Turns[0].Traces[0][0])
 	require.NoError(t, err)
 	assert.Equal(t, "bot0", decoded["bot"])
 	assert.InDelta(t, 14.5, decoded["score"], 0.0001)
@@ -95,6 +97,27 @@ func TestTraceWriterWritesReplayFile(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &got))
 	assert.Equal(t, traceID, got.TraceID)
 	assert.Equal(t, TraceTypeReplay, got.Type)
+}
+
+// Setup carries the raw global-info lines blue's bot received on stdin —
+// game-specific format, captured verbatim. Verify the field round-trips
+// through the trace file.
+func TestTraceWriterPreservesSetup(t *testing.T) {
+	dir := t.TempDir()
+	writer := NewTraceWriter(dir, 1)
+
+	match := TraceMatch{
+		MatchID: 7,
+		Setup:   []string{"37", "0 3 1 2 3 4 5 6", "1 0 7 8 2 0 6 18"},
+	}
+	require.NoError(t, writer.WriteMatch(match))
+
+	data, err := os.ReadFile(filepath.Join(dir, "trace-1-7.json"))
+	require.NoError(t, err)
+
+	var got TraceMatch
+	require.NoError(t, json.Unmarshal(data, &got))
+	assert.Equal(t, match.Setup, got.Setup)
 }
 
 func TestTraceWriterNilIsNoop(t *testing.T) {

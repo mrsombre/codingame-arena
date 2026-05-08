@@ -29,7 +29,7 @@ func (a testMetricAnalyzer) AnalyzeTraceMetrics(trace TraceMatch) (TraceMetricSt
 func runTestAnalysis(t *testing.T, files []TraceFile, analyzer TraceMetricAnalyzer) string {
 	t.Helper()
 	report, err := AnalyzeTraceFiles(
-		TraceAnalysisInput{TraceDir: "traces", GameID: "test", Files: files},
+		TraceAnalysisInput{TraceDir: "traces", PuzzleName: "test", Files: files},
 		analyzer,
 	)
 	require.NoError(t, err)
@@ -58,7 +58,7 @@ func TestAnalysisReportSummarizesGenericMatchStats(t *testing.T) {
 		{Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
 			EndReason:   EndReasonTimeout,
-			Deactivated: [2]bool{true, false},
+			Disqualified: [2]bool{true, false},
 			Scores:      [2]TraceScore{0, 7}, Ranks: [2]int{1, 0},
 			Turns: testTurns(1),
 		}},
@@ -90,19 +90,19 @@ func TestAnalysisReportSummarizesGenericMatchStats(t *testing.T) {
 
 func TestAnalysisReportEndReasonsAttributeBlueFault(t *testing.T) {
 	files := []TraceFile{
-		{Trace: TraceMatch{
+		{Name: "replay-100.json", Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
 			EndReason:   EndReasonTimeout,
-			Deactivated: [2]bool{true, false},
+			Disqualified: [2]bool{true, false},
 			Scores:      [2]TraceScore{0, 5}, Ranks: [2]int{1, 0},
 		}},
-		{Trace: TraceMatch{
+		{Name: "replay-200.json", Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
 			EndReason:   EndReasonInvalid,
-			Deactivated: [2]bool{false, true},
+			Disqualified: [2]bool{false, true},
 			Scores:      [2]TraceScore{6, 0}, Ranks: [2]int{0, 1},
 		}},
-		{Trace: TraceMatch{
+		{Name: "replay-300.json", Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
 			EndReason: EndReasonScore,
 			Scores:    [2]TraceScore{10, 4}, Ranks: [2]int{0, 1},
@@ -113,9 +113,37 @@ func TestAnalysisReportEndReasonsAttributeBlueFault(t *testing.T) {
 
 	assert.Contains(t, text, "END REASONS")
 	assert.Contains(t, text, "SCORE")
-	assert.Contains(t, text, "TIMEOUT         33.3%  (blue 100.0%)")
-	assert.Contains(t, text, "INVALID         33.3%  (blue 0.0%)")
+	assert.Contains(t, text, "TIMEOUT         33.3%  (blue 100.0%)  100")
+	assert.Contains(t, text, "INVALID         33.3%  (blue 0.0%)  200")
 	assert.Contains(t, text, "TIMEOUT_START    0.0%")
+}
+
+func TestAnalysisReportEndReasonsListAllIncidentMatchIDs(t *testing.T) {
+	files := []TraceFile{
+		{Name: "replay-101.json", Trace: TraceMatch{
+			Blue: "us", Players: [2]string{"us", "rival"},
+			EndReason: EndReasonTimeout,
+			Scores:    [2]TraceScore{0, 5}, Ranks: [2]int{1, 0},
+		}},
+		{Name: "replay-102.json", Trace: TraceMatch{
+			Blue: "us", Players: [2]string{"us", "rival"},
+			EndReason: EndReasonTimeout,
+			Scores:    [2]TraceScore{0, 7}, Ranks: [2]int{1, 0},
+		}},
+		// ELIMINATED is not in the ListMatches set — its row must stay
+		// quiet even though it carries blue-side attribution, so noisy
+		// per-match elimination games don't bloat the END REASONS block.
+		{Name: "replay-103.json", Trace: TraceMatch{
+			Blue: "us", Players: [2]string{"us", "rival"},
+			EndReason: EndReasonEliminated,
+			Scores:    [2]TraceScore{0, 4}, Ranks: [2]int{1, 0},
+		}},
+	}
+
+	text := runTestAnalysis(t, files, nil)
+
+	assert.Contains(t, text, "TIMEOUT         66.7%  (blue 100.0%)  101, 102")
+	assert.NotContains(t, text, "ELIMINATED      33.3%  (blue 100.0%)  103")
 }
 
 func TestAnalysisReportAggregatesMetricKinds(t *testing.T) {
@@ -290,7 +318,7 @@ func TestAnalysisReportRejectsPerTurnMetricAboveTurnCount(t *testing.T) {
 		},
 	}
 
-	_, err := AnalyzeTraceFiles(TraceAnalysisInput{TraceDir: "traces", GameID: "test", Files: files}, analyzer)
+	_, err := AnalyzeTraceFiles(TraceAnalysisInput{TraceDir: "traces", PuzzleName: "test", Files: files}, analyzer)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "count 3 exceeds turns 2")
 }
@@ -329,6 +357,93 @@ func TestAnalysisReportShowsRawCountsForSubOnePercentRates(t *testing.T) {
 	}
 	textRare := runTestAnalysis(t, files, rareOnly)
 	assert.Contains(t, textRare, "FALL        winner        1   loser        0   (winner only)")
+}
+
+func TestAnalysisReportComputesMedianForPerMatchValueMetric(t *testing.T) {
+	// Three matches; both sides have a sample in each. Median picks the
+	// middle of the three so a single outlier (blue's 30 in match c) doesn't
+	// drag the central turn the way a mean would.
+	files := []TraceFile{
+		{Trace: TraceMatch{
+			Type: "a", Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1}, Turns: testTurns(40),
+		}},
+		{Trace: TraceMatch{
+			Type: "b", Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1}, Turns: testTurns(40),
+		}},
+		{Trace: TraceMatch{
+			Type: "c", Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1}, Turns: testTurns(40),
+		}},
+	}
+	const firstCut = "FIRST_CUT_TURN"
+	analyzer := testMetricAnalyzer{
+		specs: []TraceMetricSpec{{Key: firstCut, Label: firstCut, Kind: TraceMetricPerMatchValue}},
+		stats: map[string]TraceMetricStats{
+			"a": {firstCut: [2]int{8, 12}},
+			"b": {firstCut: [2]int{10, 14}},
+			"c": {firstCut: [2]int{30, 18}}, // blue outlier: mean would be 16, median stays at 10
+		},
+	}
+
+	text := runTestAnalysis(t, files, analyzer)
+
+	assert.Contains(t, text, "FIRST_CUT_TURN blue       10.0   red       14.0   (red +4.0)")
+	assert.NotContains(t, text, "WORST")
+}
+
+func TestAnalysisReportPerMatchValueDropsZeroAsMissingSample(t *testing.T) {
+	// Match a: only red completed (blue=0 → no sample for blue).
+	// Match b: both sides completed.
+	// Blue's median is computed over the single match where it had a sample.
+	files := []TraceFile{
+		{Trace: TraceMatch{
+			Type: "a", Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{0, 1}, Ranks: [2]int{1, 0}, Turns: testTurns(40),
+		}},
+		{Trace: TraceMatch{
+			Type: "b", Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1}, Turns: testTurns(40),
+		}},
+	}
+	const firstCut = "FIRST_CUT_TURN"
+	analyzer := testMetricAnalyzer{
+		specs: []TraceMetricSpec{{Key: firstCut, Label: firstCut, Kind: TraceMetricPerMatchValue}},
+		stats: map[string]TraceMetricStats{
+			"a": {firstCut: [2]int{0, 6}},  // blue missing, red=6
+			"b": {firstCut: [2]int{12, 8}}, // both present
+		},
+	}
+
+	text := runTestAnalysis(t, files, analyzer)
+
+	// blue median over its only sample (match b): 12; red median over (6, 8): 7.0.
+	assert.Contains(t, text, "blue       12.0   red        7.0   (blue +5.0)")
+}
+
+func TestAnalysisReportPerMatchValueExcludedFromWorst(t *testing.T) {
+	// per_match_value isn't a hazard peak — its "biggest blue value" framing
+	// (slowest first cut) is a different question than DEAD/HIT_* peaks, so
+	// the WORST section must skip the spec entirely. With no other specs to
+	// drive WORST, the section is suppressed.
+	files := []TraceFile{
+		{Name: "trace-1.json", Trace: TraceMatch{
+			Type: "x", Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1}, Turns: testTurns(40),
+		}},
+	}
+	const firstCut = "FIRST_CUT_TURN"
+	analyzer := testMetricAnalyzer{
+		specs: []TraceMetricSpec{{Key: firstCut, Label: firstCut, Kind: TraceMetricPerMatchValue}},
+		stats: map[string]TraceMetricStats{
+			"x": {firstCut: [2]int{12, 8}},
+		},
+	}
+
+	text := runTestAnalysis(t, files, analyzer)
+
+	assert.NotContains(t, text, "WORST")
 }
 
 func TestAnalysisReportSkipsPerTurnMetricsForZeroTurnMatches(t *testing.T) {

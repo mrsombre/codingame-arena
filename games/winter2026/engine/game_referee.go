@@ -3,6 +3,8 @@
 package engine
 
 import (
+	"encoding/json"
+
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
@@ -24,7 +26,7 @@ type Referee struct {
 func NewReferee(game *Game) *Referee {
 	return &Referee{
 		Game:           game,
-		CommandManager: NewCommandManager(&game.summary),
+		CommandManager: NewCommandManager(&game.summary, game),
 	}
 }
 
@@ -142,12 +144,22 @@ func (r *Referee) ActivePlayers(players []arena.Player) int {
 	return active
 }
 
-func (r *Referee) TurnTraces(_ int, _ []arena.Player) []arena.TurnTrace {
-	if len(r.Game.traces) == 0 {
-		return nil
+// DecorateTraceTurn delegates to Game.DecorateTraceTurn for the per-turn
+// state payload. The arena runner type-asserts on the Referee, so the
+// method must live here even though Game owns the data.
+func (r *Referee) DecorateTraceTurn(turn int, players []arena.Player) json.RawMessage {
+	return r.Game.DecorateTraceTurn(turn, players)
+}
+
+func (r *Referee) TurnTraces(_ int, _ []arena.Player) [2][]arena.TurnTrace {
+	var out [2][]arena.TurnTrace
+	for i, slot := range r.Game.traces {
+		if len(slot) == 0 {
+			continue
+		}
+		out[i] = make([]arena.TurnTrace, len(slot))
+		copy(out[i], slot)
 	}
-	out := make([]arena.TurnTrace, len(r.Game.traces))
-	copy(out, r.Game.traces)
 	return out
 }
 
@@ -178,14 +190,17 @@ func (r *Referee) RawScores() [2]int {
 //
 // "Timeout!" is the literal deactivation message used by both the arena
 // runner (on no output) and CommandManager.ParseCommands (on empty input).
-func (r *Referee) EndReason(turn int, players []arena.Player, deactivationTurns [2]int) string {
+// TIMEOUT_START fires when the deactivation lands on the player's first
+// prompted turn (loop turn 0 for Winter 2026, which has no leading
+// engine-only frame).
+func (r *Referee) EndReason(turn int, players []arena.Player, deactivationTurns, firstOutputTurns [2]int) string {
 	for i, p := range players {
 		if !p.IsDeactivated() {
 			continue
 		}
 		reason := p.DeactivationReason()
 		switch {
-		case reason == "Timeout!" && deactivationTurns[i] == 0:
+		case reason == "Timeout!" && deactivationTurns[i] == firstOutputTurns[i]:
 			return arena.EndReasonTimeoutStart
 		case reason == "Timeout!":
 			return arena.EndReasonTimeout

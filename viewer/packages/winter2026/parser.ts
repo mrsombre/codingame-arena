@@ -30,7 +30,7 @@ export interface FrameData {
 
 /** Trace JSON from GET /api/matches/{id}. */
 export interface TraceMatch {
-  match_id: number
+  matchId: number
   seed: string
   /** CodinGame-style ranks: 0 = first place, [0,0] = draw. */
   ranks: [number, number]
@@ -48,21 +48,22 @@ export function winnerFromRanks(ranks: [number, number]): number {
 }
 
 export interface TraceTiming {
-  first_response: [number, number]
-  response_average: [number, number]
-  response_median: [number, number]
+  firstResponse: [number, number]
+  responseAverage: [number, number]
+  responseMedian: [number, number]
 }
 
 export interface TraceTurn {
   turn: number
   /** Stdin lines fed to the blue side this turn (the user's bot — see
    * TraceMatch.blue). Absent on turns where blue did not execute. */
-  game_input?: string[]
+  gameInput?: string[]
   /** Raw stdout per side: [left, right]. Empty entry means the side did
    * not execute this turn. Absent when both sides were silent. */
   output?: [string, string]
   timing?: TraceTurnTiming
-  traces?: TurnTrace[]
+  /** Per-player trace events. Index 0 owns player 0's events; index 1 player 1. */
+  traces?: [TurnTrace[], TurnTrace[]]
 }
 
 export interface TraceTurnTiming {
@@ -71,7 +72,7 @@ export interface TraceTurnTiming {
 
 export interface TurnTrace<M = unknown> {
   type: string
-  meta?: M
+  data?: M
 }
 
 export interface BirdMeta {
@@ -85,7 +86,7 @@ export interface BirdCoordMeta {
 
 /**
  * Parse frame lines (apple positions + bird bodies) from a string array.
- * Used both by parseSerializeResponse and for per-turn trace game_input.
+ * Used both by parseSerializeResponse and for per-turn trace gameInput.
  *
  * Format:
  *   <appleCount>

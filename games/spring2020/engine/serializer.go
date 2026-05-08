@@ -110,6 +110,46 @@ func SerializeFrameInfoFor(player *Player, game *Game) []string {
 	return lines
 }
 
+// SerializeTraceFrameInfo builds a per-turn frame-info view that bypasses
+// fog-of-war: every pacman and every pellet/cherry is included, formatted
+// as if a side-0 bot were the recipient. Used by the trace path so analyzers
+// see the full game state every turn rather than the filtered view blue's
+// bot saw on stdin. Player visibility is not a game-state mutation — bots
+// still receive the fog-filtered SerializeFrameInfoFor lines.
+func SerializeTraceFrameInfo(game *Game) []string {
+	if len(game.Players) == 0 {
+		return nil
+	}
+	player := game.Players[0]
+	opponent := OpponentOf(player, game.Players)
+	lines := make([]string, 0)
+	lines = append(lines, fmt.Sprintf("%d %d", player.Pellets, opponent.Pellets))
+
+	pacs := append([]*Pacman(nil), game.Pacmen...)
+	if game.Config.PROVIDE_DEAD_PACS {
+		pacs = append(pacs, player.DeadPacmen()...)
+		pacs = append(pacs, opponent.DeadPacmen()...)
+	}
+	sort.SliceStable(pacs, func(i, j int) bool {
+		return pacs[i].ID < pacs[j].ID
+	})
+	lines = append(lines, strconv.Itoa(len(pacs)))
+	for _, pac := range pacs {
+		lines = append(lines, PacmanLine(player, pac))
+	}
+
+	pellets := game.Grid.AllPellets()
+	cherries := game.Grid.AllCherries()
+	lines = append(lines, strconv.Itoa(len(pellets)+len(cherries)))
+	for _, p := range pellets {
+		lines = append(lines, fmt.Sprintf("%d %d %d", p.X, p.Y, 1))
+	}
+	for _, c := range cherries {
+		lines = append(lines, fmt.Sprintf("%d %d %d", c.X, c.Y, CHERRY_SCORE))
+	}
+	return lines
+}
+
 /*
 Java: SpringChallenge2020/src/main/java/com/codingame/spring2020/Game.java:341-352
 

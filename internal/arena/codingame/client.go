@@ -41,9 +41,9 @@ func (c *Client) FetchReplay(gameID int64) ([]byte, error) {
 	return c.post(GameResultAPI, fmt.Sprintf("[%d,null]", gameID))
 }
 
-// ResolvePuzzle maps a URL pretty-id (e.g. "winter-challenge-2026-snakebyte")
-// to the puzzleLeaderboardId used by the leaderboard endpoints (e.g.
-// "winter-challenge-2026-exotec").
+// ResolvePuzzle maps a URL pretty-id (e.g. "<season>-<year>-<game>") to the
+// puzzleLeaderboardId used by the leaderboard endpoints (e.g.
+// "<season>-<year>-<sponsor>").
 func (c *Client) ResolvePuzzle(prettyID string) (string, error) {
 	body, err := c.post(PuzzleAPI, fmt.Sprintf("[%q,null]", prettyID))
 	if err != nil {

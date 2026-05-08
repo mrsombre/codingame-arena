@@ -23,22 +23,19 @@ type ReplayMoves struct {
 // and TraceMatch.FinalScores carries the post-OnEnd value matching CG's
 // gameResult.scores; both have -1 substituted for any deactivated side.
 //
-// botNames are copied into TraceMatch.Players (basename applied). blueSide
-// (0 or 1) is the in-match side whose FrameInfoFor lines are recorded as
-// each turn's GameInput; values outside [0,1] fall back to side 0. maxTurns
-// of 0 defaults to factory.MaxTurns().
+// botNames are copied into TraceMatch.Players (basename applied). maxTurns
+// of 0 defaults to factory.MaxTurns(). Setup and per-turn GameInput are
+// captured from a canonical side-agnostic view (god-mode for games that
+// implement TraceGlobalInfoProducer / TraceFrameInfoProducer; otherwise
+// players[0]'s perspective).
 func RunReplay(
 	factory GameFactory,
 	seed int64,
 	gameOptions *viper.Viper,
 	moves ReplayMoves,
 	botNames [2]string,
-	blueSide int,
 	maxTurns int,
 ) (TraceMatch, [2]int) {
-	if blueSide != 0 && blueSide != 1 {
-		blueSide = 0
-	}
 	referee, players := factory.NewGame(seed, gameOptions)
 	referee.Init(players)
 
@@ -70,14 +67,23 @@ func RunReplay(
 		})
 	}
 
+	// Send each side its own per-side global info (respects fog-of-war /
+	// player-index headers), then capture the trace's setup lines from a
+	// canonical side-agnostic view independent of who's playing where.
 	for _, player := range players {
 		for _, line := range referee.GlobalInfoFor(player) {
 			player.SendInputLine(line)
 		}
 	}
+	traceSetup := captureTraceGlobalInfo(referee, players)
 
 	var traceTurns []TraceTurn
 	deactivationTurns := [2]int{-1, -1}
+	// firstOutputTurns[i] is the loop turn index of the first turn side i was
+	// prompted for output (-1 if never prompted). See match.go for the
+	// rationale; convert paths use the same value so EndReason classification
+	// matches what self-play would produce on an equivalent match.
+	firstOutputTurns := [2]int{-1, -1}
 	turn := 0
 	for ; !referee.Ended() && turn < maxTurns; turn++ {
 		referee.ResetGameTurnData()
@@ -94,20 +100,40 @@ func RunReplay(
 			liveTurn = false
 		}
 
+		// outputTurn[i] mirrors the gating used in the inner Execute loop below:
+		// true iff side i would be prompted this turn. See match.go for the
+		// rationale.
+		wasDeactivated := [2]bool{players[0].IsDeactivated(), players[1].IsDeactivated()}
+		outputTurn := [2]bool{}
+		if liveTurn {
+			for i, player := range players {
+				outputTurn[i] = !wasDeactivated[i] && !referee.ShouldSkipPlayerTurn(player)
+			}
+		}
+		for i := range outputTurn {
+			if outputTurn[i] && firstOutputTurns[i] == -1 {
+				firstOutputTurns[i] = turn
+			}
+		}
+
 		playerOutputs := [2]string{}
 		var turnInput []string
 
 		if liveTurn {
+			// Capture trace's gameInput once per live turn from a canonical
+			// side-agnostic view (god-mode if the referee implements
+			// TraceFrameInfoProducer, otherwise players[0]'s perspective).
+			// Done before bots are sent their per-side fog-filtered input.
+			if outputTurn[0] || outputTurn[1] {
+				turnInput = captureTraceFrameInfo(referee, players)
+			}
+
 			for _, player := range players {
 				if player.IsDeactivated() || referee.ShouldSkipPlayerTurn(player) {
 					continue
 				}
-				lines := referee.FrameInfoFor(player)
-				for _, line := range lines {
+				for _, line := range referee.FrameInfoFor(player) {
 					player.SendInputLine(line)
-				}
-				if player.GetIndex() == blueSide {
-					turnInput = append([]string(nil), lines...)
 				}
 				_ = player.Execute()
 				if outs := player.GetOutputs(); len(outs) > 0 {
@@ -117,14 +143,24 @@ func RunReplay(
 		}
 
 		tt := TraceTurn{
-			Turn:      turn,
-			GameInput: turnInput,
-			Output:    playerOutputs,
-			Timing:    &TraceTurnTiming{Response: [2]float64{}},
+			Turn:         turn,
+			GameInput:    turnInput,
+			Output:       playerOutputs,
+			IsOutputTurn: outputTurn,
+			Timing:       &TraceTurnTiming{Response: [2]float64{}},
 		}
 
 		if liveTurn {
 			handlePlayerCommands(players, referee)
+		}
+
+		if rsp, ok := referee.(RawScoresProvider); ok {
+			tt.Score = rsp.RawScores()
+		}
+		if decorator, ok := referee.(TraceTurnDecorator); ok {
+			if state := decorator.DecorateTraceTurn(turn, players); len(state) > 0 {
+				tt.State = state
+			}
 		}
 
 		referee.PerformGameUpdate(turn)
@@ -136,7 +172,10 @@ func RunReplay(
 		}
 
 		if ttp, ok := referee.(TurnTraceProvider); ok {
-			tt.Traces = ttp.TurnTraces(turn, players)
+			per := ttp.TurnTraces(turn, players)
+			for i := range per {
+				tt.Traces[i] = append(tt.Traces[i], per[i]...)
+			}
 		}
 		traceTurns = append(traceTurns, tt)
 	}
@@ -160,39 +199,35 @@ func RunReplay(
 		rawTraceScores = rawScores
 	}
 	finalTraceScores := finalScores
-	deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
-	// Match CG's gameResult.scores convention: a deactivated side's score is
-	// reported as -1 even when its raw in-game count was higher. Without this
-	// the trace would show a live count for a player who never finished the
-	// match, disagreeing with the replay JSON for the same field.
-	for i := range deactivated {
-		if deactivated[i] {
-			rawTraceScores[i] = -1
-			finalTraceScores[i] = -1
-		}
-	}
-	// Ranks derive from finalScores (post-OnEnd) so a deactivated side never
-	// records as drawing against the survivor and tie-break adjustments the
-	// engine performs in OnEnd are reflected. convert overrides this with the
-	// replay's gameResult.ranks for replay traces, which carries CG-side
-	// tiebreakers the engine doesn't model.
-	winner := TraceWinnerFromScores(finalScores, deactivated)
+	disqualified := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
+	// Trace keeps engine truth in both Scores and FinalScores. Disqualified
+	// flags which side(s) the engine deactivated; convert.go later
+	// overwrites FinalScores with CG's gameResult.scores when a replay
+	// match was disqualified, since CG's value is authoritative there.
+	//
+	// Ranks derive from finalScores (post-OnEnd) so a disqualified side
+	// never records as drawing against the survivor and tie-break
+	// adjustments the engine performs in OnEnd are reflected. convert
+	// overrides this with the replay's gameResult.ranks for replay traces,
+	// which carries CG-side tiebreakers the engine doesn't model.
+	winner := TraceWinnerFromScores(finalScores, disqualified)
 
 	var endReason string
 	if erp, ok := referee.(EndReasonProvider); ok {
-		endReason = erp.EndReason(turn, players, deactivationTurns)
+		endReason = erp.EndReason(turn, players, deactivationTurns, firstOutputTurns)
 	}
 
 	return TraceMatch{
 		MatchID:     0,
-		GameID:      factory.Name(),
+		PuzzleName:  factory.Name(),
 		PuzzleID:    factory.PuzzleID(),
 		Seed:        seed,
 		EndReason:   endReason,
-		Deactivated: deactivated,
+		Disqualified: disqualified,
 		Scores:      [2]TraceScore{TraceScore(rawTraceScores[0]), TraceScore(rawTraceScores[1])},
 		FinalScores: [2]TraceScore{TraceScore(finalTraceScores[0]), TraceScore(finalTraceScores[1])},
 		Ranks:       RanksFromWinner(winner),
+		Setup:       traceSetup,
 		Players:     [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
 		Timing:      &TraceTiming{},
 		Turns:       traceTurns,

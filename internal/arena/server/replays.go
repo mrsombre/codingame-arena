@@ -149,12 +149,8 @@ func handleReplayGet(replayDir string, resolver factoryResolver) http.HandlerFun
 
 		moves := arena.ReplayMovesFromFrames(replay)
 		names := arena.ReplayPlayerNames(replay)
-		blueSide := 0
-		if replay.Blue != "" && names[1] == replay.Blue {
-			blueSide = 1
-		}
 
-		trace, _ := arena.RunReplay(factory, seed, gameOptions, moves, names, blueSide, 0)
+		trace, _ := arena.RunReplay(factory, seed, gameOptions, moves, names, 0)
 		// Keep the original replay id so the client can use it as a stable key.
 		if n, err := strconv.Atoi(id); err == nil {
 			trace.MatchID = n

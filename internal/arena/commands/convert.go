@@ -13,15 +13,22 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-// errReplayMismatch flags a verification failure (engine output disagrees with
-// the replay) so the caller can skip writing the trace and move on instead of
-// aborting the whole batch.
+// errReplayPrep flags a pre-run failure (replay missing required metadata so
+// the engine can't be started). No trace is produced; the caller skips the
+// replay and moves on.
+var errReplayPrep = errors.New("replay prep failed")
+
+// errReplayMismatch flags a verifier disagreement (engine ran successfully
+// but its output does not match the replay). A trace is produced; the caller
+// still writes it so users can compare engine output against the raw replay
+// on disk. The mismatch is logged but is not treated as a hard failure.
 var errReplayMismatch = errors.New("replay mismatch")
 
 type convertOutcome int
 
 const (
 	convertOutcomeSaved convertOutcome = iota
+	convertOutcomeSavedMismatch
 	convertOutcomeSkippedExisting
 	convertOutcomeSkippedPuzzle
 	convertOutcomeSkippedMismatch
@@ -42,6 +49,7 @@ type convertResult struct {
 type convertSummary struct {
 	Total           int
 	Saved           int
+	SavedMismatch   int
 	SkippedExisting int
 	SkippedPuzzle   int
 	SkippedMismatch int
@@ -85,17 +93,25 @@ func convertReplay(factory arena.GameFactory, opts ConvertOptions, target conver
 
 	trace, league, err := convertReplayTrace(factory, replay, opts.League)
 	if err != nil {
-		if errors.Is(err, errReplayMismatch) {
+		if errors.Is(err, errReplayPrep) {
 			res.Outcome = convertOutcomeSkippedMismatch
 			res.Detail = err.Error()
 			return res, nil
 		}
-		return convertResult{}, fmt.Errorf("convert replay %d: %w", target.ID, err)
+		if !errors.Is(err, errReplayMismatch) {
+			return convertResult{}, fmt.Errorf("convert replay %d: %w", target.ID, err)
+		}
 	}
 	applyReplayMetadata(&trace, replay)
 
-	if err := arena.NewTraceWriter(opts.TraceDir, target.ID).WriteMatch(trace); err != nil {
-		return convertResult{}, fmt.Errorf("write trace for replay %d: %w", target.ID, err)
+	if writeErr := arena.NewTraceWriter(opts.TraceDir, target.ID).WriteMatch(trace); writeErr != nil {
+		return convertResult{}, fmt.Errorf("write trace for replay %d: %w", target.ID, writeErr)
+	}
+
+	if err != nil {
+		res.Outcome = convertOutcomeSavedMismatch
+		res.Detail = err.Error()
+		return res, nil
 	}
 
 	res.Outcome = convertOutcomeSaved
@@ -146,6 +162,16 @@ func applyReplayMetadata(trace *arena.TraceMatch, replay arena.CodinGameReplay[a
 			trace.Ranks = r
 		}
 	}
+	// For disqualified matches the engine's post-OnEnd value is unreliable
+	// (CodinGame's record can keep the live count or substitute -1; either
+	// way it disagrees with a clean simulation). Trust CG's gameResult.scores
+	// as authoritative — engine truth still lives in trace.Scores.
+	if (trace.Disqualified[0] || trace.Disqualified[1]) && len(replay.GameResult.Scores) >= 2 {
+		trace.FinalScores = [2]arena.TraceScore{
+			arena.TraceScore(replay.GameResult.Scores[0]),
+			arena.TraceScore(replay.GameResult.Scores[1]),
+		}
+	}
 }
 
 func summarizeConvertResults(results []convertResult) convertSummary {
@@ -154,6 +180,8 @@ func summarizeConvertResults(results []convertResult) convertSummary {
 		switch r.Outcome {
 		case convertOutcomeSaved:
 			s.Saved++
+		case convertOutcomeSavedMismatch:
+			s.SavedMismatch++
 		case convertOutcomeSkippedExisting:
 			s.SkippedExisting++
 		case convertOutcomeSkippedPuzzle:
@@ -188,18 +216,23 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 	}
 
 	if replay.Blue == "" {
-		return arena.TraceMatch{}, league, fmt.Errorf("%w: replay missing blue (re-fetch with `arena replay` so the username is recorded)", errReplayMismatch)
+		return arena.TraceMatch{}, league, fmt.Errorf("%w: replay missing blue (re-fetch with `arena replay` so the username is recorded)", errReplayPrep)
 	}
 	botNames := arena.ReplayPlayerNames(replay)
-	blueSide := -1
-	for i, name := range botNames {
+	// Validate that the recorded blue username actually appears in the
+	// replay's players list — convert refuses to write a trace where blue
+	// can't be located. (The trace's gameInput is no longer captured from
+	// blue's side, but we still want the early error so downstream
+	// analyzers don't load a trace whose Blue field doesn't resolve.)
+	blueFound := false
+	for _, name := range botNames {
 		if name == replay.Blue {
-			blueSide = i
+			blueFound = true
 			break
 		}
 	}
-	if blueSide == -1 {
-		return arena.TraceMatch{}, league, fmt.Errorf("%w: blue %q not found in players %v", errReplayMismatch, replay.Blue, botNames)
+	if !blueFound {
+		return arena.TraceMatch{}, league, fmt.Errorf("%w: blue %q not found in players %v", errReplayPrep, replay.Blue, botNames)
 	}
 
 	trace, _ := arena.RunReplay(
@@ -208,13 +241,12 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		gameOptions,
 		arena.ReplayMovesFromFrames(replay),
 		botNames,
-		blueSide,
 		0,
 	)
 
 	turnModel := resolveTurnModel(factory)
 	if err := verifyReplayTrace(trace, replay, turnModel); err != nil {
-		return arena.TraceMatch{}, league, err
+		return trace, league, err
 	}
 
 	return trace, league, nil
@@ -232,26 +264,32 @@ func resolveTurnModel(factory arena.GameFactory) arena.TurnModel {
 // verifyReplayTrace checks the engine reproduces the replay across three
 // agreement layers:
 //
-//   - L0 outcome: trace.FinalScores (post-OnEnd, -1 for DQ) matches
-//     replay.gameResult.scores — the only score the replay records. Winner
-//     ranks match (trace.Ranks vs gameResult.ranks) and deactivation flags
-//     match (trace.Deactivated vs scores[i] == -1). trace.Scores (raw
-//     pre-OnEnd, -1 for DQ) is stored for analysis but is not compared.
+//   - L0 outcome: trace.FinalScores equals replay.gameResult.scores per
+//     side, and trace.Ranks equals replay.gameResult.ranks. Disqualified
+//     matches skip the score check entirely — CodinGame's score and frame
+//     counts after a DQ diverge from a clean simulation in ways the engine
+//     can't reproduce (spring2020 keeps the live count, spring2021/winter
+//     2026 sometimes substitute -1, frame layouts differ around the DQ
+//     event). Engine truth for DQ matches still lives in trace.Scores.
 //   - L1 main-turn count: trace.MainTurns matches the model's MainTurnCount.
 //     Counts player-decision turns only; phase frames and post-end frames
-//     are excluded on both sides.
+//     are excluded on both sides. Skipped for disqualified matches.
 //   - L2 total trace-turn count: len(trace.Turns) matches the model's
-//     ExpectedTraceTurnCount.
+//     ExpectedTraceTurnCount. Skipped for disqualified matches.
 func verifyReplayTrace(trace arena.TraceMatch, replay arena.CodinGameReplay[arena.CodinGameReplayFrame], model arena.TurnModel) error {
-	outcome, ok := arena.ExtractReplayOutcome(replay)
-	if !ok {
+	if _, ok := arena.ExtractReplayOutcome(replay); !ok {
 		return fmt.Errorf("replay scores or ranks malformed")
 	}
-	if float64(trace.FinalScores[0]) != replay.GameResult.Scores[0] || float64(trace.FinalScores[1]) != replay.GameResult.Scores[1] {
-		return fmt.Errorf("%w: final score mismatch: replay=[%.1f %.1f] engine=[%.1f %.1f]",
-			errReplayMismatch,
-			replay.GameResult.Scores[0], replay.GameResult.Scores[1],
-			float64(trace.FinalScores[0]), float64(trace.FinalScores[1]))
+
+	disqualified := trace.Disqualified[0] || trace.Disqualified[1]
+
+	if !disqualified {
+		if float64(trace.FinalScores[0]) != replay.GameResult.Scores[0] || float64(trace.FinalScores[1]) != replay.GameResult.Scores[1] {
+			return fmt.Errorf("%w: final score mismatch: replay=[%.1f %.1f] engine=[%.1f %.1f]",
+				errReplayMismatch,
+				replay.GameResult.Scores[0], replay.GameResult.Scores[1],
+				float64(trace.FinalScores[0]), float64(trace.FinalScores[1]))
+		}
 	}
 
 	replayRanks, _ := arena.RanksFromCGRanks(replay.GameResult.Ranks)
@@ -267,8 +305,8 @@ func verifyReplayTrace(trace arena.TraceMatch, replay arena.CodinGameReplay[aren
 		}
 	}
 
-	if trace.Deactivated != outcome.Deactivated {
-		return fmt.Errorf("%w: deactivation mismatch: replay=%v engine=%v", errReplayMismatch, outcome.Deactivated, trace.Deactivated)
+	if disqualified {
+		return nil
 	}
 
 	expectedMain := model.MainTurnCount(replay)

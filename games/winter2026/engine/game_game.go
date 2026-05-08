@@ -30,7 +30,7 @@ type Game struct {
 	Losses        [2]int
 	ended         bool
 	summary       []string
-	traces        []arena.TurnTrace
+	traces        [2][]arena.TurnTrace
 }
 
 func NewGame(seed int64, leagueLevel int) *Game {
@@ -131,6 +131,12 @@ func (g *Game) ResetGameTurnData() {
 	for _, p := range g.Players {
 		p.Reset()
 	}
+	// Trace buffer is cleared at turn start (before command parsing emits
+	// MOVE/WAIT/MARK and before PerformGameUpdate emits EAT/HIT_*/DEAD/
+	// DEAD_FALL) so command and event traces from the same turn share the
+	// slice. The runner harvests this slice via TurnTraces() after
+	// PerformGameUpdate.
+	g.traces = [2][]arena.TurnTrace{}
 }
 
 /*
@@ -234,14 +240,20 @@ func (g *Game) DoBeheadings() {
 		}
 
 		head := bird.HeadPos()
+		ownerSide := bird.Owner.GetIndex()
+		// HIT_* events are attributed to the moving bird only — even
+		// HIT_ENEMY is asymmetric: the active bird collides into the
+		// stationary one and pays the segment cost. The opponent's slot
+		// stays clean so per-match HIT_ENEMY count tracks "segments lost"
+		// rather than "encounters had".
 		if isInWall {
-			g.trace(arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
+			g.tracePlayer(ownerSide, arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
 		}
 		if isInEnemy {
-			g.trace(arena.MakeTurnTrace(TraceHitEnemy, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
+			g.tracePlayer(ownerSide, arena.MakeTurnTrace(TraceHitEnemy, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
 		}
 		if isInSelf {
-			g.trace(arena.MakeTurnTrace(TraceHitSelf, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
+			g.tracePlayer(ownerSide, arena.MakeTurnTrace(TraceHitSelf, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(head)}))
 		}
 
 		// Single-cause attribution by priority: WALL outranks the body
@@ -266,7 +278,7 @@ func (g *Game) DoBeheadings() {
 		if len(c.bird.Body) <= 3 {
 			c.bird.Alive = false
 			g.Losses[c.bird.Owner.GetIndex()] += len(c.bird.Body)
-			g.trace(arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: c.bird.ID, Cause: c.cause}))
+			g.tracePlayer(c.bird.Owner.GetIndex(), arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: c.bird.ID, Cause: c.cause}))
 		} else {
 			c.bird.Body = c.bird.Body[1:]
 			g.Losses[c.bird.Owner.GetIndex()]++
@@ -295,7 +307,7 @@ func (g *Game) DoEats() {
 	for _, p := range g.Players {
 		for _, bird := range p.Birds {
 			if bird.Alive && coordSliceContains(g.Grid.Apples, bird.HeadPos()) {
-				g.trace(arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(bird.HeadPos())}))
+				g.tracePlayer(bird.Owner.GetIndex(), arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: bird.ID, Coord: coordPair(bird.HeadPos())}))
 				eaten[bird.HeadPos()] = struct{}{}
 			}
 		}
@@ -433,7 +445,7 @@ func (g *Game) DoFalls() {
 			if allOut {
 				bird.Alive = false
 				outOfBounds = append(outOfBounds, bird)
-				g.trace(arena.MakeTurnTrace(TraceDeadFall, BirdSegmentsMeta{Bird: bird.ID, Segments: len(bird.Body)}))
+				g.tracePlayer(bird.Owner.GetIndex(), arena.MakeTurnTrace(TraceDeadFall, BirdSegmentsMeta{Bird: bird.ID, Segments: len(bird.Body)}))
 			}
 		}
 		for _, bird := range outOfBounds {
@@ -459,7 +471,6 @@ public void performGameUpdate(int turn) {
 
 func (g *Game) PerformGameUpdate(turn int) {
 	g.Turn = turn
-	g.traces = g.traces[:0]
 	g.DoMoves()
 	g.DoEats()
 	g.DoBeheadings()
@@ -573,4 +584,3 @@ func sortedBirdSet(set map[*Bird]struct{}) []*Bird {
 	})
 	return birds
 }
-

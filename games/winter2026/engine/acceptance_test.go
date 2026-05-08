@@ -472,9 +472,11 @@ func TestEatEmitsTraceWithBirdAndCoord(t *testing.T) {
 
 	advance(g, 0)
 
-	types := make([]string, 0, len(g.traces))
-	for _, e := range g.traces {
-		types = append(types, e.Type)
+	var types []string
+	for _, slot := range g.traces {
+		for _, e := range slot {
+			types = append(types, e.Type)
+		}
 	}
 	assert.Contains(t, types, TraceEat)
 }

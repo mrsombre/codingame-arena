@@ -54,7 +54,10 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	}
 	defer cleanup()
 
-	// Send global info.
+	tracing := runner.Options.TraceSink != nil
+
+	// Send global info to each side's stdin (each receives its own
+	// per-side view — fog-of-war / player-index headers respected).
 	for _, player := range players {
 		lines := referee.GlobalInfoFor(player)
 		for _, line := range lines {
@@ -66,6 +69,15 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				fmt.Fprintln(os.Stderr, line)
 			}
 		}
+	}
+
+	// Capture the trace's setup lines from a canonical side-agnostic view
+	// (god-mode if the referee implements TraceGlobalInfoProducer, otherwise
+	// players[0]'s perspective). Independent of what bots actually received
+	// so analyzers see full state regardless of fog-of-war.
+	var traceSetup []string
+	if tracing {
+		traceSetup = captureTraceGlobalInfo(referee, players)
 	}
 
 	// Flush global info to subprocess stdin immediately so the bot can begin
@@ -81,7 +93,12 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	turn := 0
 	var badCommands []BadCommandInfo
 	deactivationTurns := [2]int{-1, -1}
-	tracing := runner.Options.TraceSink != nil
+	// firstOutputTurns[i] is the loop turn index of the first turn side i was
+	// prompted for output (-1 if never prompted). Lets EndReason classify
+	// TIMEOUT_START as "deactivated on first output turn" without depending on
+	// game-specific frame numbering — Spring 2021's first output turn is loop
+	// turn 1 (after GATHERING), Spring 2020's is loop turn 0.
+	firstOutputTurns := [2]int{-1, -1}
 	var traceTurns []TraceTurn
 
 	for turn = 0; !referee.Ended() && turn < maxTurns; turn++ {
@@ -93,7 +110,7 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		// where the referee runs only resetGameTurnData / performGameUpdate /
 		// performGameOver / endGame on the trailing frame. The same applies
 		// when the engine has flagged its post-end frame explicitly (Spring
-		// 2020's gameOverFrame branch) — both sides may still be active but
+		// 2020's gameOverFrame branch) — both sides may still be active, but
 		// the outcome is decided.
 		liveTurn := referee.ActivePlayers(players) >= 2
 		if reporter, ok := referee.(GameOverFrameReporter); ok && reporter.InGameOverFrame() {
@@ -101,19 +118,37 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		}
 
 		wasDeactivated := [2]bool{players[0].IsDeactivated(), players[1].IsDeactivated()}
+		// outputTurn[i] mirrors the gating used in the inner Execute loop below:
+		// true iff side i would be prompted this turn. Captured up front so the
+		// trace records the prompt regardless of whether Execute later
+		// deactivates the side (an empty-output Timeout still counts as an
+		// output turn — the bot was asked, just failed to answer).
+		outputTurn := [2]bool{}
+		if liveTurn {
+			for i, player := range players {
+				outputTurn[i] = !wasDeactivated[i] && !referee.ShouldSkipPlayerTurn(player)
+			}
+		}
+		for i := range outputTurn {
+			if outputTurn[i] && firstOutputTurns[i] == -1 {
+				firstOutputTurns[i] = turn
+			}
+		}
 		playerOutputs := [2]string{}
 		var turnInput []string
-		// Blue is our bot identity from --blue; after seed-driven swap, blue
-		// plays the right side. Capturing only blue's view keeps traces compact;
-		// for symmetric-input games either side would yield the same lines.
-		blueSideIndex := 0
-		if bluePlaysRight {
-			blueSideIndex = 1
-		}
 
 		if liveTurn {
 			for _, controller := range controllers {
 				controller.BeginTurn()
+			}
+
+			// Capture the trace's gameInput once per live turn — independent of
+			// which sides will be prompted below, and side-agnostic (god-mode
+			// when the referee implements TraceFrameInfoProducer; otherwise
+			// players[0]'s perspective). Done before any FrameInfoFor send so
+			// the snapshot reflects the state bots are about to act on.
+			if tracing && (outputTurn[0] || outputTurn[1]) {
+				turnInput = captureTraceFrameInfo(referee, players)
 			}
 
 			for _, player := range players {
@@ -123,9 +158,6 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				lines := referee.FrameInfoFor(player)
 				for _, line := range lines {
 					player.SendInputLine(line)
-				}
-				if tracing && player.GetIndex() == blueSideIndex {
-					turnInput = append([]string(nil), lines...)
 				}
 				if runner.Options.Debug {
 					side := "left"
@@ -162,10 +194,11 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				}
 			}
 			traceTurns = append(traceTurns, TraceTurn{
-				Turn:      turn,
-				GameInput: turnInput,
-				Output:    playerOutputs,
-				Timing:    turnTiming,
+				Turn:         turn,
+				GameInput:    turnInput,
+				Output:       playerOutputs,
+				IsOutputTurn: outputTurn,
+				Timing:       turnTiming,
 			})
 		}
 
@@ -186,6 +219,17 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			}
 		}
 
+		if tracing {
+			if rsp, ok := referee.(RawScoresProvider); ok {
+				traceTurns[len(traceTurns)-1].Score = rsp.RawScores()
+			}
+			if decorator, ok := referee.(TraceTurnDecorator); ok {
+				if state := decorator.DecorateTraceTurn(turn, players); len(state) > 0 {
+					traceTurns[len(traceTurns)-1].State = state
+				}
+			}
+		}
+
 		referee.PerformGameUpdate(turn)
 
 		// Record turn-of-deactivation for any side that became deactivated
@@ -199,7 +243,11 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 
 		if tracing {
 			if ttp, ok := referee.(TurnTraceProvider); ok {
-				traceTurns[len(traceTurns)-1].Traces = ttp.TurnTraces(turn, players)
+				per := ttp.TurnTraces(turn, players)
+				dst := &traceTurns[len(traceTurns)-1].Traces
+				for i := range per {
+					dst[i] = append(dst[i], per[i]...)
+				}
 			}
 		}
 	}
@@ -238,15 +286,15 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 	}
 
 	if tracing {
-		// Trace uses in-match side perspective: index 0 is left side, index 1
-		// is right side. result fields are blue/red perspective after the
+		// Trace uses in-match side perspective: index 0 is the left side, index 1
+		// is the right side. result fields are blue/red perspective after the
 		// potential swap-back; un-swap to restore the in-match view.
 		//
 		// Scores stores the raw pre-OnEnd value when the engine exposes one
-		// (intrinsic in-game count, no tie-break adjustments) and FinalScores
+		// (intrinsic in-game count, no tie-break adjustments), and FinalScores
 		// stores the post-OnEnd value matching CG's gameResult.scores
-		// convention. Ranks follow result.Winner — i.e. the post-OnEnd
-		// outcome — so a tie-broken match never records as a draw and a
+		// convention. Ranks follow result.Winner — i.e., the post-OnEnd
+		// outcome — so a tie-broken match never records as a draw, and a
 		// deactivated side never ties against the survivor.
 		rawTraceScores := result.Scores
 		if haveRawScores {
@@ -261,15 +309,14 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				traceWinner = 1 - traceWinner
 			}
 		}
-		deactivated := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
-		// Match CG's gameResult.scores convention: a deactivated side's
-		// score is reported as -1, replacing the raw or post-OnEnd count.
-		for i := range deactivated {
-			if deactivated[i] {
-				rawTraceScores[i] = -1
-				finalTraceScores[i] = -1
-			}
-		}
+		disqualified := [2]bool{deactivationTurns[0] != -1, deactivationTurns[1] != -1}
+		// Self-play traces stay in engine-truth units: Scores/FinalScores
+		// carry the engine's actual accumulated values for both sides, and
+		// Disqualified[i] flags whether the engine deactivated that side.
+		// Replay-converted traces (see convert.go) further overwrite
+		// FinalScores with CG's gameResult.scores when the match was
+		// disqualified, since CG's record is the authoritative outcome
+		// there.
 		stats := [2]playerTimingStats{controllers[0].TimingStats(), controllers[1].TimingStats()}
 		traceTiming := &TraceTiming{
 			FirstResponse: [2]float64{
@@ -291,21 +338,22 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		}
 		var endReason string
 		if erp, ok := referee.(EndReasonProvider); ok {
-			endReason = erp.EndReason(turn, players, deactivationTurns)
+			endReason = erp.EndReason(turn, players, deactivationTurns, firstOutputTurns)
 		}
 		traceMatch := TraceMatch{
 			MatchID:     simulationID,
-			GameID:      runner.Factory.Name(),
+			PuzzleName:  runner.Factory.Name(),
 			PuzzleID:    runner.Factory.PuzzleID(),
 			Seed:        seed,
 			Blue:        filepath.Base(runner.Options.BlueBotBin),
 			League:      league,
 			CreatedAt:   time.Now().UTC().Format(time.RFC3339),
 			EndReason:   endReason,
-			Deactivated: deactivated,
+			Disqualified: disqualified,
 			Scores:      [2]TraceScore{TraceScore(rawTraceScores[0]), TraceScore(rawTraceScores[1])},
 			FinalScores: [2]TraceScore{TraceScore(finalTraceScores[0]), TraceScore(finalTraceScores[1])},
 			Ranks:       RanksFromWinner(traceWinner),
+			Setup:       traceSetup,
 			Players:     [2]string{filepath.Base(sideOptions.BlueBotBin), filepath.Base(sideOptions.RedBotBin)},
 			Timing:      traceTiming,
 			Turns:       traceTurns,
@@ -328,8 +376,7 @@ func handlePlayerCommands(players []Player, referee Referee) {
 		if err == nil {
 			continue
 		}
-		var timeout hardTimeoutError
-		if errors.As(err, &timeout) {
+		if _, ok := errors.AsType[hardTimeoutError](err); ok {
 			player.SetTimedOut(true)
 		}
 		player.Deactivate(err.Error())

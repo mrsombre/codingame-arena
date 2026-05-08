@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,25 +13,30 @@ func TestAnalyzeWinterTraceMetricsCountsEverySegmentLossEvent(t *testing.T) {
 	trace := arena.TraceMatch{
 		Turns: []arena.TraceTurn{
 			{
-				Turn:   0,
-				Output: [2]string{"0 UP;1 UP", "2 UP;3 UP"},
-				Traces: []arena.TurnTrace{
-					// Two HIT_WALL on the same side in one turn must both count
-					// — each event is one lost segment.
-					arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: 0, Coord: [2]int{5, 5}}),
-					arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: 1, Coord: [2]int{4, 5}}),
-					arena.MakeTurnTrace(TraceHitEnemy, BirdCoordMeta{Bird: 2, Coord: [2]int{1, 1}}),
-					// Turn 0 < cutoff: this EAT counts toward EAT_T20.
-					arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: 0, Coord: [2]int{2, 2}}),
-					arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: 3, Cause: DeathCauseEnemy}),
-					arena.MakeTurnTrace(TraceDeadFall, BirdSegmentsMeta{Bird: 2, Segments: 5}),
+				Turn: 0,
+				Traces: [2][]arena.TurnTrace{
+					{
+						// Two HIT_WALL on the same side in one turn must both
+						// count — each event is one lost segment.
+						arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: 0, Coord: [2]int{5, 5}}),
+						arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: 1, Coord: [2]int{4, 5}}),
+						// Turn 0 < cutoff: this EAT counts toward EAT_T20.
+						arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: 0, Coord: [2]int{2, 2}}),
+					},
+					{
+						arena.MakeTurnTrace(TraceHitEnemy, BirdCoordMeta{Bird: 2, Coord: [2]int{1, 1}}),
+						arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: 3, Cause: DeathCauseEnemy}),
+						arena.MakeTurnTrace(TraceDeadFall, BirdSegmentsMeta{Bird: 2, Segments: 5}),
+					},
 				},
 			},
 			{
-				Turn:   1,
-				Output: [2]string{"0 UP;1 UP", "2 UP;3 UP"},
-				Traces: []arena.TurnTrace{
-					arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: 2, Coord: [2]int{0, 0}}),
+				Turn: 1,
+				Traces: [2][]arena.TurnTrace{
+					nil,
+					{
+						arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: 2, Coord: [2]int{0, 0}}),
+					},
 				},
 			},
 		},
@@ -54,12 +58,15 @@ func TestAnalyzeWinterTraceMetricsAttributesEachDeathCause(t *testing.T) {
 	trace := arena.TraceMatch{
 		Turns: []arena.TraceTurn{
 			{
-				Output: [2]string{"0 UP;1 UP", "2 UP;3 UP"},
-				Traces: []arena.TurnTrace{
-					arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: 0, Cause: DeathCauseWall}),
-					arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: 1, Cause: DeathCauseSelf}),
-					arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: 2, Cause: DeathCauseEnemy}),
-					arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: 3, Cause: DeathCauseSelf}),
+				Traces: [2][]arena.TurnTrace{
+					{
+						arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: 0, Cause: DeathCauseWall}),
+						arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: 1, Cause: DeathCauseSelf}),
+					},
+					{
+						arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: 2, Cause: DeathCauseEnemy}),
+						arena.MakeTurnTrace(TraceDead, BirdDeathMeta{Bird: 3, Cause: DeathCauseSelf}),
+					},
 				},
 			},
 		},
@@ -76,12 +83,14 @@ func TestAnalyzeWinterTraceMetricsDropsDeadWithUnknownCause(t *testing.T) {
 	trace := arena.TraceMatch{
 		Turns: []arena.TraceTurn{
 			{
-				Output: [2]string{"0 UP", "2 UP"},
-				Traces: []arena.TurnTrace{
-					// Empty cause (e.g. legacy BirdMeta-shaped DEAD trace from
-					// before the cause field existed) must be dropped, not
-					// miscategorized into a side bucket.
-					arena.MakeTurnTrace(TraceDead, BirdMeta{Bird: 0}),
+				Traces: [2][]arena.TurnTrace{
+					{
+						// Empty cause (e.g. legacy BirdMeta-shaped DEAD trace from
+						// before the cause field existed) must be dropped, not
+						// miscategorized into a side bucket.
+						arena.MakeTurnTrace(TraceDead, BirdMeta{Bird: 0}),
+					},
+					nil,
 				},
 			},
 		},
@@ -99,19 +108,18 @@ func TestAnalyzeWinterTraceMetricsExcludesLateEatsFromEatT20(t *testing.T) {
 		Turns: []arena.TraceTurn{
 			{
 				// Turn 19 is the last turn that counts (cutoff is < 20).
-				Turn:   19,
-				Output: [2]string{"0 UP", "2 UP"},
-				Traces: []arena.TurnTrace{
-					arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: 0, Coord: [2]int{1, 1}}),
-					arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: 2, Coord: [2]int{2, 2}}),
+				Turn: 19,
+				Traces: [2][]arena.TurnTrace{
+					{arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: 0, Coord: [2]int{1, 1}})},
+					{arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: 2, Coord: [2]int{2, 2}})},
 				},
 			},
 			{
 				// Turn 20 is past the cutoff and must NOT count.
-				Turn:   20,
-				Output: [2]string{"0 UP", "2 UP"},
-				Traces: []arena.TurnTrace{
-					arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: 0, Coord: [2]int{3, 3}}),
+				Turn: 20,
+				Traces: [2][]arena.TurnTrace{
+					{arena.MakeTurnTrace(TraceEat, BirdCoordMeta{Bird: 0, Coord: [2]int{3, 3}})},
+					nil,
 				},
 			},
 		},
@@ -120,39 +128,6 @@ func TestAnalyzeWinterTraceMetricsExcludesLateEatsFromEatT20(t *testing.T) {
 	stats := analyzeWinterTraceMetrics(trace)
 
 	assert.Equal(t, [2]int{1, 1}, stats[winterMetricEatByTurn20])
-}
-
-func TestAnalyzeWinterTraceMetricsWithoutBirdMappingReturnsZeroes(t *testing.T) {
-	trace := arena.TraceMatch{
-		Turns: []arena.TraceTurn{
-			{Traces: []arena.TurnTrace{
-				arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: 0, Coord: [2]int{5, 5}}),
-			}},
-		},
-	}
-
-	stats := analyzeWinterTraceMetrics(trace)
-
-	assert.Equal(t, [2]int{}, stats[TraceHitWall])
-}
-
-func TestAnalyzeWinterTraceMetricsSkipsUnknownBirdsAndMalformedMeta(t *testing.T) {
-	trace := arena.TraceMatch{
-		Turns: []arena.TraceTurn{
-			{
-				Output: [2]string{"0 UP", "2 UP"},
-				Traces: []arena.TurnTrace{
-					{Type: TraceHitWall, Meta: json.RawMessage(`{"bird": "MARK"}`)},
-					arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: 99, Coord: [2]int{7, 7}}),
-					arena.MakeTurnTrace(TraceHitWall, BirdCoordMeta{Bird: 0, Coord: [2]int{1, 1}}),
-				},
-			},
-		},
-	}
-
-	stats := analyzeWinterTraceMetrics(trace)
-
-	assert.Equal(t, [2]int{1, 0}, stats[TraceHitWall])
 }
 
 func TestWinterTraceMetricSpecsListExpectedMetrics(t *testing.T) {

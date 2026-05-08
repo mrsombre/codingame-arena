@@ -47,32 +47,32 @@ func buildTraceAnalysisInput(traceDir, configuredGame string) (arena.TraceAnalys
 		return arena.TraceAnalysisInput{}, nil, fmt.Errorf("no arena trace JSON files found in %s", traceDir)
 	}
 
-	gameID, err := resolveAnalyzeGame(configuredGame, files)
+	puzzleName, err := resolveAnalyzeGame(configuredGame, files)
 	if err != nil {
 		return arena.TraceAnalysisInput{}, nil, err
 	}
 
-	gameFiles := filterTraceFilesByGame(files, gameID)
+	gameFiles := filterTraceFilesByGame(files, puzzleName)
 	if len(gameFiles) == 0 {
-		return arena.TraceAnalysisInput{}, nil, fmt.Errorf("no %s trace JSON files found in %s", gameID, traceDir)
+		return arena.TraceAnalysisInput{}, nil, fmt.Errorf("no %s trace JSON files found in %s", puzzleName, traceDir)
 	}
 
-	metricAnalyzer, err := resolveTraceMetricAnalyzer(gameID)
+	metricAnalyzer, err := resolveTraceMetricAnalyzer(puzzleName)
 	if err != nil {
 		return arena.TraceAnalysisInput{}, nil, err
 	}
 
 	return arena.TraceAnalysisInput{
-		TraceDir: traceDir,
-		Files:    gameFiles,
-		GameID:   gameID,
+		TraceDir:   traceDir,
+		Files:      gameFiles,
+		PuzzleName: puzzleName,
 	}, metricAnalyzer, nil
 }
 
-func resolveTraceMetricAnalyzer(gameID string) (arena.TraceMetricAnalyzer, error) {
-	factory := arena.GetFactory(gameID)
+func resolveTraceMetricAnalyzer(puzzleName string) (arena.TraceMetricAnalyzer, error) {
+	factory := arena.GetFactory(puzzleName)
 	if factory == nil {
-		return nil, fmt.Errorf("unknown game %q", gameID)
+		return nil, fmt.Errorf("unknown game %q", puzzleName)
 	}
 	metricAnalyzer, _ := factory.(arena.TraceMetricAnalyzer)
 	return metricAnalyzer, nil
@@ -128,7 +128,7 @@ func readAnalyzeTraceFile(path string) (arena.TraceMatch, error) {
 }
 
 func looksLikeArenaTrace(trace arena.TraceMatch) bool {
-	return trace.GameID != "" || len(trace.Turns) > 0
+	return trace.PuzzleName != "" || len(trace.Turns) > 0
 }
 
 func validateAnalyzeTrace(name string, trace arena.TraceMatch) error {
@@ -148,14 +148,14 @@ func resolveAnalyzeGame(configured string, files []arena.TraceFile) (string, err
 
 	seen := make(map[string]struct{})
 	for _, file := range files {
-		if file.Trace.GameID == "" {
+		if file.Trace.PuzzleName == "" {
 			continue
 		}
-		seen[file.Trace.GameID] = struct{}{}
+		seen[file.Trace.PuzzleName] = struct{}{}
 	}
 	if len(seen) == 1 {
-		for gameID := range seen {
-			return gameID, nil
+		for puzzleName := range seen {
+			return puzzleName, nil
 		}
 	}
 	if len(seen) == 0 {
@@ -163,17 +163,17 @@ func resolveAnalyzeGame(configured string, files []arena.TraceFile) (string, err
 	}
 
 	games := make([]string, 0, len(seen))
-	for gameID := range seen {
-		games = append(games, gameID)
+	for puzzleName := range seen {
+		games = append(games, puzzleName)
 	}
 	sort.Strings(games)
 	return "", fmt.Errorf("multiple games in trace files (%v); pass --game", games)
 }
 
-func filterTraceFilesByGame(files []arena.TraceFile, gameID string) []arena.TraceFile {
+func filterTraceFilesByGame(files []arena.TraceFile, puzzleName string) []arena.TraceFile {
 	out := make([]arena.TraceFile, 0, len(files))
 	for _, file := range files {
-		if file.Trace.GameID == gameID {
+		if file.Trace.PuzzleName == puzzleName {
 			out = append(out, file)
 		}
 	}

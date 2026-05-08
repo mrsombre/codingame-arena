@@ -69,17 +69,19 @@ function parseMoves(turn: TraceTurn, myIds: Set<number>, frame: FrameData | unde
   }
 
   const tracesByBird = new Map<number, MoveTrace[]>()
-  for (const turnTrace of turn.traces ?? []) {
-    const kind = turnTrace.type as TraceKind
-    if (!(kind in TRACE_ORDER)) continue
-    const meta = turnTrace.meta as BirdCoordMeta | BirdMeta | undefined
-    if (!meta) continue
-    const bid = meta.bird
-    if (typeof bid !== "number") continue
-    const coord = "coord" in meta && Array.isArray(meta.coord) ? `${meta.coord[0]},${meta.coord[1]}` : undefined
-    const list = tracesByBird.get(bid) ?? []
-    list.push({ kind, coord })
-    tracesByBird.set(bid, list)
+  for (const slot of turn.traces ?? []) {
+    for (const turnTrace of slot) {
+      const kind = turnTrace.type as TraceKind
+      if (!(kind in TRACE_ORDER)) continue
+      const meta = turnTrace.data as BirdCoordMeta | BirdMeta | undefined
+      if (!meta) continue
+      const bid = meta.bird
+      if (typeof bid !== "number") continue
+      const coord = "coord" in meta && Array.isArray(meta.coord) ? `${meta.coord[0]},${meta.coord[1]}` : undefined
+      const list = tracesByBird.get(bid) ?? []
+      list.push({ kind, coord })
+      tracesByBird.set(bid, list)
+    }
   }
   for (const list of tracesByBird.values()) {
     list.sort((a, b) => TRACE_ORDER[a.kind] - TRACE_ORDER[b.kind])
@@ -150,12 +152,12 @@ export const winter2026Adapter: GameViewerAdapter<MapData, FrameData, TraceTurn>
     const frames: FrameData[] = []
     const turns: (TraceTurn | null)[] = []
     const initialTurn = trace.turns[0]
-    const initialInput = initialTurn?.game_input
+    const initialInput = initialTurn?.gameInput
     if (initialTurn && initialInput) {
       frames.push(parseFrameLines(initialInput))
       turns.push(null)
       for (let i = 1; i <= trace.turns.length; i++) {
-        const source = trace.turns[i]?.game_input ?? trace.turns[i - 1]?.game_input ?? initialInput
+        const source = trace.turns[i]?.gameInput ?? trace.turns[i - 1]?.gameInput ?? initialInput
         frames.push(parseFrameLines(source))
         turns.push(trace.turns[i - 1] ?? null)
       }

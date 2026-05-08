@@ -82,6 +82,7 @@ func TestSummarizeConvertResultsAggregatesOutcomes(t *testing.T) {
 	results := []convertResult{
 		{Outcome: convertOutcomeSaved},
 		{Outcome: convertOutcomeSaved},
+		{Outcome: convertOutcomeSavedMismatch},
 		{Outcome: convertOutcomeSkippedExisting},
 		{Outcome: convertOutcomeSkippedPuzzle},
 		{Outcome: convertOutcomeSkippedPuzzle},
@@ -90,8 +91,9 @@ func TestSummarizeConvertResultsAggregatesOutcomes(t *testing.T) {
 	}
 	got := summarizeConvertResults(results)
 	assert.Equal(t, convertSummary{
-		Total:           7,
+		Total:           8,
 		Saved:           2,
+		SavedMismatch:   1,
 		SkippedExisting: 1,
 		SkippedPuzzle:   2,
 		SkippedMismatch: 1,

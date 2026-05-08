@@ -22,12 +22,12 @@ func newEndReasonScenario(t *testing.T) (*Referee, []arena.Player) {
 	return r, players
 }
 
-func TestEndReasonTimeoutStartOnTurnZero(t *testing.T) {
+func TestEndReasonTimeoutStartOnFirstOutputTurn(t *testing.T) {
 	r, players := newEndReasonScenario(t)
 	g := r.Game
 	g.Players[0].Deactivate("Timeout!")
 
-	got := r.EndReason(0, players, [2]int{0, -1})
+	got := r.EndReason(0, players, [2]int{0, -1}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonTimeoutStart, got)
 }
 
@@ -36,7 +36,7 @@ func TestEndReasonTimeoutOnLaterTurn(t *testing.T) {
 	g := r.Game
 	g.Players[1].Deactivate("Timeout!")
 
-	got := r.EndReason(42, players, [2]int{-1, 42})
+	got := r.EndReason(42, players, [2]int{-1, 42}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonTimeout, got)
 }
 
@@ -45,7 +45,7 @@ func TestEndReasonInvalidForBadCommand(t *testing.T) {
 	g := r.Game
 	g.Players[0].Deactivate("Pac 0 cannot be commanded twice!")
 
-	got := r.EndReason(5, players, [2]int{5, -1})
+	got := r.EndReason(5, players, [2]int{5, -1}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonInvalid, got)
 }
 
@@ -54,7 +54,7 @@ func TestEndReasonEliminatedWhenAllPacmenDead(t *testing.T) {
 	g := r.Game
 	g.Players[1].Deactivate("all pacmen dead")
 
-	got := r.EndReason(20, players, [2]int{-1, 20})
+	got := r.EndReason(20, players, [2]int{-1, 20}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonEliminated, got)
 }
 
@@ -66,7 +66,7 @@ func TestEndReasonScoreWhenAllPelletsConsumed(t *testing.T) {
 		cell.HasCherry = false
 	}
 
-	got := r.EndReason(15, players, [2]int{-1, -1})
+	got := r.EndReason(15, players, [2]int{-1, -1}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonScore, got)
 }
 
@@ -83,7 +83,7 @@ func TestEndReasonScoreEarlyOnMathLockIn(t *testing.T) {
 	g.Players[0].Pellets = 5
 	g.Players[1].Pellets = 0
 
-	got := r.EndReason(30, players, [2]int{-1, -1})
+	got := r.EndReason(30, players, [2]int{-1, -1}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonScoreEarly, got)
 }
 
@@ -91,6 +91,6 @@ func TestEndReasonTurnsOutWhenCapHit(t *testing.T) {
 	r, players := newEndReasonScenario(t)
 	// Both players still active, pellets remain, scores tied → game can still
 	// improve so IsGameOver is false. Loop must have exited via turn cap.
-	got := r.EndReason(MaxMainTurns, players, [2]int{-1, -1})
+	got := r.EndReason(MaxMainTurns, players, [2]int{-1, -1}, [2]int{0, 0})
 	assert.Equal(t, arena.EndReasonTurnsOut, got)
 }

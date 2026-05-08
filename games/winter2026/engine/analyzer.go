@@ -1,9 +1,6 @@
 package engine
 
 import (
-	"strconv"
-	"strings"
-
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
@@ -72,45 +69,33 @@ func analyzeWinterTraceMetrics(trace arena.TraceMatch) arena.TraceMetricStats {
 		winterMetricEatByTurn20: {},
 	}
 
-	birdSide := winterBirdSideMap(trace)
-	if len(birdSide) == 0 {
-		return stats
-	}
-
 	for _, turn := range trace.Turns {
-		for _, ev := range turn.Traces {
-			birdID, ok := decodeWinterSubject(ev)
-			if !ok {
-				continue
-			}
-			side, ok := birdSide[birdID]
-			if !ok {
-				continue
-			}
-
-			switch ev.Type {
-			case TraceHitSelf, TraceHitWall, TraceHitEnemy:
-				addWinterTraceMetricCount(stats, ev.Type, side, 1)
-			case TraceDead:
-				meta, err := arena.DecodeMeta[BirdDeathMeta](ev)
-				if err != nil {
-					continue
+		for side := 0; side < 2; side++ {
+			for _, ev := range turn.Traces[side] {
+				switch ev.Type {
+				case TraceHitSelf, TraceHitWall, TraceHitEnemy:
+					addWinterTraceMetricCount(stats, ev.Type, side, 1)
+				case TraceDead:
+					meta, err := arena.DecodeData[BirdDeathMeta](ev)
+					if err != nil {
+						continue
+					}
+					key, ok := winterDeadKeyForCause(meta.Cause)
+					if !ok {
+						continue
+					}
+					addWinterTraceMetricCount(stats, key, side, 1)
+				case TraceEat:
+					if turn.Turn < winterEarlyTurnCutoff {
+						addWinterTraceMetricCount(stats, winterMetricEatByTurn20, side, 1)
+					}
+				case TraceDeadFall:
+					meta, err := arena.DecodeData[BirdSegmentsMeta](ev)
+					if err != nil {
+						continue
+					}
+					addWinterTraceMetricCount(stats, ev.Type, side, meta.Segments)
 				}
-				key, ok := winterDeadKeyForCause(meta.Cause)
-				if !ok {
-					continue
-				}
-				addWinterTraceMetricCount(stats, key, side, 1)
-			case TraceEat:
-				if turn.Turn < winterEarlyTurnCutoff {
-					addWinterTraceMetricCount(stats, winterMetricEatByTurn20, side, 1)
-				}
-			case TraceDeadFall:
-				meta, err := arena.DecodeMeta[BirdSegmentsMeta](ev)
-				if err != nil {
-					continue
-				}
-				addWinterTraceMetricCount(stats, ev.Type, side, meta.Segments)
 			}
 		}
 	}
@@ -133,66 +118,6 @@ func winterDeadKeyForCause(cause string) (string, bool) {
 	default:
 		return "", false
 	}
-}
-
-// decodeWinterSubject extracts the subject bird ID from any Winter 2026 trace.
-// Every winter meta carries a top-level "bird" field, so a single shape covers
-// all event types.
-func decodeWinterSubject(t arena.TurnTrace) (int, bool) {
-	meta, err := arena.DecodeMeta[BirdMeta](t)
-	if err != nil {
-		return 0, false
-	}
-	return meta.Bird, true
-}
-
-// winterBirdSideMap reads the per-turn command outputs to learn which side
-// owns each bird ID. A move command starts with `<birdID> <DIR>`; only the
-// bird's owner can issue commands for it, so the leading int identifies
-// ownership unambiguously. MARK commands (which lead with `MARK`) are skipped.
-func winterBirdSideMap(trace arena.TraceMatch) map[int]int {
-	birdSide := make(map[int]int)
-	for _, turn := range trace.Turns {
-		for side := 0; side < 2; side++ {
-			for _, cmd := range winterSplitCommands(turn.Output[side]) {
-				birdID, ok := parseLeadingBirdID(cmd)
-				if !ok {
-					continue
-				}
-				birdSide[birdID] = side
-			}
-		}
-	}
-	return birdSide
-}
-
-func winterSplitCommands(output string) []string {
-	if output == "" {
-		return nil
-	}
-	replacer := strings.NewReplacer(";", "\n", "\r", "\n")
-	lines := strings.Split(replacer.Replace(output), "\n")
-	commands := make([]string, 0, len(lines))
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		commands = append(commands, line)
-	}
-	return commands
-}
-
-// parseLeadingBirdID extracts the first whitespace-delimited integer from a
-// command line. Used only by winterBirdSideMap; trace metas are decoded via
-// DecodeMeta and do not need string parsing.
-func parseLeadingBirdID(cmd string) (int, bool) {
-	head, _, _ := strings.Cut(cmd, " ")
-	n, err := strconv.Atoi(head)
-	if err != nil {
-		return 0, false
-	}
-	return n, true
 }
 
 func addWinterTraceMetricCount(stats arena.TraceMetricStats, key string, side, delta int) {
