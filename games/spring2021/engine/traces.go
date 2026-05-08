@@ -15,15 +15,14 @@ import (
 // player index is encoded positionally by the slot, so per-event payloads
 // no longer carry a "player" field. Phase markers and game-state events
 // (SUN_MOVE, SEED_CONFLICT) are not emitted as traces; that information
-// lives in the per-turn TraceTurnState payload (phase, sun_direction,
-// seed_conflict_cell).
+// lives in the per-turn TraceTurnState payload (phase, sunDirection,
+// seedConflictCell).
 const (
 	TraceGather   = "GATHER"
 	TraceGrow     = "GROW"
 	TraceSeed     = "SEED"
 	TraceComplete = "COMPLETE"
 	TraceWait     = "WAIT"
-	TraceDebug    = "DEBUG"
 )
 
 // TraceTurnState is the spring2021-owned per-turn payload written into
@@ -32,51 +31,73 @@ const (
 type TraceTurnState struct {
 	Day              *int       `json:"day,omitempty"`
 	Phase            string     `json:"phase,omitempty"`
-	DayActionIndex   *int       `json:"day_action_index,omitempty"`
-	SunDirection     *int       `json:"sun_direction,omitempty"`
+	DayActionIndex   *int       `json:"dayActionIndex,omitempty"`
+	SunDirection     *int       `json:"sunDirection,omitempty"`
 	Nutrients        *int       `json:"nutrients,omitempty"`
 	Sun              []int      `json:"sun,omitempty"`
 	Trees            [][][4]int `json:"trees,omitempty"`
-	SeedConflictCell *int       `json:"seed_conflict_cell,omitempty"`
+	SeedConflictCell *int       `json:"seedConflictCell,omitempty"`
 }
 
-// GatherData is the data for GATHER events: one event per tree that gathered
-// sun this phase. Cell is the tree's cell index; Sun is the points it gave
-// (equal to its size when not under a spooky shadow). Events are ordered by
-// cell id ascending (TreeOrder traversal).
+// GatherData is the data for GATHER events: one event per tree at the
+// gathering phase, regardless of whether it harvested. Cell is the tree's
+// cell index; Sun is the points it gave — equal to the tree's size when not
+// under a spooky shadow, 0 when it is. Events are ordered by cell id ascending
+// (TreeOrder traversal). Seeds (size 0) emit Sun=0 too, since rules grant no
+// sun for size-0 trees regardless of shadow.
 type GatherData struct {
 	Cell int `json:"cell"`
 	Sun  int `json:"sun"`
 }
 
+// Action data structs share a `Debug` field carrying the trailing free-text
+// "message" the player appended to their command (e.g. "GL HF" in
+// "WAIT GL HF"). It is omitted when empty. CommandManager extracts the
+// message via the optional group on each action regex; Player.Reset clears
+// it at turn start, so a non-empty Debug reflects the message sent on the
+// same turn the surrounding action trace was emitted. There is no separate
+// DEBUG event — the message piggybacks on the action it accompanied; on
+// errored actions (no trace emitted) the message is dropped.
+
 // GrowData is the data for GROW events: the cell index of the tree the
-// owning player just grew.
+// owning player just grew. Cost is the sun debited from the player for
+// this action (TREE_BASE_COST[targetSize] + count of player-owned trees
+// already at targetSize at the moment of the action).
 type GrowData struct {
-	Cell int `json:"cell"`
+	Cell  int    `json:"cell"`
+	Cost  int    `json:"cost"`
+	Debug string `json:"debug,omitempty"`
 }
 
 // SeedData is the data for SEED events: the owning player sent a seed
-// from Source to Target.
+// from Source to Target. Cost is the sun debited at submission time
+// (number of seeds — size-0 trees — the player already owns). On a
+// same-frame seed conflict (state.seedConflictCell set) the cost is
+// refunded by the engine, but the trace still reports what was attempted.
 type SeedData struct {
-	Source int `json:"source"`
-	Target int `json:"target"`
+	Source int    `json:"source"`
+	Target int    `json:"target"`
+	Cost   int    `json:"cost"`
+	Debug  string `json:"debug,omitempty"`
 }
 
 // CompleteData is the data for COMPLETE events: the owning player cut a
 // tree on Cell, awarding Points (Nutrients plus the cell's richness bonus
-// at the moment of the action).
+// at the moment of the action). Cost is the sun debited (always
+// LIFECYCLE_END_COST = 4).
 type CompleteData struct {
-	Cell   int `json:"cell"`
-	Points int `json:"points"`
+	Cell   int    `json:"cell"`
+	Points int    `json:"points"`
+	Cost   int    `json:"cost"`
+	Debug  string `json:"debug,omitempty"`
 }
 
-// DebugData is the data for DEBUG events: the trailing free-text "message"
-// the player appended to their command (e.g. "GL HF" in "WAIT GL HF").
-// CommandManager extracts it via the optional message group on each action
-// regex; Player.Reset clears it at turn start, so a non-empty Value reflects
-// the message sent on the same turn the surrounding action trace was emitted.
-type DebugData struct {
-	Value string `json:"value"`
+// WaitData is the data for WAIT events when the player appended a chat
+// message ("WAIT GL HF" → Debug="GL HF"). When the player waited without
+// a message, the trace is emitted with no `data` field at all rather than
+// `data: {}`.
+type WaitData struct {
+	Debug string `json:"debug,omitempty"`
 }
 
 func (g *Game) DecorateTraceTurn(_ int, _ []arena.Player) json.RawMessage {

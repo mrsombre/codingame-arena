@@ -98,12 +98,13 @@ live in [engine/traces.go](engine/traces.go).
 
 | `type`     | Emitted on phase | `data`                       | Notes                                                                                                          |
 |------------|------------------|------------------------------|----------------------------------------------------------------------------------------------------------------|
-| `GATHER`   | `gathering`      | `{cell, sun}`                | One event per non-spooky tree. `sun` equals the tree's size (`1`/`2`/`3`). Ordered by cell id ascending.       |
-| `GROW`     | `actions`        | `{cell}`                     | Successful `GROW` action: the tree on `cell` advanced one size.                                                |
-| `SEED`     | `actions`        | `{source, target}`           | Successful `SEED` action. If both players seed the same `target` on the same sub-frame, both `SEED` events are still emitted but the seeds are not planted — see `state.seedConflictCell`. |
-| `COMPLETE` | `actions`        | `{cell, points}`             | Successful `COMPLETE` action. `points` = `nutrients + richness bonus` at the moment of the cut (richness bonus: `+0`/`+2`/`+4` for richness `1`/`2`/`3`). |
-| `WAIT`     | `actions`        | none                         | Player ended the day asleep. No `data`.                                                                         |
-| `DEBUG`    | `actions`        | `{value}`                    | Free-text appended to the action command (e.g. `WAIT GL HF` → `"GL HF"`). Emitted **after** the action's own event in the same frame. |
+| `GATHER`   | `gathering`      | `{cell, sun}`                  | One event per tree (regardless of harvest outcome). `sun` equals the tree's size (`1`/`2`/`3`) when not under a spooky shadow, `0` otherwise. Seeds (size `0`) always emit `sun: 0`. Ordered by cell id ascending. |
+| `GROW`     | `actions`        | `{cell, cost, debug?}`         | Successful `GROW` action: the tree on `cell` advanced one size. `cost` = `1`/`3`/`7` (target size 1/2/3) plus the count of player-owned trees already at that size at action time. |
+| `SEED`     | `actions`        | `{source, target, cost, debug?}` | Successful `SEED` action. `cost` = number of size-0 trees the player owned at action time. If both players seed the same `target` on the same sub-frame, both `SEED` events are still emitted but the seeds are not planted and `cost` is refunded by the engine (the trace still reports the attempted `cost`); see `state.seedConflictCell`. |
+| `COMPLETE` | `actions`        | `{cell, points, cost, debug?}` | Successful `COMPLETE` action. `points` = `nutrients + richness bonus` at the moment of the cut (richness bonus: `+0`/`+2`/`+4` for richness `1`/`2`/`3`). `cost` is always `4` (`LIFECYCLE_END_COST`). |
+| `WAIT`     | `actions`        | `{debug?}` or none             | Player ended the day asleep. Emitted with no `data` field when the bot sent a bare `WAIT`; with `{debug}` when the bot appended free text (`WAIT GL HF` → `data: {debug: "GL HF"}`). |
+
+**Inline `debug` field.** Free-text appended to any action command (`SEED 0 3 im seeding`, `WAIT GL HF`, …) rides on the action event itself as `data.debug` rather than as a separate event. The field is omitted when the bot's command had no trailing message, so `data.debug` is unambiguously a bot-authored chat string when present. Errored actions (no event emitted at all) drop the message — there's no carrier to attach it to.
 
 ### What is **not** a per-player event
 
@@ -180,11 +181,8 @@ structure is the spring2021-specific part.
       "isOutputTurn": [true, true],
       "score": [0, 0],
       "traces": [
-        [{ "type": "GROW", "data": { "cell": 21 } }],
-        [
-          { "type": "GROW", "data": { "cell": 30 } },
-          { "type": "DEBUG", "data": { "value": "GL HF" } }
-        ]
+        [{ "type": "GROW", "data": { "cell": 21, "cost": 3 } }],
+        [{ "type": "GROW", "data": { "cell": 30, "cost": 3, "debug": "GL HF" } }]
       ],
       "state": {
         "day": 0,
@@ -227,8 +225,8 @@ Things worth pointing out in the example:
 - Turn 1 is the first `actions` sub-frame (`dayActionIndex: 0`). After
   the action, the grown trees are flagged dormant (`isDormant: 1` in
   `state.trees`) and stay that way for the rest of the day. Player 1
-  appended `GL HF` to their `GROW` command, producing a `DEBUG` event
-  immediately after their `GROW` event.
+  appended `GL HF` to their `GROW` command; the chat text rides on the
+  action event itself as `data.debug` rather than a separate event.
 - Turn 2 is the day-0 `sun` frame. No player events; dormancy resets
   for all trees as the day ends (the next day's `actions` frames will
   see `isDormant: 0`). `sunDirection` stamps the orientation

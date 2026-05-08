@@ -472,7 +472,7 @@ Java: SpringChallenge2021/src/main/java/com/codingame/game/Game.java:405-434
 private void doGrow(Player player, Action action) throws GameException { ... }
 */
 
-func (g *Game) doGrow(player *Player, action Action) error {
+func (g *Game) doGrow(player *Player, action Action, debug string) error {
 	idx := action.GetTargetID()
 	cell := g.Board.CellByIndex(idx)
 	if !cell.IsValid() {
@@ -499,7 +499,7 @@ func (g *Game) doGrow(player *Player, action Action) error {
 	g.AvailableSun[player.GetIndex()] = current - cost
 	tree.Grow()
 	g.Summary.AddGrowTree(player, cell)
-	g.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceGrow, GrowData{Cell: cell.GetIndex()}))
+	g.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceGrow, GrowData{Cell: cell.GetIndex(), Cost: cost, Debug: debug}))
 	tree.SetDormant()
 	return nil
 }
@@ -510,7 +510,7 @@ Java: SpringChallenge2021/src/main/java/com/codingame/game/Game.java:436-464
 private void doComplete(Player player, Action action) throws GameException { ... }
 */
 
-func (g *Game) doComplete(player *Player, action Action) error {
+func (g *Game) doComplete(player *Player, action Action, debug string) error {
 	idx := action.GetTargetID()
 	cell := g.Board.CellByIndex(idx)
 	if !cell.IsValid() {
@@ -538,6 +538,20 @@ func (g *Game) doComplete(player *Player, action Action) error {
 	coord, _ := g.Board.CoordByIndex(cell.GetIndex())
 	g.DyingTrees = append(g.DyingTrees, coord)
 	tree.SetDormant()
+	// Emit the COMPLETE trace eagerly (before any DEBUG message in the same
+	// action loop). Score-award and tree-removal still happen later in
+	// removeDyingTrees, but nutrients and richness don't change between here
+	// and there, so the points computed now equal the points awarded then —
+	// including the simultaneous-COMPLETE case where both players get full
+	// points before updateNutrients drops the pool.
+	points := g.Nutrients
+	switch cell.GetRichness() {
+	case RICHNESS_OK:
+		points += RICHNESS_BONUS_OK
+	case RICHNESS_LUSH:
+		points += RICHNESS_BONUS_LUSH
+	}
+	g.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceComplete, CompleteData{Cell: cell.GetIndex(), Points: points, Cost: cost, Debug: debug}))
 	return nil
 }
 
@@ -547,7 +561,7 @@ Java: SpringChallenge2021/src/main/java/com/codingame/game/Game.java:475-525
 private void doSeed(Player player, Action action) throws GameException { ... }
 */
 
-func (g *Game) doSeed(player *Player, action Action) error {
+func (g *Game) doSeed(player *Player, action Action, debug string) error {
 	targetCell := g.Board.CellByIndex(action.GetTargetID())
 	if !targetCell.IsValid() {
 		return NewCellNotFoundException(action.GetTargetID())
@@ -597,7 +611,7 @@ func (g *Game) doSeed(player *Player, action Action) error {
 		TargetCell: targetCell.GetIndex(),
 	})
 	g.Summary.AddPlantSeed(player, targetCell, sourceCell)
-	g.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceSeed, SeedData{Source: sourceCell.GetIndex(), Target: targetCell.GetIndex()}))
+	g.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceSeed, SeedData{Source: sourceCell.GetIndex(), Target: targetCell.GetIndex(), Cost: cost, Debug: debug}))
 	return nil
 }
 
@@ -626,11 +640,13 @@ func (g *Game) giveSun() {
 	for _, idx := range g.TreeOrder {
 		tree := g.Trees[idx]
 		shadow, has := g.Shadows[idx]
+		gathered := 0
 		if !has || shadow < tree.Size {
 			tree.Owner.AddSun(tree.Size)
 			given[tree.Owner.GetIndex()] += tree.Size
-			g.tracePlayer(tree.Owner.GetIndex(), arena.MakeTurnTrace(TraceGather, GatherData{Cell: idx, Sun: tree.Size}))
+			gathered = tree.Size
 		}
+		g.tracePlayer(tree.Owner.GetIndex(), arena.MakeTurnTrace(TraceGather, GatherData{Cell: idx, Sun: gathered}))
 	}
 	for _, p := range g.Players {
 		v := given[p.GetIndex()]
@@ -669,7 +685,6 @@ func (g *Game) removeDyingTrees() {
 		player := g.Trees[cell.GetIndex()].Owner
 		player.AddScore(points)
 		g.Summary.AddCutTree(player, cell, points)
-		g.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceComplete, CompleteData{Cell: cell.GetIndex(), Points: points}))
 		g.removeTree(cell.GetIndex())
 	}
 }
@@ -808,25 +823,30 @@ func (g *Game) performActionUpdate() {
 			continue
 		}
 		action := player.GetAction()
+		debug := ""
+		if player.HasMessage {
+			debug = player.Message
+		}
 		var err error
 		switch {
 		case action.IsGrow():
-			err = g.doGrow(player, action)
+			err = g.doGrow(player, action, debug)
 		case action.IsSeed():
-			err = g.doSeed(player, action)
+			err = g.doSeed(player, action, debug)
 		case action.IsComplete():
-			err = g.doComplete(player, action)
+			err = g.doComplete(player, action, debug)
 		default:
 			player.SetWaiting(true)
 			g.Summary.AddWait(player)
-			g.tracePlayer(player.GetIndex(), arena.TurnTrace{Type: TraceWait})
+			if debug != "" {
+				g.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceWait, WaitData{Debug: debug}))
+			} else {
+				g.tracePlayer(player.GetIndex(), arena.TurnTrace{Type: TraceWait})
+			}
 		}
 		if err != nil {
 			g.Summary.AddError(fmt.Sprintf("%s: %s", player.NicknameToken(), err.Error()))
 			player.SetWaiting(true)
-		}
-		if player.HasMessage {
-			g.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceDebug, DebugData{Value: player.Message}))
 		}
 	}
 

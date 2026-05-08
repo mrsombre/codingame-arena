@@ -131,7 +131,7 @@ Trimmed spring2021 replay trace (truncated at the second turn for brevity):
       "state": {
         "day": 0,
         "phase": "gathering",
-        "sun_direction": 0,
+        "sunDirection": 0,
         "nutrients": 20,
         "sun":   [0, 0],
         "trees": [[[30, 1, 1], [33, 1, 1]], [[21, 1, 1], [24, 1, 1]]]
