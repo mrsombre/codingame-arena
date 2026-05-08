@@ -359,6 +359,93 @@ func TestAnalysisReportShowsRawCountsForSubOnePercentRates(t *testing.T) {
 	assert.Contains(t, textRare, "FALL        winner        1   loser        0   (winner only)")
 }
 
+func TestAnalysisReportComputesMedianForPerMatchValueMetric(t *testing.T) {
+	// Three matches; both sides have a sample in each. Median picks the
+	// middle of the three so a single outlier (blue's 30 in match c) doesn't
+	// drag the central turn the way a mean would.
+	files := []TraceFile{
+		{Trace: TraceMatch{
+			Type: "a", Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1}, Turns: testTurns(40),
+		}},
+		{Trace: TraceMatch{
+			Type: "b", Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1}, Turns: testTurns(40),
+		}},
+		{Trace: TraceMatch{
+			Type: "c", Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1}, Turns: testTurns(40),
+		}},
+	}
+	const firstCut = "FIRST_CUT_TURN"
+	analyzer := testMetricAnalyzer{
+		specs: []TraceMetricSpec{{Key: firstCut, Label: firstCut, Kind: TraceMetricPerMatchValue}},
+		stats: map[string]TraceMetricStats{
+			"a": {firstCut: [2]int{8, 12}},
+			"b": {firstCut: [2]int{10, 14}},
+			"c": {firstCut: [2]int{30, 18}}, // blue outlier: mean would be 16, median stays at 10
+		},
+	}
+
+	text := runTestAnalysis(t, files, analyzer)
+
+	assert.Contains(t, text, "FIRST_CUT_TURN blue       10.0   red       14.0   (red +4.0)")
+	assert.NotContains(t, text, "WORST")
+}
+
+func TestAnalysisReportPerMatchValueDropsZeroAsMissingSample(t *testing.T) {
+	// Match a: only red completed (blue=0 → no sample for blue).
+	// Match b: both sides completed.
+	// Blue's median is computed over the single match where it had a sample.
+	files := []TraceFile{
+		{Trace: TraceMatch{
+			Type: "a", Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{0, 1}, Ranks: [2]int{1, 0}, Turns: testTurns(40),
+		}},
+		{Trace: TraceMatch{
+			Type: "b", Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1}, Turns: testTurns(40),
+		}},
+	}
+	const firstCut = "FIRST_CUT_TURN"
+	analyzer := testMetricAnalyzer{
+		specs: []TraceMetricSpec{{Key: firstCut, Label: firstCut, Kind: TraceMetricPerMatchValue}},
+		stats: map[string]TraceMetricStats{
+			"a": {firstCut: [2]int{0, 6}},  // blue missing, red=6
+			"b": {firstCut: [2]int{12, 8}}, // both present
+		},
+	}
+
+	text := runTestAnalysis(t, files, analyzer)
+
+	// blue median over its only sample (match b): 12; red median over (6, 8): 7.0.
+	assert.Contains(t, text, "blue       12.0   red        7.0   (blue +5.0)")
+}
+
+func TestAnalysisReportPerMatchValueExcludedFromWorst(t *testing.T) {
+	// per_match_value isn't a hazard peak — its "biggest blue value" framing
+	// (slowest first cut) is a different question than DEAD/HIT_* peaks, so
+	// the WORST section must skip the spec entirely. With no other specs to
+	// drive WORST, the section is suppressed.
+	files := []TraceFile{
+		{Name: "trace-1.json", Trace: TraceMatch{
+			Type: "x", Blue: "us", Players: [2]string{"us", "rival"},
+			Scores: [2]TraceScore{1, 0}, Ranks: [2]int{0, 1}, Turns: testTurns(40),
+		}},
+	}
+	const firstCut = "FIRST_CUT_TURN"
+	analyzer := testMetricAnalyzer{
+		specs: []TraceMetricSpec{{Key: firstCut, Label: firstCut, Kind: TraceMetricPerMatchValue}},
+		stats: map[string]TraceMetricStats{
+			"x": {firstCut: [2]int{12, 8}},
+		},
+	}
+
+	text := runTestAnalysis(t, files, analyzer)
+
+	assert.NotContains(t, text, "WORST")
+}
+
 func TestAnalysisReportSkipsPerTurnMetricsForZeroTurnMatches(t *testing.T) {
 	files := []TraceFile{{Trace: TraceMatch{
 		Type: "zero",

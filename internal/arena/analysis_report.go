@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -88,7 +89,7 @@ func normalizedTraceMetricSpecs(metricAnalyzer TraceMetricAnalyzer) ([]TraceMetr
 			spec.Label = spec.Key
 		}
 		switch spec.Kind {
-		case TraceMetricPerMatchCount, TraceMetricPerTurnRate:
+		case TraceMetricPerMatchCount, TraceMetricPerTurnRate, TraceMetricPerMatchValue:
 		default:
 			return nil, nil, fmt.Errorf("trace metric %q has unsupported kind %q", spec.Key, spec.Kind)
 		}
@@ -214,6 +215,11 @@ type traceAnalysisMetricAggregate struct {
 	Sum      float64
 	Samples  int
 	RawCount int
+	// Values retains the per-match samples for TraceMetricPerMatchValue
+	// metrics so the report can compute medians (a single Sum/Samples mean
+	// would be skewed by missing-sample matches and by outliers — the median
+	// is the whole point of using this kind). Empty for count/rate kinds.
+	Values []float64
 }
 
 type traceAnalysisMetricWorst struct {
@@ -284,7 +290,7 @@ func (r *traceAnalysisReport) add(file TraceFile, stats TraceMetricStats) {
 			addTraceMetricSample(r.blueLost, spec, values[blueSide], turns)
 		}
 
-		if !spec.HigherIsBetter && blueSide >= 0 {
+		if !spec.HigherIsBetter && spec.Kind != TraceMetricPerMatchValue && blueSide >= 0 {
 			blueValue := values[blueSide]
 			if w, seen := r.worstBlue[spec.Key]; !seen || blueValue > w.Value {
 				r.worstBlue[spec.Key] = traceAnalysisMetricWorst{Value: blueValue, File: file.Name}
@@ -302,6 +308,9 @@ func addTraceMetricSample(dst map[string]traceAnalysisMetricAggregate, spec Trac
 	current.Sum += sample
 	current.Samples++
 	current.RawCount += value
+	if spec.Kind == TraceMetricPerMatchValue {
+		current.Values = append(current.Values, sample)
+	}
 	dst[spec.Key] = current
 }
 
@@ -314,6 +323,14 @@ func traceMetricSample(kind TraceMetricKind, value, turns int) (float64, bool) {
 			return 0, false
 		}
 		return float64(value) / float64(turns) * 100, true
+	case TraceMetricPerMatchValue:
+		// 0 = "no sample for this side/match" by convention. Drop from the
+		// aggregate so a side that never reached the milestone (e.g. never
+		// completed a tree) doesn't pull the median toward 0.
+		if value == 0 {
+			return 0, false
+		}
+		return float64(value), true
 	default:
 		return 0, false
 	}
@@ -392,8 +409,9 @@ func (r *traceAnalysisReport) writeWorstCases(w io.Writer) error {
 	if _, err := fmt.Fprintln(w, "WORST"); err != nil {
 		return err
 	}
+	labelWidth := r.metricLabelWidth()
 	for _, row := range rows {
-		if _, err := fmt.Fprintf(w, "  %-11s %4d   %s\n", row.Label, row.Value, row.ID); err != nil {
+		if _, err := fmt.Fprintf(w, "  %-*s %4d   %s\n", labelWidth, row.Label, row.Value, row.ID); err != nil {
 			return err
 		}
 	}
@@ -646,6 +664,26 @@ func (r traceAnalysisEndReasonRow) label() string {
 // keep the reader anchored on actual frequency.
 const traceMetricLowRateThreshold = 1.0
 
+// traceMetricLabelMinWidth is the historic baseline label-column width. The
+// renderer expands beyond this when a game's specs include a longer label so
+// long names don't push the side columns out of alignment, but never narrows
+// below this baseline (short-label games like winter2026's HIT_* keep their
+// familiar layout).
+const traceMetricLabelMinWidth = 11
+
+// metricLabelWidth returns the column width to use for metric labels in the
+// comparison and WORST sections. Picks the longest spec label so a row like
+// "POINTS_PER_CUT" doesn't push side columns 3 chars past every other row.
+func (r *traceAnalysisReport) metricLabelWidth() int {
+	width := traceMetricLabelMinWidth
+	for _, spec := range r.metricSpecs {
+		if n := len(spec.Label); n > width {
+			width = n
+		}
+	}
+	return width
+}
+
 func (r *traceAnalysisReport) writeMetricComparison(w io.Writer, title string,
 	a, b map[string]traceAnalysisMetricAggregate, aLabel, bLabel string,
 ) error {
@@ -653,12 +691,13 @@ func (r *traceAnalysisReport) writeMetricComparison(w io.Writer, title string,
 		return err
 	}
 
+	labelWidth := r.metricLabelWidth()
 	wrote := false
 	for _, spec := range r.metricSpecs {
 		aAgg := a[spec.Key]
 		bAgg := b[spec.Key]
-		av := averageTraceMetric(aAgg)
-		bv := averageTraceMetric(bAgg)
+		av := centralTraceMetric(spec.Kind, aAgg)
+		bv := centralTraceMetric(spec.Kind, bAgg)
 		if !av.ok && !bv.ok {
 			continue
 		}
@@ -678,11 +717,15 @@ func (r *traceAnalysisReport) writeMetricComparison(w io.Writer, title string,
 			bText = formatTraceMetricRawCount(bAgg.RawCount)
 		}
 
-		if _, err := fmt.Fprintf(w, "  %-11s %-6s %s   %-5s %s   (%s)\n",
-			spec.Label,
+		explanation := traceAnalysisValueExplanation(aDisplay, bDisplay, aLabel, bLabel)
+		if spec.Kind == TraceMetricPerMatchValue {
+			explanation = traceAnalysisDeltaExplanation(aDisplay, bDisplay, aLabel, bLabel)
+		}
+		if _, err := fmt.Fprintf(w, "  %-*s %-6s %s   %-5s %s   (%s)\n",
+			labelWidth, spec.Label,
 			aLabel, aText,
 			bLabel, bText,
-			traceAnalysisValueExplanation(aDisplay, bDisplay, aLabel, bLabel)); err != nil {
+			explanation); err != nil {
 			return err
 		}
 	}
@@ -707,12 +750,41 @@ func averageTraceMetric(agg traceAnalysisMetricAggregate) traceAnalysisMetricAve
 	return traceAnalysisMetricAverage{value: agg.Sum / float64(agg.Samples), ok: true}
 }
 
+// centralTraceMetric returns the row's central value: the mean for count/rate
+// kinds and the median for per-match-value kinds. Median uses the midpoint of
+// two middle samples on even counts so a 50/50 win rate doesn't bias toward
+// either side. Empty aggregates return ok=false so callers can skip the row.
+func centralTraceMetric(kind TraceMetricKind, agg traceAnalysisMetricAggregate) traceAnalysisMetricAverage {
+	if kind != TraceMetricPerMatchValue {
+		return averageTraceMetric(agg)
+	}
+	if len(agg.Values) == 0 {
+		return traceAnalysisMetricAverage{}
+	}
+	sorted := append([]float64(nil), agg.Values...)
+	sort.Float64s(sorted)
+	n := len(sorted)
+	var med float64
+	if n%2 == 1 {
+		med = sorted[n/2]
+	} else {
+		med = (sorted[n/2-1] + sorted[n/2]) / 2
+	}
+	return traceAnalysisMetricAverage{value: med, ok: true}
+}
+
 func formatTraceMetricValue(kind TraceMetricKind, value float64) string {
 	switch kind {
 	case TraceMetricPerMatchCount:
 		return fmt.Sprintf("%6.2f/m", value)
 	case TraceMetricPerTurnRate:
 		return fmt.Sprintf("%7.1f%%", value)
+	case TraceMetricPerMatchValue:
+		// Bare number — per_match_value units (turn index, game day, milestone
+		// score, etc.) vary by game, so the legend's Description carries the
+		// unit instead of a hardcoded prefix. Width matches the count/rate
+		// formatters (8 chars) so columns line up across kinds in one block.
+		return fmt.Sprintf("%8.1f", value)
 	default:
 		return fmt.Sprintf("%8.1f", value)
 	}
@@ -748,6 +820,30 @@ func analysisTraceDirLabel(dir string) string {
 		return label
 	}
 	return "." + string(filepath.Separator) + label
+}
+
+// traceAnalysisDeltaExplanation summarizes the gap as an absolute difference
+// ("<bigger> +N.N"). Used for per-match-value rows where a ratio (e.g. "loser
+// 1.25x winner") would read as a multiplicative time-cost — but turn-of-first-X
+// is an additive index, so "loser +6 turns later" is the natural framing. Equal
+// values render as "equal"; a zero on one side as "<other> only" since the
+// other side is missing data, not zero-valued.
+func traceAnalysisDeltaExplanation(a, b float64, aLabel, bLabel string) string {
+	a = math.Round(a*100) / 100
+	b = math.Round(b*100) / 100
+	const epsilon = 0.0000001
+	switch {
+	case math.Abs(a-b) < epsilon:
+		return "equal"
+	case a == 0:
+		return fmt.Sprintf("%s only", bLabel)
+	case b == 0:
+		return fmt.Sprintf("%s only", aLabel)
+	case a > b:
+		return fmt.Sprintf("%s +%.1f", aLabel, a-b)
+	default:
+		return fmt.Sprintf("%s +%.1f", bLabel, b-a)
+	}
 }
 
 // traceAnalysisValueExplanation summarizes the gap between two metric values
