@@ -1,11 +1,30 @@
 package arena
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestWriteDebugStderrEmitsHeaderAndLines(t *testing.T) {
+	var buf bytes.Buffer
+	writeDebugStderr(&buf, 7, 1, []string{"hello", "world"})
+	assert.Equal(t, "--- turn 7 right stderr ---\nhello\nworld\n", buf.String())
+}
+
+func TestWriteDebugStderrLeftSide(t *testing.T) {
+	var buf bytes.Buffer
+	writeDebugStderr(&buf, 0, 0, []string{"x"})
+	assert.Equal(t, "--- turn 0 left stderr ---\nx\n", buf.String())
+}
+
+func TestWriteDebugStderrEmptyIsNoOp(t *testing.T) {
+	var buf bytes.Buffer
+	writeDebugStderr(&buf, 7, 0, nil)
+	assert.Empty(t, buf.String())
+}
 
 type mockPlayer struct {
 	index               int

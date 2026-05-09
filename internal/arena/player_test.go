@@ -32,6 +32,21 @@ func TestAverageDurationEmpty(t *testing.T) {
 	assert.Equal(t, time.Duration(0), averageDuration(nil))
 }
 
+func TestCommandPlayerTakeStderrReturnsAndClearsBuffer(t *testing.T) {
+	cp := &commandPlayer{}
+	cp.stderrBuf = []string{"first", "second"}
+
+	got := cp.TakeStderr()
+
+	assert.Equal(t, []string{"first", "second"}, got)
+	assert.Nil(t, cp.TakeStderr(), "second drain should be empty")
+}
+
+func TestCommandPlayerTakeStderrEmptyReturnsNil(t *testing.T) {
+	cp := &commandPlayer{}
+	assert.Nil(t, cp.TakeStderr())
+}
+
 func TestCommandPlayerHardTimeoutKillsProcess(t *testing.T) {
 	sleepBin, err := exec.LookPath("sleep")
 	if err != nil {

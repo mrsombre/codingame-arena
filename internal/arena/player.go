@@ -53,9 +53,11 @@ type commandPlayer struct {
 	timeToFirstOutput time.Duration
 	outputDurations   []time.Duration
 	lastDuration      time.Duration
+	stderrMu          sync.Mutex
+	stderrBuf         []string
 }
 
-func newCommandPlayer(player Player, path string) (*commandPlayer, error) {
+func newCommandPlayer(player Player, path string, captureStderr bool) (*commandPlayer, error) {
 	cmd := exec.Command(path)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -82,9 +84,40 @@ func newCommandPlayer(player Player, path string) (*commandPlayer, error) {
 	}
 	go func() {
 		defer close(cp.stderrDone)
-		_, _ = io.Copy(io.Discard, stderr)
+		if !captureStderr {
+			_, _ = io.Copy(io.Discard, stderr)
+			return
+		}
+		scanner := bufio.NewScanner(stderr)
+		// Bots may print large state dumps; raise the per-line cap from
+		// bufio's 64KiB default so scanning doesn't truncate.
+		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			cp.stderrMu.Lock()
+			cp.stderrBuf = append(cp.stderrBuf, scanner.Text())
+			cp.stderrMu.Unlock()
+		}
 	}()
 	return cp, nil
+}
+
+// TakeStderr returns and clears the bot stderr lines buffered since the
+// previous call. Returns nil when capture is disabled or nothing was
+// written. Lines are in the order the bot emitted them; whitespace inside
+// each line is preserved, trailing newlines stripped (one entry per line).
+//
+// The reader goroutine drains the pipe asynchronously, so a stderr line
+// the bot writes after its stdout response may not appear in this turn's
+// drain — it shows up in the next call. Acceptable for human-debug use.
+func (cp *commandPlayer) TakeStderr() []string {
+	cp.stderrMu.Lock()
+	defer cp.stderrMu.Unlock()
+	if len(cp.stderrBuf) == 0 {
+		return nil
+	}
+	out := cp.stderrBuf
+	cp.stderrBuf = nil
+	return out
 }
 
 func (cp *commandPlayer) Execute() error {

@@ -31,7 +31,7 @@ func AddRunFlags(fs *pflag.FlagSet) {
 	fs.String("trace-dir", "./traces", "Output directory for trace files (used with --trace; created if missing)")
 	fs.Bool("verbose", false, "Print the full JSON summary on stdout instead of the one-line summary")
 	fs.Bool("output-matches", false, "Include each match's result inline in the verbose JSON summary")
-	fs.Bool("debug", false, "Single-match debug: forces -n=1 -p=1, locks sides, passes bot stderr through, prints match trace JSON to stdout")
+	fs.Bool("debug", false, "Single-match debug: forces -n=1 -p=1, locks sides, prints the match's full trace JSON to stdout (no file written, even with --trace), and prints each turn's bot stderr under a per-turn header")
 }
 
 // RunOptions holds the parsed configuration for the "run" subcommand.

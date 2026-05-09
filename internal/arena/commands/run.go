@@ -66,8 +66,11 @@ Output channels:
   default      one-line summary on stdout
   --verbose    full JSON summary on stdout (per-metric averages, runner metadata,
                bad-command list, five worst losses from blue's perspective)
-  --debug      forces -n=1 -p=1, locks sides, passes bot stderr through to your
-               terminal, and prints the single match's trace JSON to stdout
+  --debug      forces -n=1 -p=1, locks sides, prints the match's full trace
+               JSON to stdout (same shape ` + "`arena run --trace`" + ` writes to disk;
+               nothing is written to --trace-dir, even if --trace is also
+               set), and prints each turn's bot stderr to your terminal under
+               a "--- turn N <side> stderr ---" header (silent turns omitted)
 
 Tracing:
   --trace writes one JSON file per match to --trace-dir (default ./traces).
@@ -83,17 +86,35 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 	}
 
 	startedAt := time.Now()
-	results := runMatches(factory, opts, v, startedAt)
+	var debugSink *debugTraceCapture
+	if opts.Debug {
+		debugSink = &debugTraceCapture{traceID: startedAt.Unix()}
+	}
+	results := runMatches(factory, opts, v, startedAt, debugSink)
 	elapsed := time.Since(startedAt)
 
-	return writeRunOutput(stdout, opts, results, elapsed)
+	return writeRunOutput(stdout, opts, results, elapsed, debugSink)
 }
 
-func runMatches(factory arena.GameFactory, opts RunOptions, v *viper.Viper, startedAt time.Time) []arena.MatchResult {
-	traceDir := ""
-	if opts.Trace {
-		traceDir = opts.TraceDir
+// debugTraceCapture is the in-memory TraceSink used by --debug. Stamps the
+// trace with the same TraceID/Type defaults that TraceWriter applies on
+// disk, so the JSON printed to stdout is byte-for-byte the file `arena run
+// --trace` would have produced — only without writing anything.
+type debugTraceCapture struct {
+	traceID int64
+	match   arena.TraceMatch
+}
+
+func (c *debugTraceCapture) WriteMatch(m arena.TraceMatch) error {
+	m.TraceID = c.traceID
+	if m.Type == "" {
+		m.Type = arena.TraceTypeTrace
 	}
+	c.match = m
+	return nil
+}
+
+func runMatches(factory arena.GameFactory, opts RunOptions, v *viper.Viper, startedAt time.Time, debugSink *debugTraceCapture) []arena.MatchResult {
 	matchOpts := arena.MatchOptions{
 		MaxTurns:    opts.MaxTurns,
 		BlueBotBin:  opts.BlueBotBin,
@@ -102,8 +123,13 @@ func runMatches(factory arena.GameFactory, opts RunOptions, v *viper.Viper, star
 		NoSwap:      opts.NoSwap,
 		GameOptions: v,
 	}
-	if traceWriter := arena.NewTraceWriter(traceDir, startedAt.Unix()); traceWriter != nil {
-		matchOpts.TraceSink = traceWriter
+	switch {
+	case debugSink != nil:
+		// Debug always captures in-memory and never writes to disk, so
+		// --trace / --trace-dir are intentionally bypassed here.
+		matchOpts.TraceSink = debugSink
+	case opts.Trace:
+		matchOpts.TraceSink = arena.NewTraceWriter(opts.TraceDir, startedAt.Unix())
 	}
 
 	runner := arena.NewRunner(factory, matchOpts)
@@ -111,9 +137,14 @@ func runMatches(factory arena.GameFactory, opts RunOptions, v *viper.Viper, star
 	return arena.RunMatches(opts.BatchOptions, runner.RunMatch)
 }
 
-func writeRunOutput(stdout io.Writer, opts RunOptions, results []arena.MatchResult, elapsed time.Duration) error {
+func writeRunOutput(stdout io.Writer, opts RunOptions, results []arena.MatchResult, elapsed time.Duration, debugSink *debugTraceCapture) error {
 	if opts.Debug {
-		_, err := io.WriteString(stdout, results[0].RenderMatch())
+		data, err := json.MarshalIndent(debugSink.match, "", "  ")
+		if err != nil {
+			return err
+		}
+		data = append(data, '\n')
+		_, err = stdout.Write(data)
 		return err
 	}
 
