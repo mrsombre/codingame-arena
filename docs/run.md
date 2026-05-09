@@ -47,6 +47,8 @@ Timing: avg_first_response=<blue>x<red> avg_turn_response=<blue>x<red>
 
 Win/loss/draw counts are from blue's (our) perspective.
 
+**Progress** (stderr): for batches larger than one match, the runner prints `Completed N matches` on stderr at every milestone — every 100 matches when `--simulations` ≤ 1000, every 1000 matches above that. Goes to stderr so it doesn't mix with the summary / JSON / trace on stdout.
+
 **Verbose JSON** (`--verbose`): full summary with per-metric averages, runner metadata, bad-command list, and the five worst losses for blue.
 
 **Debug** (`--debug`): forces `--simulations=1` and `--parallel=1`, locks sides (no swap), and emits the match's full trace JSON to stdout — same shape as the files [`--trace`](trace.md) writes (`type: "trace"`, populated `setup` / `gameInput` / `state` / `traces`). Nothing is written to `--trace-dir` even if `--trace` is also set; pipe to `jq` to inspect, or to a file (`> traces/debug.json`) and load it in [`arena serve`](serve.md).

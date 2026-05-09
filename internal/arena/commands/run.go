@@ -2,7 +2,9 @@ package commands
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -134,7 +136,40 @@ func runMatches(factory arena.GameFactory, opts RunOptions, v *viper.Viper, star
 
 	runner := arena.NewRunner(factory, matchOpts)
 
-	return arena.RunMatches(opts.BatchOptions, runner.RunMatch)
+	batchOpts := opts.BatchOptions
+	batchOpts.Progress = newProgressLogger(opts.Simulations, os.Stderr)
+
+	return arena.RunMatches(batchOpts, runner.RunMatch)
+}
+
+// progressStep is the report cadence: every 100 matches up to and
+// including 1000 total, every 1000 thereafter. Returns 0 when no
+// progress lines should fire at all (single-match runs, e.g. --debug).
+func progressStep(total int) int {
+	switch {
+	case total <= 1:
+		return 0
+	case total <= 1000:
+		return 100
+	default:
+		return 1000
+	}
+}
+
+// newProgressLogger returns a BatchOptions.Progress callback that prints
+// "Completed N matches" to w at every progressStep(total) milestone.
+// Returns nil when no milestones would fire (saves the per-match callback
+// invocation).
+func newProgressLogger(total int, w io.Writer) func(completed, total int) {
+	step := progressStep(total)
+	if step == 0 {
+		return nil
+	}
+	return func(completed, _ int) {
+		if completed%step == 0 {
+			_, _ = fmt.Fprintf(w, "Completed %d matches\n", completed)
+		}
+	}
 }
 
 func writeRunOutput(stdout io.Writer, opts RunOptions, results []arena.MatchResult, elapsed time.Duration, debugSink *debugTraceCapture) error {

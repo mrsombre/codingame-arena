@@ -126,6 +126,50 @@ func TestWriteRunOutputDebugWritesCapturedTraceJSON(t *testing.T) {
 	assert.Equal(t, int64(12345), trace.Seed)
 }
 
+func TestProgressStepThresholds(t *testing.T) {
+	cases := []struct {
+		total int
+		want  int
+	}{
+		{0, 0},
+		{1, 0},
+		{50, 100},
+		{100, 100},
+		{1000, 100},
+		{1001, 1000},
+		{5000, 1000},
+	}
+	for _, c := range cases {
+		assert.Equal(t, c.want, progressStep(c.total), "total=%d", c.total)
+	}
+}
+
+func TestNewProgressLoggerFiresAtMilestones(t *testing.T) {
+	var buf bytes.Buffer
+	cb := newProgressLogger(250, &buf)
+	require.NotNil(t, cb)
+
+	for i := 1; i <= 250; i++ {
+		cb(i, 250)
+	}
+	assert.Equal(t, "Completed 100 matches\nCompleted 200 matches\n", buf.String())
+}
+
+func TestNewProgressLoggerHighVolumeUses1000Step(t *testing.T) {
+	var buf bytes.Buffer
+	cb := newProgressLogger(2500, &buf)
+	require.NotNil(t, cb)
+
+	for i := 1; i <= 2500; i++ {
+		cb(i, 2500)
+	}
+	assert.Equal(t, "Completed 1000 matches\nCompleted 2000 matches\n", buf.String())
+}
+
+func TestNewProgressLoggerSingleMatchReturnsNil(t *testing.T) {
+	assert.Nil(t, newProgressLogger(1, &bytes.Buffer{}))
+}
+
 func TestDebugTraceCaptureStampsTraceIDAndDefaultsType(t *testing.T) {
 	sink := &debugTraceCapture{traceID: 7}
 	require.NoError(t, sink.WriteMatch(arena.TraceMatch{Seed: 99}))
