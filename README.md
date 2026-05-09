@@ -49,6 +49,26 @@ Run `arena help <command>` for full flag listings.
 
 ## Quick Start
 
+### Download Prebuilt Binary
+
+Download the latest release binary for your platform and rename it to `arena`:
+
+```shell
+# macOS (Apple Silicon)
+curl -L -o arena https://github.com/mrsombre/codingame-arena/releases/latest/download/arena-darwin-arm64
+chmod +x arena
+
+# Linux (amd64)
+curl -L -o arena https://github.com/mrsombre/codingame-arena/releases/latest/download/arena-linux-amd64
+chmod +x arena
+
+# Linux (arm64)
+curl -L -o arena https://github.com/mrsombre/codingame-arena/releases/latest/download/arena-linux-arm64
+chmod +x arena
+```
+
+For Windows, download `arena-windows-amd64.exe` from the [latest release](https://github.com/mrsombre/codingame-arena/releases/latest).
+
 ### Build
 
 ```shell
