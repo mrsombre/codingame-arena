@@ -62,22 +62,58 @@ type replayBatchConfig struct {
 
 // ReplayUsage returns the help text shown for `arena help replay`.
 func ReplayUsage(fs *pflag.FlagSet) string {
+	extra := `Positional args:
+  arena replay <game> <username> [<id|url>[,<id|url>...]]
+    <game>      engine slug (e.g. winter2026, spring2020); selects which
+                CodinGame leaderboard slug + puzzleId to use.
+    <username>  CodinGame nickname we are playing for. Stamped into every
+                saved replay as the top-level "blue" field so analyze and
+                the viewer know which side is "us".
+    <id|url>    optional: zero or more replay ids (numeric) or full replay
+                URLs ending in an id. Pass them as separate args, comma-
+                separated within one arg, or both.
+
+Modes:
+  No ids → leaderboard mode. Resolves the active game's leaderboard slug,
+           looks up <username>'s agentId on it, and downloads every replay
+           from that player's last-battles list. Slug + agentId lookups are
+           cached in db.sqlite3.
+  Ids    → get mode. Fetches only the listed games from codingame.com.
+
+Auto-convert:
+  Each freshly-saved replay is immediately converted to a verified arena
+  trace under the same id: replays/<id>.json → traces/replay-<id>.json.
+  This is NOT a separate convert command. The conversion re-runs the engine
+  with the recorded player moves and verifies final scores, ranks, and turn
+  counts against the replay. Verifier disagreements still write a trace
+  (tagged MISMATCH so analyze can compare engine vs replay); pre-run
+  failures (missing seed, unknown blue) are skipped with no trace.
+
+Skipping rules:
+  Replays already on disk are skipped (download + convert). Pass -f/--force
+  to refetch AND reconvert, overwriting both files. To regenerate ONLY a
+  missing trace without redownloading: delete the trace file and re-run
+  without -f — the existing replay JSON is kept and only the trace is
+  rebuilt.
+
+Output (per replay):
+  [i/N] save  <id> (<bytes>)             freshly downloaded
+  [i/N] trace <id> (league=L turns=T scores=A:B)   trace written
+  [i/N] trace <id> MISMATCH (...)        verifier disagreement, trace still written
+  [i/N] skip  <id> (exists | puzzleId M != N)
+  [i/N] fail  <id>: <error>
+  done:   <saved>/<skipped-existing>/<skipped-puzzle>/<failed>  (out=...)
+  traces: <saved>/<saved-mismatch>/<skipped-existing>/<skipped-mismatch>/<failed>  (out=...)
+
+Files:
+  --out      → replays/<gameId>.json (raw replay payload + arena annotations)
+  --trace-dir → traces/replay-<gameId>.json (the verified trace)
+  Both feed into ` + "`arena analyze <game>`" + ` and the web viewer (` + "`arena serve`" + `).`
 	return arena.CommandUsage(
-		"replay <username> [<id|url>[,<id|url>...]]",
-		"Download raw replay JSON from codingame.com. Each freshly-saved "+
-			"replay is auto-converted to a verified arena trace written to "+
-			"--trace-dir under the same id (replays/<id>.json → "+
-			"traces/replay-<id>.json) — this is not a separate convert "+
-			"command. With no IDs, downloads every replay from <username>'s "+
-			"last battles list on the active game's leaderboard. With one or "+
-			"more IDs (or replay URLs), downloads only those games. "+
-			"<username> is the player we are playing for; it is recorded as "+
-			"the top-level \"blue\" field in every saved replay. By default, "+
-			"replays already on disk are skipped (and so is their conversion "+
-			"step). Pass -f/--force to re-download the replay and re-convert "+
-			"the trace, overwriting both files in place under the same id.",
+		"replay <game> <username> [<id|url>...]",
+		"Download CodinGame replays for a player and auto-convert each to a verified arena trace.",
 		fs,
-		"",
+		extra,
 	)
 }
 

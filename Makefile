@@ -50,14 +50,14 @@ build-winter2026-agents:
 	cp -f $(WINTER2026_AGENTS)/bot.py $(WINTER2026_PYBOT)
 
 match-winter2026:
-	./$(BIN_DIR)/arena --game=winter2026 --blue=./$(WINTER2026_CPPBOT) --red=./$(WINTER2026_PYBOT) \
+	./$(BIN_DIR)/arena run winter2026 --blue=./$(WINTER2026_CPPBOT) --red=./$(WINTER2026_PYBOT) \
 		--seed=100030005000700089 --simulations 50 --trace
 
 # analytics
 .PHONY: replay analyze
 
 replay:
-	./$(BIN_DIR)/arena replay mrsombre --game winter2026
+	./$(BIN_DIR)/arena replay winter2026 mrsombre
 
 analyze:
-	./$(BIN_DIR)/arena analyze --game winter2026
+	./$(BIN_DIR)/arena analyze winter2026

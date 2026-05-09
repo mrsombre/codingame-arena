@@ -9,7 +9,7 @@ import (
 
 // AddAnalyzeFlags registers flags used by the "analyze" subcommand on fs.
 func AddAnalyzeFlags(fs *pflag.FlagSet) {
-	fs.String("trace-dir", filepath.Clean("./traces"), "Directory to scan for trace JSON files")
+	fs.String("trace-dir", filepath.Clean("./traces"), "Directory to scan for trace JSON files (top-level *.json only; subdirectories are ignored)")
 }
 
 // AnalyzeOptions holds the parsed configuration for the "analyze" subcommand.

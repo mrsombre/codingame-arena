@@ -9,11 +9,11 @@ import (
 
 // AddServeFlags registers flags used by the "serve" subcommand on fs.
 func AddServeFlags(fs *pflag.FlagSet) {
-	fs.Int("port", 5757, "HTTP port")
-	fs.String("host", "localhost", "Bind host")
-	fs.String("trace-dir", "./traces", "Directory with match trace JSON files (powers /api/matches)")
-	fs.String("replay-dir", "./replays", "Directory with CodinGame replay JSON files (powers /api/replays)")
-	fs.String("bin-dir", "./bin", "Directory to scan for bot binaries (powers /api/bots)")
+	fs.String("host", "localhost", "Bind host (use 0.0.0.0 to expose on the LAN)")
+	fs.Int("port", 5757, "HTTP port (1..65535)")
+	fs.String("trace-dir", "./traces", "Directory of arena trace JSON files served via /api/matches and /api/matches/{id}")
+	fs.String("replay-dir", "./replays", "Directory of CodinGame replay JSON files served via /api/replays and /api/replays/{id}")
+	fs.String("bin-dir", "./bin", "Directory scanned for bot executables (any executable file whose name contains 'bot') exposed via /api/bots")
 }
 
 // ServeOptions holds the parsed configuration for the "serve" subcommand.

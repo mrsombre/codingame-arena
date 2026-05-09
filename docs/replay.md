@@ -2,12 +2,12 @@
 
 Download raw replay JSON from codingame.com. Each freshly-saved replay is **auto-converted** to a verified arena trace under the same id (`replays/<id>.json` → `traces/replay-<id>.json`).
 
-`arena replay <username> [<id|url>[,<id|url>...]]`
+`arena replay <game> <username> [<id|url>[,<id|url>...]]`
 
 - With **no IDs**, downloads every replay from `<username>`'s last-battles list on the active game's leaderboard.
 - With **one or more IDs/URLs**, downloads only those games.
 
-The leaderboard slug is baked into each game engine (e.g. `winter-challenge-2026-snakebyte`, `spring-challenge-2020`), so you no longer pass the puzzle URL on the command line — the active game is selected via `--game` (or `arena.yml`).
+The leaderboard slug is baked into each game engine (e.g. `winter-challenge-2026-snakebyte`, `spring-challenge-2020`), so you don't pass the puzzle URL — the engine is selected by the leading `<game>` positional.
 
 `<username>` is the player you are playing for. It is recorded as the top-level `blue` field in each saved replay so the viewer and the trace know which side is "yours".
 
@@ -15,14 +15,14 @@ The leaderboard slug is baked into each game engine (e.g. `winter-challenge-2026
 
 ```shell
 # Download + auto-convert every replay from a player's leaderboard last-battles list
-bin/arena replay mrsombre --game winter2026
+bin/arena replay winter2026 mrsombre
 
 # Download + auto-convert specific replays (comma- or space-separated)
-bin/arena replay mrsombre --game winter2026 875142454,875142455
-bin/arena replay mrsombre --game winter2026 875142454 875142455
+bin/arena replay winter2026 mrsombre 875142454,875142455
+bin/arena replay winter2026 mrsombre 875142454 875142455
 
 # Re-download AND re-convert in place (overwrites both files under the same id)
-bin/arena replay mrsombre --game winter2026 875142454 -f
+bin/arena replay winter2026 mrsombre 875142454 -f
 ```
 
 Replay JSON is saved under `--out` (default `./replays/`) as `<gameId>.json`. The matching trace is written to `--trace-dir` (default `./traces/`) as `replay-<gameId>.json`.

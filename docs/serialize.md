@@ -1,4 +1,4 @@
-# Command serialize
+# Command game serialize
 
 Print the game input that a bot would receive on its first turn for a given seed.
 
@@ -7,7 +7,7 @@ Useful for inspecting initial map state, capturing fixtures for unit tests, or f
 ## Quick start
 
 ```shell
-bin/arena serialize --game=winter2026 --seed=100030005000
+bin/arena game serialize winter2026 100030005000
 ```
 
 Output is the raw lines a bot reads from stdin:
@@ -22,12 +22,12 @@ Output is the raw lines a bot reads from stdin:
 
 ## Options
 
+`arena game serialize <game> <seed> [OPTIONS]` — the game slug and seed are required positionals, in that order.
+
 | Flag           | Default       | Description                          |
 |----------------|---------------|--------------------------------------|
-| `-s, --seed`   | —             | RNG seed (required)                  |
 | `--player`     | `0`           | Player perspective (`0` or `1`)      |
 | `-l, --league` | game-specific | League level                         |
-| `--game`       | —             | Active game (or set in `arena.yml`)  |
 
 ## Output
 
@@ -39,5 +39,5 @@ Two blocks separated by newline-terminated lines:
 Format matches exactly what bots receive on stdin during a real match. Pipe it into a bot binary to drive a single-turn invocation:
 
 ```shell
-bin/arena serialize --game=winter2026 --seed=42 | bin/bot-winter2026-cpp
+bin/arena game serialize winter2026 42 | bin/bot-winter2026-cpp
 ```

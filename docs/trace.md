@@ -13,16 +13,16 @@ Two commands write traces:
 
 ```shell
 # Self-play: 100 matches, one trace file per match
-bin/arena run --game=winter2026 \
+bin/arena run winter2026 \
   --blue=bin/bot-winter2026-cpp \
   --red=bin/bot-winter2026-py \
   --trace --trace-dir=./traces
 
 # Replay-derived: download + auto-convert (writes both replays/<id>.json and traces/replay-<id>.json)
-bin/arena replay mrsombre --game=winter2026 875142454
+bin/arena replay winter2026 mrsombre 875142454
 
 # Print one self-play match's trace to stdout (handy for piping into jq)
-bin/arena run --game=winter2026 --blue=... --debug
+bin/arena run winter2026 --blue=... --debug
 ```
 
 A self-play batch shares a `traceId` (the batch start timestamp) across every file it writes, so one batch's traces can be filtered together. Replay traces use the CodinGame replay id as their `traceId`, so a single replay always has `matchId: 0`.

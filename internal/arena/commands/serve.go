@@ -29,10 +29,43 @@ import (
 
 // ServeUsage returns the help text shown for `arena help serve`.
 func ServeUsage(fs *pflag.FlagSet) string {
-	extra := "API: GET /api/game, GET /api/games, GET /api/bots, GET /api/matches, GET /api/matches/{id},\n" +
-		"     GET /api/replays, GET /api/replays/{id}, POST /api/run\n" +
-		"Stdin keys: o<enter> open in default browser   q<enter> quit"
-	return arena.CommandUsage("serve", "Serve the embedded web viewer.", fs, extra)
+	extra := `Positional args:
+  arena serve [OPTIONS]   No <game> positional. The server registers every
+                          engine compiled into this binary; the viewer
+                          (and HTTP clients) pick a game per request via
+                          ?game=<slug> on relevant endpoints.
+
+What it does:
+  Boots an HTTP server (default http://localhost:5757) that serves the
+  React + PixiJS viewer (compiled into the arena binary, no extra setup)
+  and a JSON API over your local trace/replay/bot directories.
+
+HTTP API:
+  GET  /healthz                ok / 200
+  GET  /api/games              list of registered engine slugs
+  GET  /api/game?game=<slug>   { name, maxTurns } for one engine
+  GET  /api/serialize?game=<slug>&seed=<int>&player=<0|1>&...
+                               same bytes as ` + "`arena game serialize`" + `, plus
+                               any extra query params forwarded as game opts
+  GET  /api/bots               executables under --bin-dir whose name
+                               contains 'bot' (used as p0/p1 picks)
+  GET  /api/matches            list of arena traces in --trace-dir
+  GET  /api/matches/{id}       one trace by id
+  GET  /api/replays            list of CodinGame replays in --replay-dir
+  GET  /api/replays/{id}       one replay by id
+  POST /api/run                run a match from the UI
+  POST /api/batch              run a batch and stream results
+
+Stdin shortcuts (server is also listening on stdin):
+  o<enter>   open the URL in the default OS browser
+  q<enter>   graceful shutdown
+  Ctrl-C / SIGTERM also shut down gracefully.
+
+Hot reload:
+  serve watches its own binary's parent directory and re-execs itself
+  when the binary changes (e.g. after ` + "`make build-arena`" + `). No manual
+  restart needed during local dev.`
+	return arena.CommandUsage("serve", "Run the embedded web viewer + JSON API over local traces, replays, and bots.", fs, extra)
 }
 
 // Serve is the entry point for the "serve" subcommand. It serves the embedded
@@ -43,10 +76,7 @@ func Serve(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 		return err
 	}
 
-	factories, err := serveFactories(factory, v)
-	if err != nil {
-		return err
-	}
+	factories := serveFactories()
 	bots := scanBots(opts.BinDir)
 
 	assets, err := fs.Sub(viewer.Assets, "dist")
@@ -54,7 +84,6 @@ func Serve(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 		return fmt.Errorf("sub dist: %w", err)
 	}
 	handler := server.New(server.Options{
-		Factory:   factory,
 		Factories: factories,
 		Assets:    assets,
 		TraceDir:  opts.TraceDir,
@@ -134,27 +163,15 @@ func Serve(args []string, stdout io.Writer, factory arena.GameFactory, flags *pf
 	}
 }
 
-func serveFactories(factory arena.GameFactory, v *viper.Viper) (map[string]arena.GameFactory, error) {
-	if factory != nil {
-		return map[string]arena.GameFactory{factory.Name(): factory}, nil
-	}
+func serveFactories() map[string]arena.GameFactory {
 	names := arena.Games()
-	if selected := v.GetString("game"); selected != "" {
-		f := arena.GetFactory(selected)
-		if f == nil {
-			return nil, fmt.Errorf("unknown game %q; available: %s", selected, strings.Join(names, ", "))
-		}
-		return map[string]arena.GameFactory{selected: f}, nil
-	}
-
 	factories := make(map[string]arena.GameFactory, len(names))
 	for _, name := range names {
-		f := arena.GetFactory(name)
-		if f != nil {
+		if f := arena.GetFactory(name); f != nil {
 			factories[name] = f
 		}
 	}
-	return factories, nil
+	return factories
 }
 
 func readStdinCommands(ctx context.Context) <-chan string {

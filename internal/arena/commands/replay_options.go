@@ -14,12 +14,12 @@ import (
 
 // AddReplayFlags registers flags used by the "replay" command on fs.
 func AddReplayFlags(fs *pflag.FlagSet) {
-	fs.StringP("out", "o", filepath.Clean("./replays"), "Directory to save replays as <gameId>.json")
-	fs.String("trace-dir", filepath.Clean("./traces"), "Directory to write converted trace files")
-	fs.IntP("limit", "n", 0, "Maximum number of replays to download (0 = all)")
-	fs.IntP("league", "l", 4, "League level recorded in saved replay")
-	fs.Duration("delay", 500*time.Millisecond, "Delay between replay downloads")
-	fs.BoolP("force", "f", false, "Re-download replays even if they already exist on disk")
+	fs.StringP("out", "o", filepath.Clean("./replays"), "Output directory for raw replay JSON, saved as <gameId>.json (created if missing)")
+	fs.String("trace-dir", filepath.Clean("./traces"), "Output directory for auto-converted traces, saved as replay-<gameId>.json (created if missing)")
+	fs.IntP("limit", "n", 0, "Cap on the number of replays to download in one invocation (0 = no cap, fetch every id)")
+	fs.IntP("league", "l", 4, "League level stamped into each saved replay's 'league' field (does not filter what gets downloaded)")
+	fs.Duration("delay", 500*time.Millisecond, "Sleep between successive HTTP fetches (rate-limit politeness; skipped-existing replays do not reset it)")
+	fs.BoolP("force", "f", false, "Re-fetch replays already on disk and re-run the auto-convert step, overwriting both files in place")
 }
 
 // ReplayOptions holds the parsed configuration for the "replay" command.
@@ -47,7 +47,7 @@ func parseReplayOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (Repla
 	var opts ReplayOptions
 
 	if fs.NArg() < 1 {
-		return ReplayOptions{}, fmt.Errorf("usage: arena replay <username> [<id|url>[,<id|url>...]]")
+		return ReplayOptions{}, fmt.Errorf("usage: arena replay <game> <username> [<id|url>[,<id|url>...]]")
 	}
 
 	username := strings.TrimSpace(fs.Arg(0))

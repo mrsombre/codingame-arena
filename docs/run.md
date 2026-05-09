@@ -2,12 +2,12 @@
 
 Run one or more match simulations between two player binaries.
 
-`run` is the implicit default — `arena --blue=... --red=...` is equivalent to `arena run --blue=... --red=...`.
+The active game is the first positional argument: `arena run <game> [OPTIONS]`.
 
 ## Quick start
 
 ```shell
-bin/arena --game=winter2026 \
+bin/arena run winter2026 \
   --blue=bin/bot-winter2026-cpp \
   --red=bin/bot-winter2026-py
 

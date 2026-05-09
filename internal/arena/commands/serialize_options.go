@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -11,9 +12,8 @@ import (
 
 // AddSerializeFlags registers flags used by the "serialize" subcommand on fs.
 func AddSerializeFlags(fs *pflag.FlagSet) {
-	fs.StringP("league", "l", "", "League level (default: game-specific)")
-	fs.StringP("seed", "s", "", "RNG seed (required)")
-	fs.Int("player", 0, "Player index (0 or 1)")
+	fs.StringP("league", "l", "", "League level for the active game (game-specific; check the game's docs)")
+	fs.Int("player", 0, "Whose perspective to render: 0 = engine left slot, 1 = right slot")
 }
 
 // SerializeOptions holds the parsed configuration for the "serialize" subcommand.
@@ -29,13 +29,13 @@ func parseSerializeOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (Se
 
 	var opts SerializeOptions
 
-	seedRaw := v.GetString("seed")
-	if seedRaw == "" {
-		return SerializeOptions{}, fmt.Errorf("--seed is required")
+	if fs.NArg() < 1 {
+		return SerializeOptions{}, fmt.Errorf("usage: arena game serialize <game> <seed> [OPTIONS]")
 	}
+	seedRaw := strings.TrimSpace(fs.Arg(0))
 	seed, err := arena.ParseSeed(seedRaw)
 	if err != nil {
-		return SerializeOptions{}, fmt.Errorf("invalid integer for --seed: %s", seedRaw)
+		return SerializeOptions{}, fmt.Errorf("invalid integer for seed: %s", seedRaw)
 	}
 	opts.Seed = seed
 

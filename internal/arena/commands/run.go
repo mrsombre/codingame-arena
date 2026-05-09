@@ -38,7 +38,41 @@ type runnerMetadata struct {
 
 // RunUsage returns the help text shown for `arena help run`.
 func RunUsage(fs *pflag.FlagSet) string {
-	return arena.CommandUsage("run", "Run one or more match simulations against a player binary.", fs, "")
+	extra := `Positional args:
+  arena run <game> [OPTIONS]   <game> selects the engine (e.g. winter2026, spring2020)
+
+Concurrency:
+  --simulations is the total number of matches the batch will play.
+  --parallel is the number of worker threads that dispatch those matches in
+  parallel — purely a wall-clock speedup; results don't depend on it.
+  Do NOT set --parallel above the number of CPU cores (oversubscription
+  degrades throughput) and do NOT start a second ` + "`arena run`" + ` (or any
+  other CPU-heavy job) on the same machine while a batch is in flight:
+  workers will compete for CPU and inflate the engine's response-time
+  measurements, skewing trace timings and bot stats.
+
+Sides:
+  blue = our bot, red = opponent. By default blue alternates between the engine's
+  left/right slots match-by-match to neutralize positional bias (--no-swap to
+  lock blue left). Win/loss/draw counts in the summary are from blue's perspective.
+
+Seeding:
+  Each match in the batch gets a deterministic per-match seed:
+      seed_i = --seed + i * --seedx     (i = 0..simulations-1)
+  Pin --seed for a reproducible batch; default --seed is the current Unix
+  nanosecond timestamp.
+
+Output channels:
+  default      one-line summary on stdout
+  --verbose    full JSON summary on stdout (per-metric averages, runner metadata,
+               bad-command list, five worst losses from blue's perspective)
+  --debug      forces -n=1 -p=1, locks sides, passes bot stderr through to your
+               terminal, and prints the single match's trace JSON to stdout
+
+Tracing:
+  --trace writes one JSON file per match to --trace-dir (default ./traces).
+  Trace files feed ` + "`arena analyze`" + ` and the web viewer (` + "`arena serve`" + `).`
+	return arena.CommandUsage("run <game>", "Play a batch of head-to-head matches between two bot binaries.", fs, extra)
 }
 
 // Run is the entry point for the "run" subcommand.
