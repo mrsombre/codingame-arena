@@ -44,6 +44,7 @@ jobs:
           mkdir -p bin
           GOOS=darwin  GOARCH=arm64 go build -ldflags="-w -s" -o bin/arena-darwin-arm64      ./cmd/arena
           GOOS=linux   GOARCH=amd64 go build -ldflags="-w -s" -o bin/arena-linux-amd64       ./cmd/arena
+          GOOS=linux   GOARCH=arm64 go build -ldflags="-w -s" -o bin/arena-linux-arm64       ./cmd/arena
           GOOS=windows GOARCH=amd64 go build -ldflags="-w -s" -o bin/arena-windows-amd64.exe ./cmd/arena
 
       - name: Upload release assets
@@ -53,5 +54,6 @@ jobs:
           gh release upload "${{ github.event.release.tag_name }}" \
             bin/arena-darwin-arm64 \
             bin/arena-linux-amd64 \
+            bin/arena-linux-arm64 \
             bin/arena-windows-amd64.exe \
             --clobber
