@@ -20,6 +20,8 @@ func (f *factory) Name() string { return "winter2026" }
 
 func (f *factory) Rules() string { return winter2026.Rules }
 
+func (f *factory) Trace() string { return winter2026.Trace }
+
 func (f *factory) PuzzleID() int { return 13771 }
 
 func (f *factory) PuzzleTitle() string { return "SnakeByte - Winter Challenge 2026" }

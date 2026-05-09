@@ -25,6 +25,8 @@ func (f *Factory) Name() string { return "spring2020" }
 
 func (f *Factory) Rules() string { return spring2020.Rules }
 
+func (f *Factory) Trace() string { return spring2020.Trace }
+
 func (f *Factory) PuzzleID() int { return 592 }
 
 func (f *Factory) PuzzleTitle() string { return "Spring Challenge 2020" }

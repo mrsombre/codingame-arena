@@ -37,14 +37,13 @@ The game slug is the first positional argument for every command that needs a ga
 
 ## Commands
 
-| Command           | Purpose                                                 |
-|-------------------|---------------------------------------------------------|
-| `run`             | Run one or more match simulations against a player      |
-| `replay`          | Download replay JSON (`get`, `leaderboard` subcommands) |
-| `analyze`         | Analyze trace outcomes and game-owned metrics           |
-| `serve`           | Serve the embedded web viewer                           |
-| `game rules`      | Print the bundled rules.md for a game                   |
-| `game serialize`  | Print initial game input for first turn for a seed      |
+| Command   | Purpose                                                 |
+|-----------|---------------------------------------------------------|
+| `run`     | Run one or more match simulations against a player      |
+| `replay`  | Download replay JSON (`get`, `leaderboard` subcommands) |
+| `analyze` | Analyze trace outcomes and game-owned metrics           |
+| `serve`   | Serve the embedded web viewer                           |
+| `game`    | Per-game helpers: `rules`, `trace`, `serialize`         |
 
 Run `arena help <command>` for full flag listings.
 

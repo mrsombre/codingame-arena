@@ -117,6 +117,18 @@ func TestExecuteGameRulesEmitsBundledMarkdown(t *testing.T) {
 	}
 }
 
+func TestExecuteGameTraceEmitsBundledMarkdown(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	code := run([]string{"game", "winter2026", "trace"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	if got := stdout.String(); !strings.Contains(got, "Trace format") {
+		t.Fatalf("stdout missing bundled trace header:\n%s", got)
+	}
+}
+
 func TestPopGameRequiresGameArg(t *testing.T) {
 	_, _, err := popGame("run", "<game>", []string{"--blue=./bot"}, []string{"winter2026"})
 	if err == nil {

@@ -26,6 +26,8 @@ func (f *Factory) Name() string { return "spring2021" }
 
 func (f *Factory) Rules() string { return spring2021.Rules }
 
+func (f *Factory) Trace() string { return spring2021.Trace }
+
 func (f *Factory) PuzzleID() int { return 730 }
 
 // TurnModel selects PhaseTurnModel: Spring 2021's engine emits standalone

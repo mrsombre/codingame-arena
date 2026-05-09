@@ -9,6 +9,17 @@ Two commands write traces:
 
 [`arena analyze`](analyze.md) and [`arena serve`](serve.md) read whatever `*.json` files live under `--trace-dir`; the `type` field and filename let consumers tell self-play apart from replay-derived traces.
 
+## Per-game trace docs
+
+This page describes the cross-game envelope (file naming, top-level fields, per-turn shape). The game-specific payloads (`setup` lines, `gameInput` lines, `state` shape, `traces[].type` event labels) are documented in each game's own `trace.md`, bundled into the arena binary so it can be read without checking out the source:
+
+```shell
+bin/arena game winter2026 trace | head
+bin/arena game spring2021 trace | less
+```
+
+See [`game.md`](game.md#trace) for the `arena game <game> trace` action; the same markdown lives in-repo at `games/<game>/trace.md`.
+
 ## Quick start
 
 ```shell

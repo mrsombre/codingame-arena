@@ -163,6 +163,12 @@ var registry = map[string]commandSpec{
 				argsSpec: "",
 				usage:    commands.RulesUsage,
 			},
+			"trace": {
+				addFlags: commands.AddTraceFlags,
+				handler:  commands.Trace,
+				argsSpec: "",
+				usage:    commands.TraceUsage,
+			},
 		},
 		subUsage: gameSubUsage,
 	},
@@ -243,6 +249,9 @@ func gameSubUsage() string {
 Actions:
   rules                  Print the bundled rules.md for <game> to stdout. The
                          file is embedded in the arena binary at build time.
+  trace                  Print the bundled trace.md for <game> to stdout —
+                         per-game trace payloads (setup, gameInput, state,
+                         event labels). Embedded at build time.
   serialize <seed>       Print the bot-stdin bytes (globals + turn-0 frame)
                          for a given seed. Use to inspect maps, build
                          deterministic test fixtures, or pipe a fixed input
