@@ -178,3 +178,11 @@ type TurnModel interface {
 type TurnModeler interface {
 	TurnModel() TurnModel
 }
+
+// RulesProvider returns the bundled rules.md contents for a game so the
+// `arena game <game> rules` subcommand can print them without a sidecar
+// filesystem path. Optional — factories without this hook surface a "no
+// rules bundled" error from the rules subcommand.
+type RulesProvider interface {
+	Rules() string
+}

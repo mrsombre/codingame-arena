@@ -7,7 +7,7 @@ Useful for inspecting initial map state, capturing fixtures for unit tests, or f
 ## Quick start
 
 ```shell
-bin/arena game serialize winter2026 100030005000
+bin/arena game winter2026 serialize 100030005000
 ```
 
 Output is the raw lines a bot reads from stdin:
@@ -22,7 +22,7 @@ Output is the raw lines a bot reads from stdin:
 
 ## Options
 
-`arena game serialize <game> <seed> [OPTIONS]` — the game slug and seed are required positionals, in that order.
+`arena game <game> serialize <seed> [OPTIONS]` — `<game>` first, then the `serialize` action, then `<seed>`.
 
 | Flag           | Default       | Description                          |
 |----------------|---------------|--------------------------------------|
@@ -39,5 +39,5 @@ Two blocks separated by newline-terminated lines:
 Format matches exactly what bots receive on stdin during a real match. Pipe it into a bot binary to drive a single-turn invocation:
 
 ```shell
-bin/arena game serialize winter2026 42 | bin/bot-winter2026-cpp
+bin/arena game winter2026 serialize 42 | bin/bot-winter2026-cpp
 ```

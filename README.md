@@ -33,7 +33,7 @@ Timing: avg_first_response=29msx198ms avg_turn_response=0msx0ms
 | Winter Challenge 2026 | `winter2026`  | `games/winter2026/` |
 | Spring Challenge 2020 | `spring2020`  | `games/spring2020/` |
 
-The game slug is the first positional argument for every command that needs a game, e.g. `arena run winter2026 ...`, `arena replay winter2026 mrsombre`, `arena game serialize winter2026 <seed>`.
+The game slug is the first positional argument for every command that needs a game, e.g. `arena run winter2026 ...`, `arena replay winter2026 mrsombre`, `arena game winter2026 rules`, `arena game winter2026 serialize <seed>`.
 
 ## Commands
 
@@ -43,6 +43,7 @@ The game slug is the first positional argument for every command that needs a ga
 | `replay`          | Download replay JSON (`get`, `leaderboard` subcommands) |
 | `analyze`         | Analyze trace outcomes and game-owned metrics           |
 | `serve`           | Serve the embedded web viewer                           |
+| `game rules`      | Print the bundled rules.md for a game                   |
 | `game serialize`  | Print initial game input for first turn for a seed      |
 
 Run `arena help <command>` for full flag listings.

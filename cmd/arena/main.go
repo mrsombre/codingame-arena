@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -21,9 +22,10 @@ type commandSpec struct {
 	addFlags     func(*pflag.FlagSet)
 	handler      handlerFunc
 	needsFactory bool
-	// argsSpec is the positional signature shown in usage errors when the
-	// leading game positional is missing — e.g. "<game> <seed>" for
-	// `arena game serialize`. Defaults to "<game>" when empty.
+	// argsSpec is the positional signature echoed in usage-error messages.
+	// Top-level commands include <game> (e.g. "<game> <username>"); under
+	// `arena game <game> <action>` the action's argsSpec is action-only
+	// (e.g. "<seed>", or "" for actions with no positionals).
 	argsSpec    string
 	usage       func(*pflag.FlagSet) string
 	subcommands map[string]commandSpec
@@ -57,6 +59,13 @@ func execute(args []string, stdout io.Writer) error {
 		return printHelp(stdout, rest, games)
 	}
 
+	// `arena game <game> <action> [args]` puts <game> before the action,
+	// matching the rest of the CLI. Dispatch is custom because the generic
+	// path expects subcommand-then-game.
+	if command == "game" {
+		return executeGame(rest, stdout, games)
+	}
+
 	spec, path, rest, err := selectCommand(command, rest)
 	if err != nil {
 		return err
@@ -73,9 +82,37 @@ func execute(args []string, stdout io.Writer) error {
 		}
 	}
 
+	return runHandler(spec, path, rest, stdout, factory)
+}
+
+// executeGame handles `arena game <game> <action> [args]`. <game> is popped
+// first, the next token names an action under registry["game"].subcommands,
+// and the resolved factory is threaded into the action's handler.
+func executeGame(args []string, stdout io.Writer, games []string) error {
+	if len(args) == 0 {
+		return writeLine(stdout, gameSubUsage())
+	}
+	factory, rest, err := popGame("game", "<game> <action>", args, games)
+	if err != nil {
+		return err
+	}
+	if len(rest) == 0 || strings.HasPrefix(rest[0], "-") {
+		return fmt.Errorf("usage: arena game <game> <action> [OPTIONS]; actions: %s", gameActionsList())
+	}
+	action := rest[0]
+	rest = rest[1:]
+
+	spec, ok := registry["game"].subcommands[action]
+	if !ok {
+		return fmt.Errorf("unknown game action %q; run `arena help game` for usage", action)
+	}
+	return runHandler(spec, "game "+action, rest, stdout, factory)
+}
+
+func runHandler(spec commandSpec, path string, args []string, stdout io.Writer, factory arena.GameFactory) error {
 	fs := arena.NewBaseFlagSet("arena")
 	spec.addFlags(fs)
-	if err := fs.Parse(rest); err != nil {
+	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, pflag.ErrHelp) {
 			return fmt.Errorf(`run "arena help %s" for usage`, path)
 		}
@@ -87,7 +124,7 @@ func execute(args []string, stdout io.Writer) error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	return spec.handler(rest, stdout, factory, fs, v)
+	return spec.handler(args, stdout, factory, fs, v)
 }
 
 // registry is the dispatch table built once at package init. Lookups are
@@ -115,11 +152,16 @@ var registry = map[string]commandSpec{
 	"game": {
 		subcommands: map[string]commandSpec{
 			"serialize": {
-				addFlags:     commands.AddSerializeFlags,
-				handler:      commands.Serialize,
-				needsFactory: true,
-				argsSpec:     "<game> <seed>",
-				usage:        commands.SerializeUsage,
+				addFlags: commands.AddSerializeFlags,
+				handler:  commands.Serialize,
+				argsSpec: "<seed>",
+				usage:    commands.SerializeUsage,
+			},
+			"rules": {
+				addFlags: commands.AddRulesFlags,
+				handler:  commands.Rules,
+				argsSpec: "",
+				usage:    commands.RulesUsage,
 			},
 		},
 		subUsage: gameSubUsage,
@@ -192,19 +234,32 @@ func writeLine(w io.Writer, line string) error {
 	return err
 }
 
-// gameSubUsage prints the help text shown for `arena game` (with no
-// subcommand) and `arena help game`. Lists every nested game-related
-// subcommand registered under `commandSet["game"]`.
+// gameSubUsage prints the help text shown for `arena game` (with no args)
+// and `arena help game`. Lists every action registered under
+// registry["game"].subcommands.
 func gameSubUsage() string {
-	return strings.TrimSpace(`arena game - Game-related helpers (engine introspection, fixtures, etc.)
+	return strings.TrimSpace(`arena game <game> <action> - Per-game helpers (rules, engine introspection, fixtures).
 
-Subcommands:
-  serialize   <game> <seed>   Print the bot-stdin bytes (globals + turn-0 frame)
-                              for a given engine seed. Use to inspect maps,
-                              build deterministic test fixtures, or pipe a
-                              fixed input straight into a bot binary.
+Actions:
+  rules                  Print the bundled rules.md for <game> to stdout. The
+                         file is embedded in the arena binary at build time.
+  serialize <seed>       Print the bot-stdin bytes (globals + turn-0 frame)
+                         for a given seed. Use to inspect maps, build
+                         deterministic test fixtures, or pipe a fixed input
+                         straight into a bot binary.
 
-Use "arena help game <subcommand>" for the full per-subcommand help.`)
+Use "arena help game <action>" for the full per-action help.`)
+}
+
+// gameActionsList returns a sorted, comma-separated list of registered game
+// actions for usage-error messages.
+func gameActionsList() string {
+	names := make([]string, 0, len(registry["game"].subcommands))
+	for name := range registry["game"].subcommands {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }
 
 // popGame consumes the leading game positional and returns the matching

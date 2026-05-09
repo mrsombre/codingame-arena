@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/mrsombre/codingame-arena/games/spring2021"
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
@@ -22,6 +23,8 @@ func NewFactory() arena.GameFactory {
 }
 
 func (f *Factory) Name() string { return "spring2021" }
+
+func (f *Factory) Rules() string { return spring2021.Rules }
 
 func (f *Factory) PuzzleID() int { return 730 }
 

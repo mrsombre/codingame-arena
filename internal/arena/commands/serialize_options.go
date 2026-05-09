@@ -30,7 +30,7 @@ func parseSerializeOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (Se
 	var opts SerializeOptions
 
 	if fs.NArg() < 1 {
-		return SerializeOptions{}, fmt.Errorf("<seed> is required; usage: arena game serialize <game> <seed> [OPTIONS]")
+		return SerializeOptions{}, fmt.Errorf("<seed> is required; usage: arena game <game> serialize <seed> [OPTIONS]")
 	}
 	seedRaw := strings.TrimSpace(fs.Arg(0))
 	seed, err := arena.ParseSeed(seedRaw)

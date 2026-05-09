@@ -69,22 +69,51 @@ func TestSelectCommandRoutesReplay(t *testing.T) {
 	}
 }
 
-func TestSelectCommandDescendsIntoGameSerialize(t *testing.T) {
-	spec, path, rest, err := selectCommand("game", []string{"serialize", "winter2026", "12345"})
-	if err != nil {
-		t.Fatalf("selectCommand returned error: %v", err)
+func TestExecuteGameRequiresGame(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	code := run([]string{"game"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
 	}
-	if spec.handler == nil {
-		t.Fatal("handler is nil")
+	if !strings.Contains(stdout.String(), "arena game <game> <action>") {
+		t.Fatalf("stdout missing game subUsage:\n%s", stdout.String())
 	}
-	if !spec.needsFactory {
-		t.Fatal("needsFactory = false, want true")
+}
+
+func TestExecuteGameRejectsUnknownGame(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	code := run([]string{"game", "galactic2099", "rules"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
 	}
-	if path != "game serialize" {
-		t.Fatalf("path = %q, want \"game serialize\"", path)
+	if !strings.Contains(stderr.String(), `unknown game "galactic2099"`) {
+		t.Fatalf("stderr missing unknown-game error: %q", stderr.String())
 	}
-	if got, want := strings.Join(rest, " "), "winter2026 12345"; got != want {
-		t.Fatalf("rest = %q, want %q", got, want)
+}
+
+func TestExecuteGameRejectsUnknownAction(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	code := run([]string{"game", "winter2026", "bogus"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), `unknown game action "bogus"`) {
+		t.Fatalf("stderr missing unknown-action error: %q", stderr.String())
+	}
+}
+
+func TestExecuteGameRulesEmitsBundledMarkdown(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	code := run([]string{"game", "winter2026", "rules"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	if got := stdout.String(); !strings.Contains(got, "Winter Challenge 2026") {
+		t.Fatalf("stdout missing bundled rules header:\n%s", got)
 	}
 }
 
@@ -109,11 +138,11 @@ func TestPopGameRejectsUnknownGame(t *testing.T) {
 }
 
 func TestPopGameUsageIncludesArgsSpec(t *testing.T) {
-	_, _, err := popGame("game serialize", "<game> <seed>", nil, []string{"winter2026"})
+	_, _, err := popGame("game", "<game> <action>", nil, []string{"winter2026"})
 	if err == nil {
 		t.Fatal("popGame returned no error for missing positionals")
 	}
-	if !strings.Contains(err.Error(), "usage: arena game serialize <game> <seed>") {
+	if !strings.Contains(err.Error(), "usage: arena game <game> <action>") {
 		t.Fatalf("error missing full positional spec: %v", err)
 	}
 }

@@ -53,11 +53,11 @@ func Usage(games []string) string {
 Usage: arena <command> [<game>] [OPTIONS]
 
 Commands:
-  run         <game>   Run one or more match simulations against a player binary
-  replay      <game>   Download replay JSON for a player and convert it to traces
-  analyze     <game>   Analyze trace outcomes and game-owned metrics
-  serve                Serve the embedded web viewer
-  game                 Game-related commands (serialize, ...)
+  run         <game>            Run one or more match simulations against a player binary
+  replay      <game>            Download replay JSON for a player and convert it to traces
+  analyze     <game>            Analyze trace outcomes and game-owned metrics
+  serve                         Serve the embedded web viewer
+  game        <game> <action>   Per-game helpers (rules, serialize, ...)
 
 Use "arena help <command>" for more information about a command.
 
