@@ -95,4 +95,8 @@ type BatchOptions struct {
 	Seed          int64
 	SeedIncrement int64
 	OutputMatches bool
+	// Progress, if set, is called once per completed match with the running
+	// completed count and the total. Invoked from the result-collection
+	// goroutine; callbacks must be cheap and safe to call serially.
+	Progress func(completed, total int)
 }

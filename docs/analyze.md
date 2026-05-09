@@ -2,16 +2,18 @@
 
 Aggregate trace files into a standard outcome report plus game-owned metrics.
 
-The command reads every `*.json` trace in `--trace-dir` (self-play `trace-*.json` files from `arena run --trace` and converted `replay-*.json` files written by `arena replay`), filters them to one selected game, and emits an arena-owned report.
+The command reads every `*.json` trace in `--trace-dir` (self-play `trace-*.json` files from `arena run --trace` and converted `replay-*.json` files written by `arena replay`), filters them to the selected game, and emits an arena-owned report.
+
+The active game is the first positional argument: `arena analyze <game> [OPTIONS]`. Trace files whose `puzzleName` does not match `<game>` are ignored.
 
 ## Quick start
 
 ```shell
-# Analyze every Spring 2020 trace in ./traces/
-bin/arena analyze --game=spring2020
+# Analyze every winter2026 trace in ./traces/
+bin/arena analyze winter2026
 
 # Read traces from a different directory
-bin/arena analyze --game=winter2026 --trace-dir=./traces/experiment-A
+bin/arena analyze winter2026 --trace-dir=./traces/experiment-A
 ```
 
 ## Options
@@ -19,14 +21,11 @@ bin/arena analyze --game=winter2026 --trace-dir=./traces/experiment-A
 | Flag          | Default    | Description                                                                    |
 |---------------|------------|--------------------------------------------------------------------------------|
 | `--trace-dir` | `./traces` | Directory to scan for trace JSON files                                         |
-| `--game`      | inferred   | Active game (or set in `arena.yml`); inferred when all traces share a `puzzleName` |
-
-If `--game` is omitted and the trace dir contains traces from multiple games, the command exits with an error listing the games it found. Pass `--game` to disambiguate.
 
 ## How it works
 
 1. Read every `*.json` file in `--trace-dir`; ignore non-trace JSON.
-2. Filter to traces whose `puzzleName` matches `--game` (or the inferred game).
+2. Filter to traces whose `puzzleName` equals the `<game>` positional.
 3. Render generic multiplayer facts: win/draw split, side wins, blue-side results, turns, scores, timing, and end reasons.
 4. If the game implements trace metrics, ask it to interpret opaque `turns[].traces` and return per-side metric counts.
 5. Arena aggregates those metrics as either average counts per match or average per-match turn rates.

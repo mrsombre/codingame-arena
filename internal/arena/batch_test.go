@@ -39,3 +39,20 @@ func TestRunMatchesCollectsResultsInOrder(t *testing.T) {
 		assert.Equal(t, i, r.ID)
 	}
 }
+
+func TestRunMatchesProgressCallbackFiresPerCompletion(t *testing.T) {
+	var seen [][2]int
+	opts := BatchOptions{
+		Simulations:   3,
+		Parallel:      2,
+		Seed:          1,
+		SeedIncrement: 1,
+		Progress: func(completed, total int) {
+			seen = append(seen, [2]int{completed, total})
+		},
+	}
+	RunMatches(opts, func(id int, seed int64) MatchResult {
+		return MatchResult{ID: id, Seed: seed}
+	})
+	assert.Equal(t, [][2]int{{1, 3}, {2, 3}, {3, 3}}, seen)
+}

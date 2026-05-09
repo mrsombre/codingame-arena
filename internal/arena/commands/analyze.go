@@ -16,21 +16,57 @@ import (
 
 // AnalyzeUsage returns the help text shown for `arena help analyze`.
 func AnalyzeUsage(fs *pflag.FlagSet) string {
-	return arena.CommandUsage("analyze", "Analyze trace outcomes and game-owned metrics.", fs, "")
+	extra := `Positional args:
+  arena analyze <game> [OPTIONS]   <game> selects which traces to read.
+  Trace files whose puzzleName != <game> are silently ignored, so the
+  same --trace-dir can hold multiple games.
+
+Inputs:
+  Reads every *.json in --trace-dir (default ./traces). Two trace shapes
+  are supported and treated identically here:
+    - trace-<traceId>-<matchId>.json   from ` + "`arena run --trace`" + ` (self-play)
+    - replay-<replayId>.json           from ` + "`arena replay`" + `       (CodinGame replay)
+  Both are filtered to <game> via the trace's puzzleName field. Files that
+  don't look like arena traces (missing turns and puzzleName) are skipped.
+  Files missing the required ` + "`blue`" + ` field cause a hard error so a stray
+  legacy trace can't silently corrupt the report.
+
+Output (stdout, plain text):
+  HEADER          <game> — N traces — <trace-dir>
+  OUTCOME         decided/draw split, plus blue-side W/L/D
+  MATCH           turn count, blue-vs-red avg score and timing
+  END REASONS     percentage of matches by termination reason
+                  (TURNS_OUT, SCORE, ELIMINATED, TIMEOUT, INVALID, …)
+  METRICS         winner-vs-loser AND blue-vs-red rollups for game-defined
+                  per-turn events (e.g. winter2026 DEAD, spring2021 GATHER).
+                  Game-specific; only present when the game implements
+                  TraceMetricAnalyzer. Per-turn rates auto-fall back to raw
+                  counts when both sides average under 1% to avoid noisy
+                  ratios.
+  WORST           per hazard metric, blue's worst single match and trace id
+                  (skipped for HigherIsBetter metrics and never-fired ones).
+
+Notes:
+  - Win/loss is always blue's perspective (the trace's ` + "`blue`" + ` field).
+  - Draws are counted in OUTCOME but excluded from winner-vs-loser metrics.
+  - Arena does not interpret game-specific event labels; each game owns
+    its own metric meaning via TraceMetricSpec.`
+	return arena.CommandUsage("analyze <game>", "Aggregate trace files into an outcome + game-metric report.", fs, extra)
 }
 
 // Analyze is the entry point for the "analyze" subcommand.
-func Analyze(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
+func Analyze(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
 	opts, err := parseAnalyzeOptions(args, fs, v)
 	if err != nil {
 		return err
 	}
 
-	input, metricAnalyzer, err := buildTraceAnalysisInput(opts.TraceDir, v.GetString("game"))
+	input, err := buildTraceAnalysisInput(opts.TraceDir, factory)
 	if err != nil {
 		return err
 	}
 
+	metricAnalyzer, _ := factory.(arena.TraceMetricAnalyzer)
 	report, err := arena.AnalyzeTraceFiles(input, metricAnalyzer)
 	if err != nil {
 		return err
@@ -38,44 +74,26 @@ func Analyze(args []string, stdout io.Writer, _ arena.GameFactory, fs *pflag.Fla
 	return report.Write(stdout)
 }
 
-func buildTraceAnalysisInput(traceDir, configuredGame string) (arena.TraceAnalysisInput, arena.TraceMetricAnalyzer, error) {
+func buildTraceAnalysisInput(traceDir string, factory arena.GameFactory) (arena.TraceAnalysisInput, error) {
 	files, err := loadAnalyzeTraceFiles(traceDir)
 	if err != nil {
-		return arena.TraceAnalysisInput{}, nil, err
+		return arena.TraceAnalysisInput{}, err
 	}
 	if len(files) == 0 {
-		return arena.TraceAnalysisInput{}, nil, fmt.Errorf("no arena trace JSON files found in %s", traceDir)
+		return arena.TraceAnalysisInput{}, fmt.Errorf("no arena trace JSON files found in %s", traceDir)
 	}
 
-	puzzleName, err := resolveAnalyzeGame(configuredGame, files)
-	if err != nil {
-		return arena.TraceAnalysisInput{}, nil, err
-	}
-
+	puzzleName := factory.Name()
 	gameFiles := filterTraceFilesByGame(files, puzzleName)
 	if len(gameFiles) == 0 {
-		return arena.TraceAnalysisInput{}, nil, fmt.Errorf("no %s trace JSON files found in %s", puzzleName, traceDir)
-	}
-
-	metricAnalyzer, err := resolveTraceMetricAnalyzer(puzzleName)
-	if err != nil {
-		return arena.TraceAnalysisInput{}, nil, err
+		return arena.TraceAnalysisInput{}, fmt.Errorf("no %s trace JSON files found in %s", puzzleName, traceDir)
 	}
 
 	return arena.TraceAnalysisInput{
 		TraceDir:   traceDir,
 		Files:      gameFiles,
 		PuzzleName: puzzleName,
-	}, metricAnalyzer, nil
-}
-
-func resolveTraceMetricAnalyzer(puzzleName string) (arena.TraceMetricAnalyzer, error) {
-	factory := arena.GetFactory(puzzleName)
-	if factory == nil {
-		return nil, fmt.Errorf("unknown game %q", puzzleName)
-	}
-	metricAnalyzer, _ := factory.(arena.TraceMetricAnalyzer)
-	return metricAnalyzer, nil
+	}, nil
 }
 
 func loadAnalyzeTraceFiles(traceDir string) ([]arena.TraceFile, error) {
@@ -139,35 +157,6 @@ func validateAnalyzeTrace(name string, trace arena.TraceMatch) error {
 		return fmt.Errorf("%s: blue %q not found in players %v", name, trace.Blue, trace.Players)
 	}
 	return nil
-}
-
-func resolveAnalyzeGame(configured string, files []arena.TraceFile) (string, error) {
-	if configured != "" {
-		return configured, nil
-	}
-
-	seen := make(map[string]struct{})
-	for _, file := range files {
-		if file.Trace.PuzzleName == "" {
-			continue
-		}
-		seen[file.Trace.PuzzleName] = struct{}{}
-	}
-	if len(seen) == 1 {
-		for puzzleName := range seen {
-			return puzzleName, nil
-		}
-	}
-	if len(seen) == 0 {
-		return "", fmt.Errorf("cannot infer game from trace files; pass --game")
-	}
-
-	games := make([]string, 0, len(seen))
-	for puzzleName := range seen {
-		games = append(games, puzzleName)
-	}
-	sort.Strings(games)
-	return "", fmt.Errorf("multiple games in trace files (%v); pass --game", games)
 }
 
 func filterTraceFilesByGame(files []arena.TraceFile, puzzleName string) []arena.TraceFile {

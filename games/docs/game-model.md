@@ -183,6 +183,6 @@ parsing it from summary text would be fragile and game-specific.
 6. Verify end-to-end:
    ```
    make test-arena && make test-games && make lint-arena && make build-arena
-   bin/arena replay <username> --game <name> -n 5 -f
+   bin/arena replay <name> <username> -n 5 -f
    ```
    Saved traces should report `0 skipped-mismatch`.

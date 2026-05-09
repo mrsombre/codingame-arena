@@ -52,6 +52,9 @@ func RunMatches(options BatchOptions, runMatch func(simulationID int, seed int64
 	all := make([]MatchResult, 0, options.Simulations)
 	for result := range results {
 		all = append(all, result)
+		if options.Progress != nil {
+			options.Progress(len(all), options.Simulations)
+		}
 	}
 
 	if workerPanic != nil {

@@ -91,13 +91,90 @@ func TestWriteRunOutputWritesVerboseJSON(t *testing.T) {
 	}
 	var stdout bytes.Buffer
 
-	err := writeRunOutput(&stdout, opts, []arena.MatchResult{matchResult(0, 1, false, 20, 10)}, time.Second)
+	err := writeRunOutput(&stdout, opts, []arena.MatchResult{matchResult(0, 1, false, 20, 10)}, time.Second, nil)
 
 	require.NoError(t, err)
 	var out runnerOutput
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &out))
 	assert.Equal(t, 1, out.Runner.Simulations)
 	assert.Equal(t, 1, out.Summary.Simulations)
+}
+
+func TestWriteRunOutputDebugWritesCapturedTraceJSON(t *testing.T) {
+	opts := RunOptions{
+		BatchOptions: arena.BatchOptions{Simulations: 1, Parallel: 1, SeedIncrement: 1},
+		BlueBotBin:   "./bin/blue",
+		RedBotBin:    "./bin/red",
+		MaxTurns:     200,
+		Debug:        true,
+	}
+	debugSink := &debugTraceCapture{traceID: 42}
+	debugSink.match = arena.TraceMatch{
+		PuzzleName: "winter2026",
+		Players:    [2]string{"blue", "red"},
+		Seed:       12345,
+		MatchID:    0,
+	}
+	var stdout bytes.Buffer
+
+	err := writeRunOutput(&stdout, opts, []arena.MatchResult{matchResult(0, 12345, false, 20, 10)}, time.Second, debugSink)
+
+	require.NoError(t, err)
+	var trace arena.TraceMatch
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &trace))
+	assert.Equal(t, "winter2026", trace.PuzzleName)
+	assert.Equal(t, int64(12345), trace.Seed)
+}
+
+func TestProgressStepThresholds(t *testing.T) {
+	cases := []struct {
+		total int
+		want  int
+	}{
+		{0, 0},
+		{1, 0},
+		{50, 100},
+		{100, 100},
+		{1000, 100},
+		{1001, 1000},
+		{5000, 1000},
+	}
+	for _, c := range cases {
+		assert.Equal(t, c.want, progressStep(c.total), "total=%d", c.total)
+	}
+}
+
+func TestNewProgressLoggerFiresAtMilestones(t *testing.T) {
+	var buf bytes.Buffer
+	cb := newProgressLogger(250, &buf)
+	require.NotNil(t, cb)
+
+	for i := 1; i <= 250; i++ {
+		cb(i, 250)
+	}
+	assert.Equal(t, "Completed 100 matches\nCompleted 200 matches\n", buf.String())
+}
+
+func TestNewProgressLoggerHighVolumeUses1000Step(t *testing.T) {
+	var buf bytes.Buffer
+	cb := newProgressLogger(2500, &buf)
+	require.NotNil(t, cb)
+
+	for i := 1; i <= 2500; i++ {
+		cb(i, 2500)
+	}
+	assert.Equal(t, "Completed 1000 matches\nCompleted 2000 matches\n", buf.String())
+}
+
+func TestNewProgressLoggerSingleMatchReturnsNil(t *testing.T) {
+	assert.Nil(t, newProgressLogger(1, &bytes.Buffer{}))
+}
+
+func TestDebugTraceCaptureStampsTraceIDAndDefaultsType(t *testing.T) {
+	sink := &debugTraceCapture{traceID: 7}
+	require.NoError(t, sink.WriteMatch(arena.TraceMatch{Seed: 99}))
+	assert.Equal(t, int64(7), sink.match.TraceID)
+	assert.Equal(t, arena.TraceTypeTrace, sink.match.Type)
 }
 
 func TestWriteRunOutputWritesShortSummaryByDefault(t *testing.T) {
@@ -113,7 +190,7 @@ func TestWriteRunOutputWritesShortSummaryByDefault(t *testing.T) {
 	}
 	var stdout bytes.Buffer
 
-	err := writeRunOutput(&stdout, opts, []arena.MatchResult{matchResult(0, 1, false, 20, 10)}, time.Second)
+	err := writeRunOutput(&stdout, opts, []arena.MatchResult{matchResult(0, 1, false, 20, 10)}, time.Second, nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, stdout.String(), "Summary: 1 matches played")

@@ -65,44 +65,7 @@ func TestLoadAnalyzeTraceFilesRejectsUnknownBlueSide(t *testing.T) {
 	assert.Contains(t, err.Error(), `blue "missing" not found`)
 }
 
-func TestResolveAnalyzeGameInfersSingleGame(t *testing.T) {
-	traceDir := makeAnalyzeTestDir(t)
-	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{
-  "puzzleName": "test-game",
-  "seed": "1",
-  "blue": "us",
-  "players": ["us", "rival"],
-  "scores": [1.0, 0.0],
-  "ranks": [0, 1],
-  "turns": [{"turn": 0}]
-}`)
-
-	files, err := loadAnalyzeTraceFiles(traceDir)
-	require.NoError(t, err)
-
-	got, err := resolveAnalyzeGame("", files)
-	require.NoError(t, err)
-	assert.Equal(t, "test-game", got)
-}
-
-func TestResolveAnalyzeGameRequiresExplicitGameForMixedTraces(t *testing.T) {
-	traceDir := makeAnalyzeTestDir(t)
-	writeAnalyzeTestFile(t, traceDir, "trace-1-0.json", `{"puzzleName": "test-game-a", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
-	writeAnalyzeTestFile(t, traceDir, "trace-2-0.json", `{"puzzleName": "test-game-b", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
-
-	files, err := loadAnalyzeTraceFiles(traceDir)
-	require.NoError(t, err)
-
-	_, err = resolveAnalyzeGame("", files)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "multiple games")
-
-	got, err := resolveAnalyzeGame("test-game-b", files)
-	require.NoError(t, err)
-	assert.Equal(t, "test-game-b", got)
-}
-
-func TestAnalyzeUsesGameFlagToFilterTraceFiles(t *testing.T) {
+func TestAnalyzeFiltersTraceFilesByGame(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
 	gameA := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_a"
 	gameB := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_b"
@@ -114,40 +77,39 @@ func TestAnalyzeUsesGameFlagToFilterTraceFiles(t *testing.T) {
 
 	fs, v := newTestAnalyzeCtx(t)
 	var out bytes.Buffer
-	err := Analyze([]string{"--game", gameA, "--trace-dir", traceDir}, &out, nil, fs, v)
+	err := Analyze([]string{"--trace-dir", traceDir}, &out, factory, fs, v)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"trace-a.json"}, factory.files)
 	assert.Contains(t, out.String(), gameA+" — 1 traces")
 }
 
-func TestBuildTraceAnalysisInputFiltersSelectedGame(t *testing.T) {
+func TestBuildTraceAnalysisInputFiltersByFactoryName(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
 	gameA := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_a"
 	gameB := "analyze_test_" + strings.NewReplacer("/", "_").Replace(t.Name()) + "_b"
 	writeAnalyzeTestFile(t, traceDir, "trace-a.json", fmt.Sprintf(`{"type": "trace-a", "puzzleName": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameA))
 	writeAnalyzeTestFile(t, traceDir, "trace-b.json", fmt.Sprintf(`{"type": "trace-b", "puzzleName": %q, "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`, gameB))
 	factory := &recordingAnalyzeFactory{name: gameB}
-	arena.Register(factory)
 
-	input, analyzer, err := buildTraceAnalysisInput(traceDir, gameB)
+	input, err := buildTraceAnalysisInput(traceDir, factory)
 
 	require.NoError(t, err)
-	require.NotNil(t, analyzer)
 	assert.Equal(t, gameB, input.PuzzleName)
 	require.Len(t, input.Files, 1)
 	assert.Equal(t, "trace-b.json", input.Files[0].Name)
 	assert.Equal(t, traceDir, input.TraceDir)
 }
 
-func TestBuildTraceAnalysisInputRejectsUnknownGame(t *testing.T) {
+func TestBuildTraceAnalysisInputRejectsTraceDirWithoutSelectedGame(t *testing.T) {
 	traceDir := makeAnalyzeTestDir(t)
-	writeAnalyzeTestFile(t, traceDir, "trace.json", `{"puzzleName": "missing-game", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+	writeAnalyzeTestFile(t, traceDir, "trace.json", `{"puzzleName": "another-game", "blue": "us", "players": ["us", "rival"], "turns": [{"turn": 0}]}`)
+	factory := &recordingAnalyzeFactory{name: "selected-game"}
 
-	_, _, err := buildTraceAnalysisInput(traceDir, "missing-game")
+	_, err := buildTraceAnalysisInput(traceDir, factory)
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `unknown game "missing-game"`)
+	assert.Contains(t, err.Error(), "no selected-game trace JSON files found")
 }
 
 func makeAnalyzeTestDir(t *testing.T) string {

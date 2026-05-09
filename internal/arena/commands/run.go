@@ -2,7 +2,9 @@ package commands
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -38,7 +40,44 @@ type runnerMetadata struct {
 
 // RunUsage returns the help text shown for `arena help run`.
 func RunUsage(fs *pflag.FlagSet) string {
-	return arena.CommandUsage("run", "Run one or more match simulations against a player binary.", fs, "")
+	extra := `Positional args:
+  arena run <game> [OPTIONS]   <game> selects the engine (e.g. winter2026, spring2020)
+
+Concurrency:
+  --simulations is the total number of matches the batch will play.
+  --parallel is the number of worker threads that dispatch those matches in
+  parallel — purely a wall-clock speedup; results don't depend on it.
+  Do NOT set --parallel above the number of CPU cores (oversubscription
+  degrades throughput) and do NOT start a second ` + "`arena run`" + ` (or any
+  other CPU-heavy job) on the same machine while a batch is in flight:
+  workers will compete for CPU and inflate the engine's response-time
+  measurements, skewing trace timings and bot stats.
+
+Sides:
+  blue = our bot, red = opponent. By default blue alternates between the engine's
+  left/right slots match-by-match to neutralize positional bias (--no-swap to
+  lock blue left). Win/loss/draw counts in the summary are from blue's perspective.
+
+Seeding:
+  Each match in the batch gets a deterministic per-match seed:
+      seed_i = --seed + i * --seedx     (i = 0..simulations-1)
+  Pin --seed for a reproducible batch; default --seed is the current Unix
+  nanosecond timestamp.
+
+Output channels:
+  default      one-line summary on stdout
+  --verbose    full JSON summary on stdout (per-metric averages, runner metadata,
+               bad-command list, five worst losses from blue's perspective)
+  --debug      forces -n=1 -p=1, locks sides, prints the match's full trace
+               JSON to stdout (same shape ` + "`arena run --trace`" + ` writes to disk;
+               nothing is written to --trace-dir, even if --trace is also
+               set), and prints each turn's bot stderr to your terminal under
+               a "--- turn N <side> stderr ---" header (silent turns omitted)
+
+Tracing:
+  --trace writes one JSON file per match to --trace-dir (default ./traces).
+  Trace files feed ` + "`arena analyze`" + ` and the web viewer (` + "`arena serve`" + `).`
+	return arena.CommandUsage("run <game>", "Play a batch of head-to-head matches between two bot binaries.", fs, extra)
 }
 
 // Run is the entry point for the "run" subcommand.
@@ -49,17 +88,35 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 	}
 
 	startedAt := time.Now()
-	results := runMatches(factory, opts, v, startedAt)
+	var debugSink *debugTraceCapture
+	if opts.Debug {
+		debugSink = &debugTraceCapture{traceID: startedAt.Unix()}
+	}
+	results := runMatches(factory, opts, v, startedAt, debugSink)
 	elapsed := time.Since(startedAt)
 
-	return writeRunOutput(stdout, opts, results, elapsed)
+	return writeRunOutput(stdout, opts, results, elapsed, debugSink)
 }
 
-func runMatches(factory arena.GameFactory, opts RunOptions, v *viper.Viper, startedAt time.Time) []arena.MatchResult {
-	traceDir := ""
-	if opts.Trace {
-		traceDir = opts.TraceDir
+// debugTraceCapture is the in-memory TraceSink used by --debug. Stamps the
+// trace with the same TraceID/Type defaults that TraceWriter applies on
+// disk, so the JSON printed to stdout is byte-for-byte the file `arena run
+// --trace` would have produced — only without writing anything.
+type debugTraceCapture struct {
+	traceID int64
+	match   arena.TraceMatch
+}
+
+func (c *debugTraceCapture) WriteMatch(m arena.TraceMatch) error {
+	m.TraceID = c.traceID
+	if m.Type == "" {
+		m.Type = arena.TraceTypeTrace
 	}
+	c.match = m
+	return nil
+}
+
+func runMatches(factory arena.GameFactory, opts RunOptions, v *viper.Viper, startedAt time.Time, debugSink *debugTraceCapture) []arena.MatchResult {
 	matchOpts := arena.MatchOptions{
 		MaxTurns:    opts.MaxTurns,
 		BlueBotBin:  opts.BlueBotBin,
@@ -68,18 +125,61 @@ func runMatches(factory arena.GameFactory, opts RunOptions, v *viper.Viper, star
 		NoSwap:      opts.NoSwap,
 		GameOptions: v,
 	}
-	if traceWriter := arena.NewTraceWriter(traceDir, startedAt.Unix()); traceWriter != nil {
-		matchOpts.TraceSink = traceWriter
+	switch {
+	case debugSink != nil:
+		// Debug always captures in-memory and never writes to disk, so
+		// --trace / --trace-dir are intentionally bypassed here.
+		matchOpts.TraceSink = debugSink
+	case opts.Trace:
+		matchOpts.TraceSink = arena.NewTraceWriter(opts.TraceDir, startedAt.Unix())
 	}
 
 	runner := arena.NewRunner(factory, matchOpts)
 
-	return arena.RunMatches(opts.BatchOptions, runner.RunMatch)
+	batchOpts := opts.BatchOptions
+	batchOpts.Progress = newProgressLogger(opts.Simulations, os.Stderr)
+
+	return arena.RunMatches(batchOpts, runner.RunMatch)
 }
 
-func writeRunOutput(stdout io.Writer, opts RunOptions, results []arena.MatchResult, elapsed time.Duration) error {
+// progressStep is the report cadence: every 100 matches up to and
+// including 1000 total, every 1000 thereafter. Returns 0 when no
+// progress lines should fire at all (single-match runs, e.g. --debug).
+func progressStep(total int) int {
+	switch {
+	case total <= 1:
+		return 0
+	case total <= 1000:
+		return 100
+	default:
+		return 1000
+	}
+}
+
+// newProgressLogger returns a BatchOptions.Progress callback that prints
+// "Completed N matches" to w at every progressStep(total) milestone.
+// Returns nil when no milestones would fire (saves the per-match callback
+// invocation).
+func newProgressLogger(total int, w io.Writer) func(completed, total int) {
+	step := progressStep(total)
+	if step == 0 {
+		return nil
+	}
+	return func(completed, _ int) {
+		if completed%step == 0 {
+			_, _ = fmt.Fprintf(w, "Completed %d matches\n", completed)
+		}
+	}
+}
+
+func writeRunOutput(stdout io.Writer, opts RunOptions, results []arena.MatchResult, elapsed time.Duration, debugSink *debugTraceCapture) error {
 	if opts.Debug {
-		_, err := io.WriteString(stdout, results[0].RenderMatch())
+		data, err := json.MarshalIndent(debugSink.match, "", "  ")
+		if err != nil {
+			return err
+		}
+		data = append(data, '\n')
+		_, err = stdout.Write(data)
 		return err
 	}
 

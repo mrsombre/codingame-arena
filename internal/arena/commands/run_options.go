@@ -15,20 +15,23 @@ import (
 
 // AddRunFlags registers flags used by the "run" subcommand on fs.
 func AddRunFlags(fs *pflag.FlagSet) {
-	fs.StringP("league", "l", "", "League level (default: game-specific)")
-	fs.IntP("simulations", "n", 100, "Number of matches to run")
-	fs.IntP("parallel", "p", runtime.NumCPU(), "Worker threads")
-	fs.StringP("seed", "s", "", "Base RNG seed (default: current time)")
-	fs.Int("seedx", 1, "Seed increment per match (seed_i = seed + i*N)")
-	fs.Bool("output-matches", false, "Include per-match results in JSON output")
-	fs.Bool("debug", false, "Force one match, fixed sides, bot debug to stderr, match trace JSON to stdout")
-	fs.Bool("no-swap", false, "Disable automatic side swapping")
-	fs.Bool("trace", false, "Write per-match JSON trace files for every match")
-	fs.String("trace-dir", "./traces", "Directory for trace files (used with --trace)")
-	fs.Int("max-turns", 200, "Maximum turns per match")
-	fs.StringP("blue", "b", "", "Our bot binary (required)")
-	fs.StringP("red", "r", filepath.Clean("./bin/opponent"), "Opponent bot binary")
-	fs.Bool("verbose", false, "Output full JSON (default: short summary line)")
+	fs.StringP("blue", "b", "", "Our bot executable (required); speaks the CodinGame stdin/stdout protocol")
+	fs.StringP("red", "r", filepath.Clean("./bin/opponent"), "Opponent bot executable")
+	fs.IntP("simulations", "n", 100, "Number of matches to play in the batch")
+	fs.IntP("parallel", "p", runtime.NumCPU(), "Concurrent match workers (default: number of CPU cores)")
+	// Override the resolved integer (e.g. 10) with a zero so pflag suppresses
+	// the auto-rendered "(default N)" suffix; the description explains it.
+	fs.Lookup("parallel").DefValue = "0"
+	fs.StringP("seed", "s", "", "Base RNG seed as int64 (default: current Unix nanoseconds)")
+	fs.Int("seedx", 1, "Per-match seed stride: seed_i = seed + i*seedx (i = 0..simulations-1)")
+	fs.Int("max-turns", 200, "Hard cap on turns per match before the engine ends the game")
+	fs.StringP("league", "l", "", "League level (game-specific; check the game's docs for valid values)")
+	fs.Bool("no-swap", false, "Disable automatic side swapping (blue is locked to the engine's left slot)")
+	fs.Bool("trace", false, "Write one JSON trace file per match to --trace-dir")
+	fs.String("trace-dir", "./traces", "Output directory for trace files (used with --trace; created if missing)")
+	fs.Bool("verbose", false, "Print the full JSON summary on stdout instead of the one-line summary")
+	fs.Bool("output-matches", false, "Include each match's result inline in the verbose JSON summary")
+	fs.Bool("debug", false, "Single-match debug: forces -n=1 -p=1, locks sides, prints the match's full trace JSON to stdout (no file written, even with --trace), and prints each turn's bot stderr under a per-turn header")
 }
 
 // RunOptions holds the parsed configuration for the "run" subcommand.

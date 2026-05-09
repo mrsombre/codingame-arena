@@ -18,7 +18,6 @@ func NewBaseFlagSet(name string) *pflag.FlagSet {
 	fs := pflag.NewFlagSet(name, pflag.ContinueOnError)
 	fs.SortFlags = false
 	fs.SetOutput(io.Discard)
-	fs.String("game", "", "Active game")
 	return fs
 }
 
@@ -51,19 +50,19 @@ func NewViper(fs *pflag.FlagSet) (*viper.Viper, error) {
 func Usage(games []string) string {
 	return strings.TrimSpace(fmt.Sprintf(`Available games: %s
 
-Usage: arena <command> [OPTIONS]
+Usage: arena <command> [<game>] [OPTIONS]
 
 Commands:
-  run          Run one or more match simulations against a player binary
-  replay       Download replay JSON for a player and convert it to traces
-  analyze      Analyze trace outcomes and game-owned metrics
-  serialize    Print initial game input for first turn for a given seed
-  serve        Serve the embedded web viewer
+  run         <game>            Run one or more match simulations against a player binary
+  replay      <game>            Download replay JSON for a player and convert it to traces
+  analyze     <game>            Analyze trace outcomes and game-owned metrics
+  serve                         Serve the embedded web viewer
+  game        <game> <action>   Per-game helpers (rules, serialize, ...)
 
 Use "arena help <command>" for more information about a command.
 
-Env vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_GAME, ARENA_SEED).
-Config: arena.yml in current directory (e.g. game: winter2026).`, strings.Join(games, ", ")))
+Env vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_SEED).
+Config: arena.yml in current directory.`, strings.Join(games, ", ")))
 }
 
 // CommandUsage returns help text for a specific subcommand using fs.FlagUsages().
@@ -76,8 +75,8 @@ func CommandUsage(command, description string, fs *pflag.FlagSet, extra string) 
 		sb.WriteString(extra)
 		sb.WriteString("\n")
 	}
-	sb.WriteString("\nEnv vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_GAME, ARENA_SEED).\n")
-	sb.WriteString("Config: arena.yml in current directory (e.g. game: winter2026).")
+	sb.WriteString("\nEnv vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_SEED).\n")
+	sb.WriteString("Config: arena.yml in current directory.")
 	return sb.String()
 }
 

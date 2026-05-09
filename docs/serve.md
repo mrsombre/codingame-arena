@@ -7,8 +7,10 @@ Run the embedded web viewer locally. The viewer bundle is compiled into the `are
 ## Quick start
 
 ```shell
-bin/arena serve --game=winter2026
+bin/arena serve
 ```
+
+`serve` registers every available game and exposes them through `/api/games`; the viewer chooses one per request. There is no game positional — pass game-specific knobs via the per-request query parameters.
 
 ```
   arena serve  ready

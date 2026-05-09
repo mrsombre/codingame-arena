@@ -14,7 +14,7 @@ Local game engine runner for [CodinGame](https://www.codingame.com/) bot program
 - **Trace analysis** — aggregate stats across batches of traces
 
 ```shell
-$ bin/arena --game=winter2026 \
+$ bin/arena run winter2026 \
     --blue=bin/bot-winter2026-cpp \
     --red=bin/bot-winter2026-py \
     --seed=100030005000 --simulations 100
@@ -28,24 +28,46 @@ Timing: avg_first_response=29msx198ms avg_turn_response=0msx0ms
 
 ## Supported Games
 
-| Game                  | Flag                | Source              |
-|-----------------------|---------------------|---------------------|
-| Winter Challenge 2026 | `--game winter2026` | `games/winter2026/` |
-| Spring Challenge 2020 | `--game spring2020` | `games/spring2020/` |
+| Game                  | Slug          | Source              |
+|-----------------------|---------------|---------------------|
+| Winter Challenge 2026 | `winter2026`  | `games/winter2026/` |
+| Spring Challenge 2020 | `spring2020`  | `games/spring2020/` |
+
+The game slug is the first positional argument for every command that needs a game, e.g. `arena run winter2026 ...`, `arena replay winter2026 mrsombre`, `arena game winter2026 rules`, `arena game winter2026 serialize <seed>`.
 
 ## Commands
 
-| Command     | Purpose                                                 |
-|-------------|---------------------------------------------------------|
-| `run`       | Run one or more match simulations against a player      |
-| `replay`    | Download replay JSON (`get`, `leaderboard` subcommands) |
-| `analyze`   | Analyze trace outcomes and game-owned metrics           |
-| `serialize` | Print initial game input for first turn for a seed      |
-| `serve`     | Serve the embedded web viewer                           |
+| Command   | Purpose                                                 |
+|-----------|---------------------------------------------------------|
+| `run`     | Run one or more match simulations against a player      |
+| `replay`  | Download replay JSON (`get`, `leaderboard` subcommands) |
+| `analyze` | Analyze trace outcomes and game-owned metrics           |
+| `serve`   | Serve the embedded web viewer                           |
+| `game`    | Per-game helpers: `rules`, `trace`, `serialize`         |
 
 Run `arena help <command>` for full flag listings.
 
 ## Quick Start
+
+### Download Prebuilt Binary
+
+Download the latest release binary for your platform and rename it to `arena`:
+
+```shell
+# macOS (Apple Silicon)
+curl -L -o arena https://github.com/mrsombre/codingame-arena/releases/latest/download/arena-darwin-arm64
+chmod +x arena
+
+# Linux (amd64)
+curl -L -o arena https://github.com/mrsombre/codingame-arena/releases/latest/download/arena-linux-amd64
+chmod +x arena
+
+# Linux (arm64)
+curl -L -o arena https://github.com/mrsombre/codingame-arena/releases/latest/download/arena-linux-arm64
+chmod +x arena
+```
+
+For Windows, download `arena-windows-amd64.exe` from the [latest release](https://github.com/mrsombre/codingame-arena/releases/latest).
 
 ### Build
 
@@ -65,7 +87,7 @@ Opens a web UI at `http://localhost:5757` where you can select bots, run matches
 
 ## Configuration
 
-Flags can be supplied via CLI, environment variables (`ARENA_<FLAG>`, hyphens become underscores — e.g. `ARENA_GAME`, `ARENA_SEED`), or an `arena.yml` config file in the current directory. See `arena.example.yml`.
+Flags can be supplied via CLI, environment variables (`ARENA_<FLAG>`, hyphens become underscores — e.g. `ARENA_SEED`), or an `arena.yml` config file in the current directory.
 
 ## License
 

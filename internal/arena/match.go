@@ -3,6 +3,7 @@ package arena
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,12 +63,6 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 		lines := referee.GlobalInfoFor(player)
 		for _, line := range lines {
 			player.SendInputLine(line)
-		}
-		if runner.Options.Debug {
-			fmt.Fprintf(os.Stderr, "--- p%d global input ---\n", player.GetIndex())
-			for _, line := range lines {
-				fmt.Fprintln(os.Stderr, line)
-			}
 		}
 	}
 
@@ -159,26 +154,12 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 				for _, line := range lines {
 					player.SendInputLine(line)
 				}
-				if runner.Options.Debug {
-					side := "left"
-					if player.GetIndex() == 1 {
-						side = "right"
-					}
-					fmt.Fprintf(os.Stderr, "--- turn %d %s input ---\n", turn, side)
-					for _, line := range lines {
-						fmt.Fprintln(os.Stderr, line)
-					}
-				}
 				_ = player.Execute()
 				if outs := player.GetOutputs(); len(outs) > 0 {
 					playerOutputs[player.GetIndex()] = strings.Join(outs, "\n")
 				}
 				if runner.Options.Debug {
-					side := "left"
-					if player.GetIndex() == 1 {
-						side = "right"
-					}
-					fmt.Fprintf(os.Stderr, "turn %d %s output: %s\n", turn, side, strings.Join(player.GetOutputs(), " | "))
+					writeDebugStderr(os.Stderr, turn, player.GetIndex(), controllers[player.GetIndex()].TakeStderr())
 				}
 			}
 		}
@@ -389,7 +370,7 @@ func attachCommandPlayers(options MatchOptions, players []Player) ([]*commandPla
 	sideBotBins := []string{options.BlueBotBin, options.RedBotBin}
 
 	for sideIndex, path := range sideBotBins {
-		cp, err := newCommandPlayer(players[sideIndex], path)
+		cp, err := newCommandPlayer(players[sideIndex], path, options.Debug)
 		if err != nil {
 			for _, controller := range controllers {
 				_ = controller.Close()
@@ -529,4 +510,22 @@ func lossReasonFor(player Player, winner, playerIndex int) LossReason {
 		return LossReasonScore
 	}
 	return LossReasonNone
+}
+
+// writeDebugStderr writes the lines a bot produced on its own stderr during
+// the just-completed turn under a `--- turn N <side> stderr ---` header.
+// Side is "left" for player index 0, "right" for index 1. No-op when the
+// bot stayed silent.
+func writeDebugStderr(w io.Writer, turn, playerIdx int, lines []string) {
+	if len(lines) == 0 {
+		return
+	}
+	side := "left"
+	if playerIdx == 1 {
+		side = "right"
+	}
+	_, _ = fmt.Fprintf(w, "--- turn %d %s stderr ---\n", turn, side)
+	for _, line := range lines {
+		_, _ = fmt.Fprintln(w, line)
+	}
 }

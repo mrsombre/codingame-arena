@@ -10,9 +10,29 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-// SerializeUsage returns the help text shown for `arena help serialize`.
+// SerializeUsage returns the help text shown for `arena help game serialize`.
 func SerializeUsage(fs *pflag.FlagSet) string {
-	return arena.CommandUsage("serialize", "Print initial game input for first turn for a given seed.", fs, "")
+	extra := `Positional args:
+  arena game <game> serialize <seed> [OPTIONS]
+    <game>   engine slug (e.g. winter2026, spring2020).
+    <seed>   RNG seed as int64 (decimal, signed). Same seed → same map and
+             initial state, every time. Accepts an optional "seed=" prefix
+             for paste compatibility with debug logs (e.g. seed=42).
+
+Output:
+  Two newline-terminated blocks on stdout, byte-for-byte the bytes a bot
+  reads on stdin during a real match (no extra framing):
+    1. Global init info — constants and map data sent once at game start.
+    2. First-frame info — per-turn state for turn 0.
+  Pipe straight into a bot binary to drive a single-turn invocation:
+      arena game winter2026 serialize 42 | bin/bot-winter2026-cpp
+
+Use cases:
+  - Inspect an initial map without spinning up the full match runner.
+  - Capture deterministic fixtures for unit tests (seeds reproduce maps).
+  - Smoke-test a bot's parsing on a fresh seed before running a batch.
+  - Debug fog-of-war / side-specific input differences with --player=0/1.`
+	return arena.CommandUsage("game <game> serialize <seed>", "Print the bot-stdin bytes (globals + turn-0 frame) for a given engine seed.", fs, extra)
 }
 
 // Serialize is the entry point for the "serialize" subcommand. It creates a

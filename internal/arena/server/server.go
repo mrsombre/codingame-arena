@@ -33,7 +33,6 @@ func gameOptionsViper(opts map[string]string) *viper.Viper {
 
 // Options configures a Handler built by New.
 type Options struct {
-	Factory   arena.GameFactory
 	Factories map[string]arena.GameFactory
 	Assets    fs.FS
 	TraceDir  string
@@ -74,9 +73,6 @@ type factoryResolver struct {
 
 func newFactoryResolver(opts Options) factoryResolver {
 	factories := make(map[string]arena.GameFactory)
-	if opts.Factory != nil {
-		factories[opts.Factory.Name()] = opts.Factory
-	}
 	for name, factory := range opts.Factories {
 		if factory != nil {
 			factories[name] = factory

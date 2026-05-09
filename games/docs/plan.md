@@ -124,7 +124,7 @@ Download the latest CodinGame replays for this game and re-simulate them
 through the engine:
 
 ```
-bin/arena replay mrsombre --game <game>
+bin/arena replay <game> mrsombre
 ```
 
 Expected outcome: zero `skipped-mismatch` entries. Discrepancies surface
@@ -149,7 +149,7 @@ following the `winter2026` example.
 Run a batch of local matches to exercise the engine + bots end-to-end:
 
 ```
-bin/arena --game=<game> \
+bin/arena run <game> \
     --blue=./bin/bot-<game>-cpp \
     --red=./bin/bot-<game>-py \
     --seed=100030005000700089 \
@@ -169,7 +169,7 @@ not the ceiling.
 
 ### 13. Analyzer
 
-Implement `TraceMetricAnalyzer` so `arena analyze --game <game>` reports
+Implement `TraceMetricAnalyzer` so `arena analyze <game>` reports
 per-turn metric counts derived from the traces produced in phase 12.
 This closes the loop: replays → traces → metrics → rendered report.
 

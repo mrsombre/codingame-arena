@@ -2,12 +2,12 @@
 
 Run one or more match simulations between two player binaries.
 
-`run` is the implicit default — `arena --blue=... --red=...` is equivalent to `arena run --blue=... --red=...`.
+The active game is the first positional argument: `arena run <game> [OPTIONS]`.
 
 ## Quick start
 
 ```shell
-bin/arena --game=winter2026 \
+bin/arena run winter2026 \
   --blue=bin/bot-winter2026-cpp \
   --red=bin/bot-winter2026-py
 
@@ -33,7 +33,7 @@ bin/arena --game=winter2026 \
 | `--trace-dir`         | `./traces`       | Directory for trace files                                    |
 | `--output-matches`    | `false`          | Include per-match results in JSON output                     |
 | `--verbose`           | `false`          | Print full JSON instead of short summary                     |
-| `--debug`             | `false`          | Single match, fixed sides, bot stderr passthrough            |
+| `--debug`             | `false`          | Single match, fixed sides, full trace JSON to stdout, per-turn bot stderr to terminal |
 
 ## Output
 
@@ -47,9 +47,21 @@ Timing: avg_first_response=<blue>x<red> avg_turn_response=<blue>x<red>
 
 Win/loss/draw counts are from blue's (our) perspective.
 
+**Progress** (stderr): for batches larger than one match, the runner prints `Completed N matches` on stderr at every milestone — every 100 matches when `--simulations` ≤ 1000, every 1000 matches above that. Goes to stderr so it doesn't mix with the summary / JSON / trace on stdout.
+
 **Verbose JSON** (`--verbose`): full summary with per-metric averages, runner metadata, bad-command list, and the five worst losses for blue.
 
-**Debug** (`--debug`): forces `--simulations=1` and `--parallel=1`, prints bot stderr to your terminal, and emits the match trace JSON to stdout.
+**Debug** (`--debug`): forces `--simulations=1` and `--parallel=1`, locks sides (no swap), and emits the match's full trace JSON to stdout — same shape as the files [`--trace`](trace.md) writes (`type: "trace"`, populated `setup` / `gameInput` / `state` / `traces`). Nothing is written to `--trace-dir` even if `--trace` is also set; pipe to `jq` to inspect, or to a file (`> traces/debug.json`) and load it in [`arena serve`](serve.md).
+
+Each turn, anything either bot writes to its own stderr is captured and printed to your terminal under a header:
+
+```
+--- turn <N> <side> stderr ---
+<line>
+<line>
+```
+
+`<side>` is `left` (player 0) or `right` (player 1). Silent turns produce no header — only sides that wrote stderr show up. The trace JSON on stdout is unaffected, so `arena run --debug ... 2>/dev/null | jq .` gives you the trace alone, and `arena run --debug ... >/dev/null` gives you only the bot logs.
 
 ## Side swapping
 
