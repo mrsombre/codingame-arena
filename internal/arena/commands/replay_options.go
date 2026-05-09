@@ -47,12 +47,12 @@ func parseReplayOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (Repla
 	var opts ReplayOptions
 
 	if fs.NArg() < 1 {
-		return ReplayOptions{}, fmt.Errorf("usage: arena replay <game> <username> [<id|url>[,<id|url>...]]")
+		return ReplayOptions{}, fmt.Errorf("<username> is required; usage: arena replay <game> <username> [<id|url>[,<id|url>...]]")
 	}
 
 	username := strings.TrimSpace(fs.Arg(0))
 	if username == "" {
-		return ReplayOptions{}, fmt.Errorf("username is required")
+		return ReplayOptions{}, fmt.Errorf("<username> must not be blank")
 	}
 	opts.Username = username
 

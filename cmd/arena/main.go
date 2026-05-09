@@ -90,47 +90,47 @@ func execute(args []string, stdout io.Writer) error {
 	return spec.handler(rest, stdout, factory, fs, v)
 }
 
-func commandSet() map[string]commandSpec {
-	return map[string]commandSpec{
-		"run": {
-			addFlags:     commands.AddRunFlags,
-			handler:      commands.Run,
-			needsFactory: true,
-			argsSpec:     "<game>",
-			usage:        commands.RunUsage,
-		},
-		"analyze": {
-			addFlags:     commands.AddAnalyzeFlags,
-			handler:      commands.Analyze,
-			needsFactory: true,
-			argsSpec:     "<game>",
-			usage:        commands.AnalyzeUsage,
-		},
-		"serve": {
-			addFlags: commands.AddServeFlags,
-			handler:  commands.Serve,
-			usage:    commands.ServeUsage,
-		},
-		"game": {
-			subcommands: map[string]commandSpec{
-				"serialize": {
-					addFlags:     commands.AddSerializeFlags,
-					handler:      commands.Serialize,
-					needsFactory: true,
-					argsSpec:     "<game> <seed>",
-					usage:        commands.SerializeUsage,
-				},
+// registry is the dispatch table built once at package init. Lookups are
+// read-only; the table is shared by execute, selectCommand, and printHelp.
+var registry = map[string]commandSpec{
+	"run": {
+		addFlags:     commands.AddRunFlags,
+		handler:      commands.Run,
+		needsFactory: true,
+		argsSpec:     "<game>",
+		usage:        commands.RunUsage,
+	},
+	"analyze": {
+		addFlags:     commands.AddAnalyzeFlags,
+		handler:      commands.Analyze,
+		needsFactory: true,
+		argsSpec:     "<game>",
+		usage:        commands.AnalyzeUsage,
+	},
+	"serve": {
+		addFlags: commands.AddServeFlags,
+		handler:  commands.Serve,
+		usage:    commands.ServeUsage,
+	},
+	"game": {
+		subcommands: map[string]commandSpec{
+			"serialize": {
+				addFlags:     commands.AddSerializeFlags,
+				handler:      commands.Serialize,
+				needsFactory: true,
+				argsSpec:     "<game> <seed>",
+				usage:        commands.SerializeUsage,
 			},
-			subUsage: gameSubUsage,
 		},
-		"replay": {
-			addFlags:     commands.AddReplayFlags,
-			handler:      commands.Replay,
-			needsFactory: true,
-			argsSpec:     "<game> <username> [<id|url>[,<id|url>...]]",
-			usage:        commands.ReplayUsage,
-		},
-	}
+		subUsage: gameSubUsage,
+	},
+	"replay": {
+		addFlags:     commands.AddReplayFlags,
+		handler:      commands.Replay,
+		needsFactory: true,
+		argsSpec:     "<game> <username> [<id|url>[,<id|url>...]]",
+		usage:        commands.ReplayUsage,
+	},
 }
 
 func normalizeCommand(args []string) (string, []string) {
@@ -142,14 +142,13 @@ func normalizeCommand(args []string) (string, []string) {
 }
 
 func selectCommand(command string, args []string) (commandSpec, string, []string, error) {
-	spec, ok := commandSet()[command]
+	spec, ok := registry[command]
 	if !ok {
 		return commandSpec{}, "", nil, fmt.Errorf("unknown command %q; run `arena help` for usage", command)
 	}
-	if len(spec.subcommands) == 0 {
-		return spec, command, args, nil
-	}
-	if len(args) == 0 {
+	// No subcommands or no candidate token → return the parent spec; the
+	// caller routes the empty-handler case to subUsage.
+	if len(spec.subcommands) == 0 || len(args) == 0 {
 		return spec, command, args, nil
 	}
 
@@ -168,7 +167,7 @@ func printHelp(stdout io.Writer, args []string, games []string) error {
 		return writeLine(stdout, arena.Usage(games))
 	}
 
-	spec, ok := commandSet()[args[0]]
+	spec, ok := registry[args[0]]
 	if !ok {
 		return fmt.Errorf("unknown command %q; run `arena help` for usage", args[0])
 	}
@@ -210,19 +209,17 @@ Use "arena help game <subcommand>" for the full per-subcommand help.`)
 
 // popGame consumes the leading game positional and returns the matching
 // factory along with the remaining args. Required by every subcommand whose
-// spec sets needsFactory. argsSpec is the positional signature shown in the
-// usage-error message; defaults to "<game>" when empty.
+// spec sets needsFactory. argsSpec is the full positional signature shown
+// in usage-error messages (e.g. "<game> <seed>") and is required.
 func popGame(path, argsSpec string, args, games []string) (arena.GameFactory, []string, error) {
-	if argsSpec == "" {
-		argsSpec = "<game>"
-	}
+	available := strings.Join(games, ", ")
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
-		return nil, nil, fmt.Errorf("usage: arena %s %s [OPTIONS]; available games: %s", path, argsSpec, strings.Join(games, ", "))
+		return nil, nil, fmt.Errorf("usage: arena %s %s [OPTIONS]; available games: %s", path, argsSpec, available)
 	}
 	name := args[0]
 	f := arena.GetFactory(name)
 	if f == nil {
-		return nil, nil, fmt.Errorf("unknown game %q; available: %s", name, strings.Join(games, ", "))
+		return nil, nil, fmt.Errorf("unknown game %q; available: %s", name, available)
 	}
 	return f, args[1:], nil
 }
