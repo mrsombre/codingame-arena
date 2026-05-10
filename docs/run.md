@@ -23,7 +23,7 @@ bin/arena run winter2026 \
 | `-b, --blue` *(required)* | —            | Our bot binary                                               |
 | `-r, --red`           | `./bin/opponent` | Opponent bot binary                                          |
 | `-n, --simulations`   | `100`            | Number of matches to run                                     |
-| `-p, --parallel`      | `NumCPU`         | Worker threads                                               |
+| `-p, --parallel`      | `floor((NumCPU-2)/2)` (min 1) | Worker threads — arena keeps 2 cores, each match uses 2 (blue + red bots) |
 | `-s, --seed`          | current time     | Base RNG seed (deterministic when set)                       |
 | `--seedx`             | `1`              | Seed increment per match (`seed_i = seed + i*seedx`)         |
 | `--max-turns`         | `200`            | Maximum turns per match                                      |
