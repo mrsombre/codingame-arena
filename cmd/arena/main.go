@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -33,6 +34,10 @@ type commandSpec struct {
 }
 
 func main() {
+	// Cap the Go scheduler so arena's own work yields the host's remaining
+	// cores to the bot subprocesses spawned per match. Two threads is enough
+	// for the engine + I/O fanout while staying well under NumCPU.
+	runtime.GOMAXPROCS(2)
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 

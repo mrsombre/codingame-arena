@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -57,8 +58,21 @@ type commandPlayer struct {
 	stderrBuf         []string
 }
 
+// singleThreadEnv pins common runtime/library thread-pool sizes to 1 so each
+// bot subprocess saturates at most one core. Arena runs many matches in
+// parallel, so a bot that fans out over OpenMP/BLAS/Go scheduler threads can
+// stampede the host. Setting these has no effect on bots that don't link the
+// matching library.
+var singleThreadEnv = []string{
+	"GOMAXPROCS=1",
+	"OMP_NUM_THREADS=1",
+	"OPENBLAS_NUM_THREADS=1",
+	"MKL_NUM_THREADS=1",
+}
+
 func newCommandPlayer(player Player, path string, captureStderr bool) (*commandPlayer, error) {
 	cmd := exec.Command(path)
+	cmd.Env = append(os.Environ(), singleThreadEnv...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err

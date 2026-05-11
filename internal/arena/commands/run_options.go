@@ -18,7 +18,7 @@ func AddRunFlags(fs *pflag.FlagSet) {
 	fs.StringP("blue", "b", "", "Our bot executable (required); speaks the CodinGame stdin/stdout protocol")
 	fs.StringP("red", "r", filepath.Clean("./bin/opponent"), "Opponent bot executable")
 	fs.IntP("simulations", "n", 100, "Number of matches to play in the batch")
-	fs.IntP("parallel", "p", runtime.NumCPU(), "Concurrent match workers (default: number of CPU cores)")
+	fs.IntP("parallel", "p", defaultParallel(), "Concurrent match workers (default: floor((NumCPU-2)/2), min 1; reserves 2 cores for arena and 2 cores per match for blue+red bots)")
 	// Override the resolved integer (e.g. 10) with a zero so pflag suppresses
 	// the auto-rendered "(default N)" suffix; the description explains it.
 	fs.Lookup("parallel").DefValue = "0"
@@ -117,6 +117,17 @@ func validateRunOptions(opts RunOptions) error {
 		return err
 	}
 	return nil
+}
+
+// defaultParallel reserves 2 cores for arena (GOMAXPROCS=2 in main) and 2
+// cores per match for the blue/red bot subprocesses, so
+// 2 + parallel*2 ≈ NumCPU. Floors to 1 on hosts with fewer than 4 cores.
+func defaultParallel() int {
+	n := (runtime.NumCPU() - 2) / 2
+	if n < 1 {
+		return 1
+	}
+	return n
 }
 
 func checkBotBinary(flag, path string) error {
