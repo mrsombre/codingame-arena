@@ -8,6 +8,7 @@ import (
 
 	"github.com/mrsombre/codingame-arena/games/spring2026"
 	"github.com/mrsombre/codingame-arena/internal/arena"
+	"github.com/mrsombre/codingame-arena/internal/util/javarand"
 )
 
 type factory struct{}
@@ -36,9 +37,12 @@ func (f *factory) MaxTurns() int { return 300 }
 func (f *factory) TurnModel() arena.TurnModel { return arena.FlatTurnModel{} }
 
 func (f *factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []arena.Player) {
-	game := NewGame(seed, f.ResolveLeague(options))
-	players := []arena.Player{NewPlayer(0), NewPlayer(1)}
-	return NewReferee(game), players
+	league := f.ResolveLeague(options)
+	p0 := NewPlayer(0)
+	p1 := NewPlayer(1)
+	board := CreateMap([]*Player{p0, p1}, javarand.New(seed), league)
+	board.Seed = seed
+	return NewReferee(board), []arena.Player{p0, p1}
 }
 
 // ResolveLeague returns the league level the factory will run with for the
