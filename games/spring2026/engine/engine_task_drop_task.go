@@ -2,7 +2,11 @@
 // Source: SpringChallenge2026-Troll/src/main/java/engine/task/DropTask.java
 package engine
 
-import "regexp"
+import (
+	"regexp"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
+)
 
 var dropRe = regexp.MustCompile(`(?i)^\s*(DROP)\s+(\d+)\s*$`)
 
@@ -53,8 +57,10 @@ public void apply(Board board, ArrayList<Task> concurrentTasks) {
 */
 
 func (t *DropTask) Apply(board *Board, concurrent []Task) {
+	var dropped [ItemsCount]int
 	for i := 0; i < ItemsCount; i++ {
 		item := Item(i)
+		dropped[i] = t.Unit.Inv.GetItemCount(item)
 		t.Player.Inv.SetItem(item, t.Player.Inv.GetItemCount(item)+t.Unit.Inv.GetItemCount(item))
 		t.Unit.Inv.SetItem(item, 0)
 	}
@@ -64,4 +70,8 @@ func (t *DropTask) Apply(board *Board, concurrent []Task) {
 		itemText += "s"
 	}
 	t.Player.AddSummary("troll " + itoa(t.Unit.ID) + " dropped " + itoa(-t.GetDeltaCarry()) + " " + itemText + " to the shack")
+	board.tracePlayer(t.Player.GetIndex(), arena.MakeTurnTrace(TraceDrop, DropData{
+		Unit:  t.Unit.ID,
+		Items: dropped,
+	}))
 }

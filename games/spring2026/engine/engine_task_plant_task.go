@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
 var plantRe = regexp.MustCompile(`(?i)^\s*(PLANT)\s+(\d+)\s+(\w+)\s*$`)
@@ -126,6 +128,12 @@ func (t *PlantTask) Apply(board *Board, concurrent []Task) {
 				}
 				pt.Applied = true
 				pt.Player.AddSummary("troll " + itoa(pt.Unit.ID) + " planted a " + pt.Type.String())
+				cell := pt.Unit.Cell
+				board.tracePlayer(pt.Player.GetIndex(), arena.MakeTurnTrace(TracePlant, PlantData{
+					Unit: pt.Unit.ID,
+					Cell: [2]int{cell.X, cell.Y},
+					Type: pt.Type.String(),
+				}))
 			}
 		} else {
 			for _, task := range byCell {

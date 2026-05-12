@@ -5,6 +5,8 @@ package engine
 import (
 	"strconv"
 	"strings"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
 // Random abstracts the two java.util.Random-shaped RNGs the engine can run
@@ -47,6 +49,13 @@ type Board struct {
 	ended          bool
 	stalled        bool
 	Summary        []string
+
+	// Traces accumulates per-turn structured events for the current
+	// PerformGameUpdate call, partitioned by player. Reset at
+	// ResetGameTurnData so MSG/WAIT events emitted during ParsePlayerOutputs
+	// (before PerformGameUpdate) live in the same turn's bucket as the
+	// task-applied MOVE/HARVEST/... events.
+	Traces [2][]arena.TurnTrace
 }
 
 // NewBoard creates a fresh empty grid. CreateMap runs map generation on top.

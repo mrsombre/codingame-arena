@@ -7,3 +7,6 @@ import _ "embed"
 
 //go:embed rules.md
 var Rules string
+
+//go:embed trace.md
+var Trace string

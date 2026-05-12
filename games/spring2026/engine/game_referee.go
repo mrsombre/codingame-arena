@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
@@ -154,6 +155,30 @@ func (r *Referee) killPlayer(player *Player, message string) {
 
 func (r *Referee) ResetGameTurnData() {
 	r.pending = nil
+	r.Board.ResetTraces()
+}
+
+// TurnTraces drains the board's per-turn trace buffer. Returns per-player
+// copies so the arena runner owns the resulting slices independently of the
+// engine's per-turn churn.
+func (r *Referee) TurnTraces(_ int, _ []arena.Player) [2][]arena.TurnTrace {
+	var out [2][]arena.TurnTrace
+	for i, slot := range r.Board.Traces {
+		if len(slot) == 0 {
+			continue
+		}
+		out[i] = make([]arena.TurnTrace, len(slot))
+		copy(out[i], slot)
+	}
+	return out
+}
+
+// DecorateTraceTurn returns the per-turn state payload (inventories, troll
+// roster, plants). Called after command parsing and before
+// PerformGameUpdate by the arena runner — values reflect what bots saw on
+// stdin this turn.
+func (r *Referee) DecorateTraceTurn(turn int, _ []arena.Player) json.RawMessage {
+	return r.Board.DecorateTraceTurn(turn)
 }
 
 func (r *Referee) Ended() bool { return r.Board.ended }

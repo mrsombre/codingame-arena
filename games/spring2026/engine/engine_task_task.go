@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
 /*
@@ -151,6 +153,7 @@ func ParseTask(player *Player, board *Board, command string, league int, usedUni
 		return nil
 	}
 	if strings.EqualFold(trimmed, "WAIT") {
+		board.tracePlayer(player.GetIndex(), arena.TurnTrace{Type: TraceWait})
 		return nil
 	}
 

@@ -2,7 +2,11 @@
 // Source: SpringChallenge2026-Troll/src/main/java/engine/task/TaskManager.java
 package engine
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
+)
 
 /*
 Java: SpringChallenge2026-Troll/src/main/java/engine/task/TaskManager.java:9-40
@@ -37,6 +41,9 @@ func (m *TaskManager) ParseTasks(player *Player, board *Board, command string, l
 	for _, comm := range strings.Split(command, ";") {
 		if len(comm) >= 4 && strings.EqualFold(comm[:4], "MSG ") {
 			player.SetMessage(strings.TrimSpace(comm[4:]))
+			board.tracePlayer(player.GetIndex(), arena.MakeTurnTrace(TraceMessage, MessageData{
+				Text: player.GetMessage(),
+			}))
 			continue
 		}
 		t := ParseTask(player, board, comm, league, usedUnits)

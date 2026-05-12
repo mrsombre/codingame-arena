@@ -2,7 +2,11 @@
 // Source: SpringChallenge2026-Troll/src/main/java/engine/task/PickTask.java
 package engine
 
-import "regexp"
+import (
+	"regexp"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
+)
 
 var pickRe = regexp.MustCompile(`(?i)^\s*(PICK)\s+(\d+)\s+(\w+)\s*$`)
 
@@ -75,6 +79,10 @@ func (t *PickTask) Apply(board *Board, concurrent []Task) {
 		t.Unit.Inv.IncrementItem(t.Type)
 		t.Applied = true
 		t.Player.AddSummary("troll " + itoa(t.Unit.ID) + " picked 1 " + t.Type.String())
+		board.tracePlayer(t.Player.GetIndex(), arena.MakeTurnTrace(TracePick, PickData{
+			Unit: t.Unit.ID,
+			Type: t.Type.String(),
+		}))
 	} else {
 		t.Player.AddError(NewInputError(
 			"troll "+itoa(t.Unit.ID)+" can't pick "+t.Type.String()+", out of stock",

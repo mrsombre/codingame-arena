@@ -21,6 +21,8 @@ func (f *factory) Name() string { return "spring2026" }
 
 func (f *factory) Rules() string { return spring2026.Rules }
 
+func (f *factory) Trace() string { return spring2026.Trace }
+
 // PuzzleID is 0: Troll Farm is a community contest, not under the
 // CodinGame/ GitHub org, and the CodinGame puzzle metadata is not yet
 // reconciled with the arena replay machinery.

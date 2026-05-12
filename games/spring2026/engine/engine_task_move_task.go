@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
 /*
@@ -191,6 +193,10 @@ func (t *MoveTask) Apply(board *Board, concurrent []Task) {
 				m.Applied = true
 				m.Player.AddSummary("troll " + itoa(m.Unit.ID) +
 					" moved to (" + itoa(m.Unit.Cell.X) + ", " + itoa(m.Unit.Cell.Y) + ")")
+				board.tracePlayer(m.Player.GetIndex(), arena.MakeTurnTrace(TraceMove, MoveData{
+					Unit: m.Unit.ID,
+					To:   [2]int{m.Unit.Cell.X, m.Unit.Cell.Y},
+				}))
 			}
 		}
 	}

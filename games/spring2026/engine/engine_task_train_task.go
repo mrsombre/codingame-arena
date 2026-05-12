@@ -5,6 +5,8 @@ package engine
 import (
 	"regexp"
 	"strconv"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
 var trainRe = regexp.MustCompile(`(?i)^\s*(TRAIN)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$`)
@@ -114,4 +116,8 @@ func (t *TrainTask) Apply(board *Board, concurrent []Task) {
 	board.AddUnit(u)
 	t.Applied = true
 	t.Player.AddSummary("trained a troll")
+	board.tracePlayer(t.Player.GetIndex(), arena.MakeTurnTrace(TraceTrain, TrainData{
+		Unit:    u.ID,
+		Talents: t.Talents,
+	}))
 }

@@ -2,7 +2,11 @@
 // Source: SpringChallenge2026-Troll/src/main/java/engine/task/MineTask.java
 package engine
 
-import "regexp"
+import (
+	"regexp"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
+)
 
 var mineRe = regexp.MustCompile(`(?i)^\s*(MINE)\s+(\d+)\s*$`)
 
@@ -49,4 +53,12 @@ func (t *MineTask) Apply(board *Board, concurrent []Task) {
 	t.Unit.Mine()
 	t.Applied = true
 	t.Player.AddSummary("troll " + itoa(t.Unit.ID) + " collected " + itoa(t.GetDeltaCarry()) + " " + ItemIRON.String())
+	if t.GetDeltaCarry() > 0 {
+		cell := t.Unit.Cell
+		board.tracePlayer(t.Player.GetIndex(), arena.MakeTurnTrace(TraceMine, MineData{
+			Unit: t.Unit.ID,
+			Cell: [2]int{cell.X, cell.Y},
+			Iron: t.GetDeltaCarry(),
+		}))
+	}
 }

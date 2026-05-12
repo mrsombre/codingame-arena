@@ -2,7 +2,11 @@
 // Source: SpringChallenge2026-Troll/src/main/java/engine/task/HarvestTask.java
 package engine
 
-import "regexp"
+import (
+	"regexp"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
+)
 
 var harvestRe = regexp.MustCompile(`(?i)^\s*(HARVEST)\s+(\d+)\s*$`)
 
@@ -91,6 +95,15 @@ func (t *HarvestTask) Apply(board *Board, concurrent []Task) {
 			}
 			task.GetPlayer().AddSummary("troll " + itoa(task.GetUnit().ID) +
 				" harvested " + itoa(task.GetDeltaCarry()) + " " + itemText)
+			if task.GetDeltaCarry() > 0 {
+				cell := task.GetCell()
+				board.tracePlayer(task.GetPlayer().GetIndex(), arena.MakeTurnTrace(TraceHarvest, HarvestData{
+					Unit:   task.GetUnit().ID,
+					Cell:   [2]int{cell.X, cell.Y},
+					Type:   plant.Type.String(),
+					Amount: task.GetDeltaCarry(),
+				}))
+			}
 		}
 	}
 }

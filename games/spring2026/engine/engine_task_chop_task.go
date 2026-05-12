@@ -2,7 +2,11 @@
 // Source: SpringChallenge2026-Troll/src/main/java/engine/task/ChopTask.java
 package engine
 
-import "regexp"
+import (
+	"regexp"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
+)
 
 var chopRe = regexp.MustCompile(`(?i)^\s*(CHOP)\s+(\d+)\s*$`)
 
@@ -90,6 +94,14 @@ func (t *ChopTask) Apply(board *Board, concurrent []Task) {
 			} else {
 				task.GetPlayer().AddSummary("troll " + itoa(task.GetUnit().ID) + " damaged a tree")
 			}
+			cell := task.GetCell()
+			board.tracePlayer(task.GetPlayer().GetIndex(), arena.MakeTurnTrace(TraceChop, ChopData{
+				Unit:   task.GetUnit().ID,
+				Cell:   [2]int{cell.X, cell.Y},
+				Damage: task.GetUnit().ChopPower,
+				Wood:   task.GetDeltaCarry(),
+				Killed: plant.IsDead(),
+			}))
 		}
 	}
 }
