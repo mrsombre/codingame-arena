@@ -14,11 +14,11 @@ Two commands write traces:
 This page describes the cross-game envelope (file naming, top-level fields, per-turn shape). The game-specific payloads (`setup` lines, `gameInput` lines, `state` shape, `traces[].type` event labels) are documented in each game's own `trace.md`, bundled into the arena binary so it can be read without checking out the source:
 
 ```shell
-bin/arena game winter2026 trace | head
-bin/arena game spring2021 trace | less
+bin/arena game trace winter2026 | head
+bin/arena game trace spring2021 | less
 ```
 
-See [`game.md`](game.md#trace) for the `arena game <game> trace` action; the same markdown lives in-repo at `games/<game>/trace.md`.
+See [`game.md`](game.md#trace) for the `arena game trace <game>` action; the same markdown lives in-repo at `games/<game>/trace.md`.
 
 ## Quick start
 

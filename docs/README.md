@@ -12,7 +12,7 @@ For a project overview, see the [top-level README](../README.md).
 | [`replay`](replay.md)   | Download replay JSON and convert it into trace files     |
 | [`trace`](trace.md)     | On-disk trace file format produced by `run` and `replay` |
 | [`analyze`](analyze.md) | Aggregate trace outcomes and game-owned metrics          |
-| [`game`](game.md)       | Per-game helpers: `rules`, `trace`, `serialize`          |
+| [`game`](game.md)       | Per-game helpers: `rules`, `trace`, `serialize`, `list`  |
 | [`serve`](serve.md)     | Serve the embedded web viewer                            |
 
 ## Typical flow
@@ -21,13 +21,14 @@ For a project overview, see the [top-level README](../README.md).
 arena run <game> --trace                 ─▶ traces/trace-<id>-<n>.json   (self-play)
 arena replay <game> <user> [ids]         ─▶ replays/<id>.json + traces/replay-<id>.json
 arena analyze <game>                     ─▶ outcome and game-metric report
-arena game <game> rules                  ─▶ bundled rules.md to stdout
-arena game <game> trace                  ─▶ bundled per-game trace.md to stdout
-arena game <game> serialize <seed>       ─▶ first-turn stdin for a given seed
+arena game rules <game>                  ─▶ bundled rules.md to stdout
+arena game trace <game>                  ─▶ bundled per-game trace.md to stdout
+arena game serialize <game> [--seed N]   ─▶ first-turn stdin (timestamp seed unless --seed is given)
+arena game list                          ─▶ every engine currently linked into the binary
 arena serve                              ─▶ web viewer over both dirs
 ```
 
-`run`, `replay`, and `analyze` take the game slug as their first positional argument. Game-specific helpers live under `arena game <game> <action>` (currently `rules`, `trace`, `serialize`) — see [game.md](game.md). `serve` lists every registered game.
+`run`, `replay`, and `analyze` take the game slug as their first positional argument. Game-specific helpers live under `arena game <action> <game>` — action first, game second, matching the rest of the CLI (currently `rules`, `trace`, `serialize`) — see [game.md](game.md). The standalone `arena game list` introspects the live registry; the banner shown by `bin/arena` uses the chronological order pinned in `games/game.go`. `serve` lists every registered game.
 
 ## Configuration
 

@@ -10,7 +10,7 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-// AddRulesFlags registers flags for `arena game <game> rules`. The action
+// AddRulesFlags registers flags for `arena game rules <game>`. The action
 // has no flags today; the function exists so the dispatch table can call
 // it uniformly.
 func AddRulesFlags(_ *pflag.FlagSet) {}
@@ -18,7 +18,7 @@ func AddRulesFlags(_ *pflag.FlagSet) {}
 // RulesUsage returns the help text shown for `arena help game rules`.
 func RulesUsage(fs *pflag.FlagSet) string {
 	extra := `Positional args:
-  arena game <game> rules    No further positionals or flags.
+  arena game rules <game>    No further positionals or flags.
 
 Output:
   Writes the bundled rules.md for <game> to stdout, verbatim. The markdown
@@ -29,14 +29,14 @@ Output:
 Use cases:
   - Refresh on a game's rules without leaving the terminal or finding the
     repo on disk.
-  - Pipe to a pager (` + "`arena game winter2026 rules | less`" + `) or to a markdown
-    renderer (` + "`arena game winter2026 rules | glow -`" + `).
+  - Pipe to a pager (` + "`arena game rules winter2026 | less`" + `) or to a markdown
+    renderer (` + "`arena game rules winter2026 | glow -`" + `).
   - Feed to an LLM agent so it can read the rules straight from the binary
     that runs the engine, no sidecar files needed.`
-	return arena.CommandUsage("game <game> rules", "Print the bundled rules.md for a game.", fs, extra)
+	return arena.CommandUsage("game rules <game>", "Print the bundled rules.md for a game.", fs, extra)
 }
 
-// Rules is the entry point for `arena game <game> rules`.
+// Rules is the entry point for `arena game rules <game>`.
 func Rules(_ []string, stdout io.Writer, factory arena.GameFactory, _ *pflag.FlagSet, _ *viper.Viper) error {
 	provider, ok := factory.(arena.RulesProvider)
 	if !ok {

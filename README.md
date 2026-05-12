@@ -33,7 +33,7 @@ Timing: avg_first_response=29msx198ms avg_turn_response=0msx0ms
 | Winter Challenge 2026 | `winter2026`  | `games/winter2026/` |
 | Spring Challenge 2020 | `spring2020`  | `games/spring2020/` |
 
-The game slug is the first positional argument for every command that needs a game, e.g. `arena run winter2026 ...`, `arena replay winter2026 mrsombre`, `arena game winter2026 rules`, `arena game winter2026 serialize <seed>`.
+The game slug is the first positional argument for top-level commands that need a game, e.g. `arena run winter2026 ...`, `arena replay winter2026 mrsombre`. Under `arena game`, the action comes first and the game second: `arena game rules winter2026`, `arena game serialize winter2026 --seed=42`. `arena game list` (no game slug) prints every engine currently registered in the binary.
 
 ## Commands
 
@@ -43,7 +43,7 @@ The game slug is the first positional argument for every command that needs a ga
 | `replay`  | Download replay JSON (`get`, `leaderboard` subcommands) |
 | `analyze` | Analyze trace outcomes and game-owned metrics           |
 | `serve`   | Serve the embedded web viewer                           |
-| `game`    | Per-game helpers: `rules`, `trace`, `serialize`         |
+| `game`    | Per-game helpers: `rules`, `trace`, `serialize`, `list` |
 
 Run `arena help <command>` for full flag listings.
 
