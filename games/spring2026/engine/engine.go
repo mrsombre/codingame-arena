@@ -8,7 +8,7 @@ import (
 
 	"github.com/mrsombre/codingame-arena/games/spring2026"
 	"github.com/mrsombre/codingame-arena/internal/arena"
-	"github.com/mrsombre/codingame-arena/internal/util/javarand"
+	"github.com/mrsombre/codingame-arena/internal/util/sha1prng"
 )
 
 type factory struct{}
@@ -40,7 +40,10 @@ func (f *factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []ar
 	league := f.ResolveLeague(options)
 	p0 := NewPlayer(0)
 	p1 := NewPlayer(1)
-	board := CreateMap([]*Player{p0, p1}, javarand.New(seed), league)
+	// SHA1PRNG matches the CG SDK's MultiplayerGameManager.getRandom(); plain
+	// java.util.Random would diverge on the very first map-height roll. See
+	// engine_board_seed_test.go for byte-for-byte parity coverage.
+	board := CreateMap([]*Player{p0, p1}, sha1prng.New(seed), league)
 	board.Seed = seed
 	return NewReferee(board), []arena.Player{p0, p1}
 }

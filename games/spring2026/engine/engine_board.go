@@ -5,9 +5,16 @@ package engine
 import (
 	"strconv"
 	"strings"
-
-	"github.com/mrsombre/codingame-arena/internal/util/javarand"
 )
+
+// Random abstracts the two java.util.Random-shaped RNGs the engine can run
+// against: javarand (plain java.util.Random) and sha1prng (CG SDK default).
+// Map generation calls NextInt(bound) and NextIntRange(origin, bound); the
+// concrete RNG is picked by the factory at game construction time.
+type Random interface {
+	NextInt(bound int) int
+	NextIntRange(origin, bound int) int
+}
 
 /*
 Java: SpringChallenge2026-Troll/src/main/java/engine/Board.java:19-30
@@ -28,7 +35,7 @@ type Board struct {
 	Width   int
 	Height  int
 	Grid    [][]*Cell // column-major: Grid[x][y], matching Java
-	Random  *javarand.Random
+	Random  Random
 	Players []*Player
 	Units   []*Unit
 	Plants  []*Plant
@@ -44,7 +51,7 @@ type Board struct {
 
 // NewBoard creates a fresh empty grid. CreateMap runs map generation on top.
 // It is private in Java; we keep it package-private here too (lowercase).
-func newBoard(width, height int, rng *javarand.Random) *Board {
+func newBoard(width, height int, rng Random) *Board {
 	b := &Board{Width: width, Height: height, Random: rng}
 	b.Grid = make([][]*Cell, width)
 	for x := 0; x < width; x++ {
@@ -113,7 +120,7 @@ public static Board createMap(List<Player> players, Random random, int league, .
 // CreateMap reproduces Java Board.createMap. Players are mutated in place
 // (init + setInventory) so the returned Board's Players slice points at the
 // same objects the caller already owns.
-func CreateMap(players []*Player, rng *javarand.Random, league int) *Board {
+func CreateMap(players []*Player, rng Random, league int) *Board {
 	for {
 		height := rng.NextInt(MAP_MAX_HEIGHT-MAP_MIN_HEIGHT+1) + MAP_MIN_HEIGHT
 		if league <= 2 {
