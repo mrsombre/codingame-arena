@@ -28,6 +28,7 @@ const (
 	downloadOutcomeSaved downloadOutcome = iota
 	downloadOutcomeSkippedExisting
 	downloadOutcomeSkippedPuzzle
+	downloadOutcomeSkippedPending
 	downloadOutcomeFailed
 )
 
@@ -42,6 +43,7 @@ type downloadSummary struct {
 	Saved           int
 	SkippedExisting int
 	SkippedPuzzle   int
+	SkippedPending  int
 	Failed          int
 }
 
@@ -96,13 +98,23 @@ Skipping rules:
   without -f — the existing replay JSON is kept and only the trace is
   rebuilt.
 
+Pending replays (HTTP 422 / UNAUTHORIZED):
+  CodinGame's last-battles list includes the gameId of an in-flight match
+  before its replay is published — fetches in that window return 422 with
+  body code "UNAUTHORIZED". These are tagged "pending" rather than failed,
+  and retried once at the end of the batch. Replays still pending after the
+  retry stay in the skipped-pending column; rerun the command to pick them
+  up once the match finishes.
+
 Output (per replay):
   [i/N] save  <id> (<bytes>)             freshly downloaded
   [i/N] trace <id> (league=L turns=T scores=A:B)   trace written
   [i/N] trace <id> MISMATCH (...)        verifier disagreement, trace still written
-  [i/N] skip  <id> (exists | puzzleId M != N)
+  [i/N] skip  <id> (exists | puzzleId M != N | pending: ...)
   [i/N] fail  <id>: <error>
-  done:   <saved>/<skipped-existing>/<skipped-puzzle>/<failed>  (out=...)
+  retry: <K> pending                      one block per batch, if any
+  [retry j/K] save|skip|fail <id> (...)   per pending id, same shape as above
+  done:   <saved>/<skipped-existing>/<skipped-puzzle>/<skipped-pending>/<failed>  (out=...)
   traces: <saved>/<saved-mismatch>/<skipped-existing>/<skipped-mismatch>/<failed>  (out=...)
 
 Files:
@@ -258,6 +270,28 @@ func runReplayDownloads(fetcher replayFetcher, cfg replayBatchConfig, stdout io.
 	dlResults := make([]downloadResult, 0, len(ids))
 	cvResults := make([]convertResult, 0, len(ids))
 	fetched := 0
+
+	maybeConvert := func(id int64, dl downloadResult, writeProgress func(convertResult)) {
+		if cfg.Factory == nil ||
+			dl.Outcome == downloadOutcomeFailed ||
+			dl.Outcome == downloadOutcomeSkippedPuzzle ||
+			dl.Outcome == downloadOutcomeSkippedPending {
+			return
+		}
+		// Convert whenever a replay file is on disk. Force-overwrite the
+		// trace when the download itself was a fresh save (the just-written
+		// replay supersedes any stale trace); otherwise honor the user's
+		// --force flag, so `delete traces && rerun replay` regenerates only
+		// the missing traces without re-downloading anything.
+		convertForce := cfg.Force || dl.Outcome == downloadOutcomeSaved
+		cv := autoConvertReplay(cfg.Factory, cfg.TraceDir, convertReplayTarget{
+			ID:   id,
+			Path: replayFilePath(cfg.OutDir, id),
+		}, convertForce)
+		writeProgress(cv)
+		cvResults = append(cvResults, cv)
+	}
+
 	for i, id := range ids {
 		var dl downloadResult
 		if !cfg.Force && replayFileExists(cfg.OutDir, id) {
@@ -276,23 +310,45 @@ func runReplayDownloads(fetcher replayFetcher, cfg replayBatchConfig, stdout io.
 		writeDownloadProgress(stdout, i+1, len(ids), dl)
 		dlResults = append(dlResults, dl)
 
-		if cfg.Factory == nil ||
-			dl.Outcome == downloadOutcomeFailed ||
-			dl.Outcome == downloadOutcomeSkippedPuzzle {
-			continue
+		maybeConvert(id, dl, func(cv convertResult) {
+			writeAutoConvertProgress(stdout, i+1, len(ids), cv)
+		})
+	}
+
+	// Retry pass: a pending replay is a match that was still running when the
+	// main loop hit it. Most clear within a few seconds, so one extra attempt
+	// at the tail of the batch catches the common case without inflating
+	// per-id latency. Still-pending replays keep the SkippedPending outcome.
+	pendingIdx := make([]int, 0)
+	for i, r := range dlResults {
+		if r.Outcome == downloadOutcomeSkippedPending {
+			pendingIdx = append(pendingIdx, i)
 		}
-		// Convert whenever a replay file is on disk. Force-overwrite the
-		// trace when the download itself was a fresh save (the just-written
-		// replay supersedes any stale trace); otherwise honor the user's
-		// --force flag, so `delete traces && rerun replay` regenerates only
-		// the missing traces without re-downloading anything.
-		convertForce := cfg.Force || dl.Outcome == downloadOutcomeSaved
-		cv := autoConvertReplay(cfg.Factory, cfg.TraceDir, convertReplayTarget{
-			ID:   id,
-			Path: replayFilePath(cfg.OutDir, id),
-		}, convertForce)
-		writeAutoConvertProgress(stdout, i+1, len(ids), cv)
-		cvResults = append(cvResults, cv)
+	}
+	if len(pendingIdx) > 0 {
+		_, _ = fmt.Fprintf(stdout, "retry: %d pending\n", len(pendingIdx))
+		for j, idx := range pendingIdx {
+			id := ids[idx]
+			if fetched > 0 && cfg.Delay > 0 {
+				time.Sleep(cfg.Delay)
+			}
+			dl, err := downloadReplay(fetcher, cfg, id, now())
+			if err != nil {
+				return nil, nil, err
+			}
+			fetched++
+			if dl.Outcome == downloadOutcomeSkippedPending {
+				dl.Detail = "still pending: replay not yet published"
+			}
+			writeRetryProgress(stdout, j+1, len(pendingIdx), dl)
+			dlResults[idx] = dl
+
+			retryNum := j + 1
+			retryTotal := len(pendingIdx)
+			maybeConvert(id, dl, func(cv convertResult) {
+				writeRetryAutoConvertProgress(stdout, retryNum, retryTotal, cv)
+			})
+		}
 	}
 	return dlResults, cvResults, nil
 }
@@ -305,6 +361,9 @@ func runReplayDownloads(fetcher replayFetcher, cfg replayBatchConfig, stdout io.
 func downloadReplay(fetcher replayFetcher, cfg replayBatchConfig, id int64, fetchedAt time.Time) (downloadResult, error) {
 	body, err := fetcher.FetchReplay(id)
 	if err != nil {
+		if codingame.IsReplayPending(err) {
+			return downloadResult{ID: id, Outcome: downloadOutcomeSkippedPending, Detail: "pending: replay not yet published"}, nil
+		}
 		return downloadResult{ID: id, Outcome: downloadOutcomeFailed, Detail: err.Error()}, nil
 	}
 
@@ -359,20 +418,28 @@ func replayFileExists(outDir string, id int64) bool {
 }
 
 func writeDownloadProgress(stdout io.Writer, current, total int, r downloadResult) {
+	writeDownloadProgressTo(stdout, fmt.Sprintf("[%d/%d]", current, total), r)
+}
+
+func writeRetryProgress(stdout io.Writer, current, total int, r downloadResult) {
+	writeDownloadProgressTo(stdout, fmt.Sprintf("[retry %d/%d]", current, total), r)
+}
+
+func writeDownloadProgressTo(stdout io.Writer, prefix string, r downloadResult) {
 	switch r.Outcome {
 	case downloadOutcomeSaved:
-		_, _ = fmt.Fprintf(stdout, "[%d/%d] save %d (%s)\n", current, total, r.ID, r.Detail)
-	case downloadOutcomeSkippedExisting, downloadOutcomeSkippedPuzzle:
-		_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (%s)\n", current, total, r.ID, r.Detail)
+		_, _ = fmt.Fprintf(stdout, "%s save %d (%s)\n", prefix, r.ID, r.Detail)
+	case downloadOutcomeSkippedExisting, downloadOutcomeSkippedPuzzle, downloadOutcomeSkippedPending:
+		_, _ = fmt.Fprintf(stdout, "%s skip %d (%s)\n", prefix, r.ID, r.Detail)
 	case downloadOutcomeFailed:
-		_, _ = fmt.Fprintf(stdout, "[%d/%d] fail %d: %s\n", current, total, r.ID, r.Detail)
+		_, _ = fmt.Fprintf(stdout, "%s fail %d: %s\n", prefix, r.ID, r.Detail)
 	}
 }
 
 func writeDownloadSummary(stdout io.Writer, outDir string, results []downloadResult) error {
 	s := summarizeDownloadResults(results)
-	_, err := fmt.Fprintf(stdout, "done: %d saved, %d skipped-existing, %d skipped-puzzle, %d failed (out=%s)\n",
-		s.Saved, s.SkippedExisting, s.SkippedPuzzle, s.Failed, outDir)
+	_, err := fmt.Fprintf(stdout, "done: %d saved, %d skipped-existing, %d skipped-puzzle, %d skipped-pending, %d failed (out=%s)\n",
+		s.Saved, s.SkippedExisting, s.SkippedPuzzle, s.SkippedPending, s.Failed, outDir)
 	return err
 }
 
@@ -386,6 +453,8 @@ func summarizeDownloadResults(results []downloadResult) downloadSummary {
 			s.SkippedExisting++
 		case downloadOutcomeSkippedPuzzle:
 			s.SkippedPuzzle++
+		case downloadOutcomeSkippedPending:
+			s.SkippedPending++
 		case downloadOutcomeFailed:
 			s.Failed++
 		}
@@ -397,15 +466,23 @@ func summarizeDownloadResults(results []downloadResult) downloadSummary {
 // "trace" verb (rather than convert.go's "save") is used so the line is
 // visually distinct from the preceding download's "save" line for the same ID.
 func writeAutoConvertProgress(stdout io.Writer, current, total int, r convertResult) {
+	writeAutoConvertProgressTo(stdout, fmt.Sprintf("[%d/%d]", current, total), r)
+}
+
+func writeRetryAutoConvertProgress(stdout io.Writer, current, total int, r convertResult) {
+	writeAutoConvertProgressTo(stdout, fmt.Sprintf("[retry %d/%d]", current, total), r)
+}
+
+func writeAutoConvertProgressTo(stdout io.Writer, prefix string, r convertResult) {
 	switch r.Outcome {
 	case convertOutcomeSaved:
-		_, _ = fmt.Fprintf(stdout, "[%d/%d] trace %d (%s)\n", current, total, r.Target.ID, r.Detail)
+		_, _ = fmt.Fprintf(stdout, "%s trace %d (%s)\n", prefix, r.Target.ID, r.Detail)
 	case convertOutcomeSavedMismatch:
-		_, _ = fmt.Fprintf(stdout, "[%d/%d] trace %d MISMATCH (%s)\n", current, total, r.Target.ID, r.Detail)
+		_, _ = fmt.Fprintf(stdout, "%s trace %d MISMATCH (%s)\n", prefix, r.Target.ID, r.Detail)
 	case convertOutcomeSkippedExisting, convertOutcomeSkippedPuzzle, convertOutcomeSkippedMismatch:
-		_, _ = fmt.Fprintf(stdout, "[%d/%d] skip %d (%s)\n", current, total, r.Target.ID, r.Detail)
+		_, _ = fmt.Fprintf(stdout, "%s skip %d (%s)\n", prefix, r.Target.ID, r.Detail)
 	case convertOutcomeFailed:
-		_, _ = fmt.Fprintf(stdout, "[%d/%d] fail %d: %s\n", current, total, r.Target.ID, r.Detail)
+		_, _ = fmt.Fprintf(stdout, "%s fail %d: %s\n", prefix, r.Target.ID, r.Detail)
 	}
 }
 

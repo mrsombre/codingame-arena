@@ -6,11 +6,48 @@ package codingame
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 )
+
+// APIError is returned by the post helper when the CodinGame endpoint replies
+// with a non-200 status. The raw body is preserved so callers can branch on
+// the embedded {"code","message"} payload (e.g. "UNAUTHORIZED" for replays
+// of matches that are still running).
+type APIError struct {
+	StatusCode int
+	Body       []byte
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, e.Body)
+}
+
+// IsReplayPending reports whether err indicates the replay exists in the
+// player's last-battles list but has not yet been published (match still
+// running). The CodinGame replay endpoint returns HTTP 422 with
+// {"code":"UNAUTHORIZED",...} in that state — distinct from a real auth
+// failure on private content, which a public unauthenticated client never
+// hits.
+func IsReplayPending(err error) bool {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	if apiErr.StatusCode != http.StatusUnprocessableEntity {
+		return false
+	}
+	var resp struct {
+		Code string `json:"code"`
+	}
+	if json.Unmarshal(apiErr.Body, &resp) != nil {
+		return false
+	}
+	return resp.Code == "UNAUTHORIZED"
+}
 
 // Endpoint URLs (POST, application/json).
 const (
@@ -177,7 +214,7 @@ func (c *Client) post(endpoint, body string) ([]byte, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, data)
+		return nil, &APIError{StatusCode: resp.StatusCode, Body: data}
 	}
 	return data, nil
 }
