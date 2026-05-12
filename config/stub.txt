@@ -1,0 +1,16 @@
+read width:int height:int
+loop height read line:string(width)
+
+gameloop
+loop 2 read plum:int lemon:int apple:int banana:int iron:int wood:int
+read treesCount:int
+loop treesCount read type:word(6) x:int y:int size:int health:int fruits:int cooldown:int
+read trollsCount:int
+loop trollsCount read id:int player:int x:int y:int movementSpeed:int carryCapacity:int harvestPower:int chopPower:int carryPlum:int carryLemon:int carryApple:int carryBanana:int carryIron:int carryWood:int
+write MOVE 0 7 7
+
+OUTPUT
+valid actions:
+MOVE <id> <x> <y>
+HARVEST <id> - when you are on the same cell as a tree
+DROP <id> - when you are next to your shack and carry items
