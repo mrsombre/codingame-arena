@@ -39,25 +39,25 @@ build-viewer:
 	cd $(VIEWER_DIR) && pnpm run build
 
 # match runner
-.PHONY: build-winter2026-agents match-winter2026
-WINTER2026_AGENTS := games/winter2026/agents
-WINTER2026_CPPBOT := $(BIN_DIR)/bot-winter2026-cpp
-WINTER2026_PYBOT  := $(BIN_DIR)/bot-winter2026-py
+.PHONY: build-spring2026-agents match-spring2026
+SPRING2026_AGENTS := games/spring2026/agents
+SPRING2026_CPPBOT := $(BIN_DIR)/bot-spring2026-cpp
+SPRING2026_PYBOT  := $(BIN_DIR)/bot-spring2026-py
 
-build-winter2026-agents:
+build-spring2026-agents:
 	rm -f $(BIN_DIR)/bot-*
-	g++ -std=c++17 -O2 -o $(WINTER2026_CPPBOT) $(WINTER2026_AGENTS)/bot.cpp
-	cp -f $(WINTER2026_AGENTS)/bot.py $(WINTER2026_PYBOT)
+	g++ -std=c++17 -O2 -o $(SPRING2026_CPPBOT) $(SPRING2026_AGENTS)/bot.cpp
+	cp -f $(SPRING2026_AGENTS)/bot.py $(SPRING2026_PYBOT)
 
-match-winter2026:
-	./$(BIN_DIR)/arena run winter2026 --blue=./$(WINTER2026_CPPBOT) --red=./$(WINTER2026_PYBOT) \
+match-spring2026:
+	./$(BIN_DIR)/arena run spring2026 --blue=./$(SPRING2026_CPPBOT) --red=./$(SPRING2026_PYBOT) \
 		--seed=100030005000700089 --simulations 50 --trace
 
 # analytics
 .PHONY: replay analyze
 
 replay:
-	./$(BIN_DIR)/arena replay winter2026 mrsombre
+	./$(BIN_DIR)/arena replay spring2026 mrsombre
 
 analyze:
-	./$(BIN_DIR)/arena analyze winter2026
+	./$(BIN_DIR)/arena analyze spring2026
