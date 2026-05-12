@@ -241,6 +241,56 @@ func TestTraceWaitEmittedOnBareToken(t *testing.T) {
 	assert.Empty(t, board.Traces[0][0].Data, "WAIT carries no data payload")
 }
 
+func TestTraceFailedEmittedForRejectedHarvest(t *testing.T) {
+	// HARVEST on a cell with no plant raises ErrNoPlant (non-critical) during
+	// parse. The trace must carry the error code and the rendered reason —
+	// no HARVEST trace is emitted (the task never applied).
+	board, p0, _ := loadScenario(t, 4, []string{
+		"0...",
+		"....",
+		"...1",
+	})
+	spawnUnit(board, p0, [4]int{1, 1, 1, 0}, 1, 0) // no plant on (1, 0)
+
+	runTurn(board, "HARVEST 0", "")
+
+	require.Equal(t, []string{TraceFailed}, traceTypes(board.Traces[0]))
+	data, err := arena.DecodeData[FailedData](board.Traces[0][0])
+	require.NoError(t, err)
+	assert.Equal(t, ErrNoPlant, data.Code)
+	assert.Contains(t, data.Reason, "not at a plant")
+}
+
+func TestTraceFailedEmitsOnePerRawError(t *testing.T) {
+	// Five same-code failures must produce five FAILED traces — we want the
+	// real count, not the PopErrors-collapsed view (which would render as
+	// "first, second, (3 more errors of that type)"). Easy way to force a
+	// run: five PICK tokens against an empty shack on one troll → first PICK
+	// emits OUT_OF_STOCK, subsequent ones hit ALREADY_USED, so use distinct
+	// trolls all picking from an empty shack.
+	board, p0, _ := loadScenario(t, 6, []string{
+		"0.....",
+		"......",
+		".....1",
+	})
+	for i := 0; i < 5; i++ {
+		spawnUnit(board, p0, [4]int{1, 1, 1, 0}, 1, 0) // adjacent to shack at (0,0)
+	}
+	// p0 inventory is empty by default → every PICK raises OUT_OF_STOCK.
+
+	cmds := "PICK 1 PLUM;PICK 2 PLUM;PICK 3 PLUM;PICK 4 PLUM;PICK 5 PLUM"
+	runTurn(board, cmds, "")
+
+	got := traceTypes(board.Traces[0])
+	failedCount := 0
+	for _, typ := range got {
+		if typ == TraceFailed {
+			failedCount++
+		}
+	}
+	assert.Equal(t, 5, failedCount, "five real PICK failures should produce five FAILED traces, got %v", got)
+}
+
 func TestRefereeTurnTracesReturnsCopyAndClearsOnReset(t *testing.T) {
 	board, p0, _ := loadScenario(t, 4, []string{
 		"0...",

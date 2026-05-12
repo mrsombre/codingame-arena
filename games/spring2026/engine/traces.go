@@ -21,6 +21,7 @@ const (
 	TraceMine    = "MINE"
 	TraceWait    = "WAIT"
 	TraceMessage = "MSG"
+	TraceFailed  = "FAILED"
 )
 
 // MoveData is emitted on a successful MOVE task. To is the cell the troll
@@ -106,6 +107,22 @@ type MineData struct {
 // ride-along.
 type MessageData struct {
 	Text string `json:"text"`
+}
+
+// FailedData is emitted on a non-critical input error — a command the bot
+// issued that the engine rejected (target blocked, no seed, opponent
+// contradicts, ...). One trace per raw error: PopErrors collapses runs of the
+// same code into a "(N more errors of that type)" summary line for the
+// summary tape, but FAILED traces preserve the actual count so analyzers can
+// count failures without re-running the engine. Code is the engine error
+// code (see engine_task_input_error.go: ErrMoveBlocked = 21, ErrAlreadyUsed
+// = 18, ...). Reason is the human-readable message the engine would have
+// surfaced in the summary tape (e.g. "troll 0 can't move to (9, 6), target
+// blocked"). Critical errors are NOT emitted as FAILED — those deactivate
+// the player and surface via endReason instead.
+type FailedData struct {
+	Code   int    `json:"code"`
+	Reason string `json:"reason"`
 }
 
 // TraceTurnState is the spring2026-owned per-turn payload written into

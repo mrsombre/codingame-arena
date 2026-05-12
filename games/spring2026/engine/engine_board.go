@@ -12,10 +12,12 @@ import (
 // Random abstracts the two java.util.Random-shaped RNGs the engine can run
 // against: javarand (plain java.util.Random) and sha1prng (CG SDK default).
 // Map generation calls NextInt(bound) and NextIntRange(origin, bound); the
-// concrete RNG is picked by the factory at game construction time.
+// BoardView consumption pass (consumeBoardViewRandoms) also uses NextDouble.
+// The concrete RNG is picked by the factory at game construction time.
 type Random interface {
 	NextInt(bound int) int
 	NextIntRange(origin, bound int) int
+	NextDouble() float64
 }
 
 /*
@@ -200,6 +202,15 @@ func CreateMap(players []*Player, rng Random, league int) *Board {
 		board.placeTree(ItemBANANA, MAP_MIN_TREE, MAP_MAX_TREE)
 
 		if board.isValid(league) {
+			// Mirror Java Board.createMap's initView call. The view never
+			// renders here, but its constructor (view.BoardView) consumes a
+			// non-trivial number of RNG draws while iterating cells for
+			// background sprites, decor placement, and the random "creator"
+			// (frog / fish / bird / cat / turtle) Easter eggs. Skipping this
+			// step would leave the shared RNG in a state shifted from the
+			// Java referee's, and every later getNextCell tie-break would
+			// drift — silently mismatching live replays.
+			board.consumeBoardViewRandoms()
 			return board
 		}
 		// Retry: drop this board (its Players reference will be reassigned on
@@ -514,6 +525,22 @@ func (b *Board) Tick(turn int, taskManager *TaskManager) {
 	b.Plants = alive
 	for _, p := range b.Players {
 		p.RecomputeScore()
+	}
+	// Emit one FAILED trace per raw non-critical error so analyzers see the
+	// actual rejection count. PopErrors (called next by the referee) collapses
+	// runs of the same code into a "(N more errors of that type)" summary
+	// line, which would erase the count if we emitted later. Critical errors
+	// are skipped — they deactivate the player and surface via endReason.
+	for _, p := range b.Players {
+		for _, err := range p.errors {
+			if err.IsCritical() {
+				continue
+			}
+			b.tracePlayer(p.GetIndex(), arena.MakeTurnTrace(TraceFailed, FailedData{
+				Code:   err.GetErrorCode(),
+				Reason: err.GetMessage(),
+			}))
+		}
 	}
 }
 
