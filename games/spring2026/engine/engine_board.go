@@ -526,6 +526,22 @@ func (b *Board) Tick(turn int, taskManager *TaskManager) {
 	for _, p := range b.Players {
 		p.RecomputeScore()
 	}
+	// Emit one FAILED trace per raw non-critical error so analyzers see the
+	// actual rejection count. PopErrors (called next by the referee) collapses
+	// runs of the same code into a "(N more errors of that type)" summary
+	// line, which would erase the count if we emitted later. Critical errors
+	// are skipped — they deactivate the player and surface via endReason.
+	for _, p := range b.Players {
+		for _, err := range p.errors {
+			if err.IsCritical() {
+				continue
+			}
+			b.tracePlayer(p.GetIndex(), arena.MakeTurnTrace(TraceFailed, FailedData{
+				Code:   err.GetErrorCode(),
+				Reason: err.GetMessage(),
+			}))
+		}
+	}
 }
 
 /*

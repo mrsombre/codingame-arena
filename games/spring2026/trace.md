@@ -164,16 +164,26 @@ All event structs live in [engine/traces.go](engine/traces.go).
 | `TRAIN`    | `TRAIN` task applied  | `{unit, talents}`                                   | A new troll spawned on the player's shack. `unit` is the freshly assigned troll id; `talents` is `[moveSpeed, carryCapacity, harvestPower, chopPower]` — the bot's requested attribute vector.                                     |
 | `DROP`     | `DROP` task applied   | `{unit, items}`                                     | The troll emptied its carry into the player's shack. `items[i]` is the count of each item handed over, indexed by Item ordinal `[PLUM, LEMON, APPLE, BANANA, IRON, WOOD]`.                                                       |
 | `MINE`     | `MINE` task applied   | `{unit, cell, iron}`                                | League 3+. The troll mined `iron` units of iron from a neighboring iron cell. `cell` is the troll's current grass cell (adjacent to iron); `iron` is bounded by `chopPower` and the troll's free carry capacity.                |
+| `FAILED`   | Non-critical input error raised | `{code, reason}`                          | The engine rejected a command the bot issued (target blocked, no seed, opponent contradicts, troll already used this turn, …). `code` is the engine `InputError` code ([engine_task_input_error.go](engine/engine_task_input_error.go) — `ErrMoveBlocked = 21`, `ErrAlreadyUsed = 18`, …); `reason` is the message the summary tape would have shown. One trace per raw error: `PopErrors` collapses runs of the same code into a "(N more errors of that type)" summary line on the summary tape, but `FAILED` traces preserve the actual count. Critical errors (unknown command, malformed output, …) are **not** emitted as `FAILED` — they deactivate the player and surface via `endReason` instead. |
 
 ### Skipped commands and rejected tasks
 
-Commands that fail parsing (unknown command, out-of-board target, no
-plant at the troll's cell, no capacity, opponent contradicts, …) emit
-**no trace** — they surface only as error lines in the summary tape
-(`P<idx>: [failed] <message>`). The trace records what actually
-resolved into game state, not what the bot tried to do. The raw
-output line is still preserved in `turns[].output[i]` so analyzers
-can correlate intent with outcome.
+Commands that fail with a **non-critical** input error (out-of-board
+target, no plant at the troll's cell, no capacity, opponent
+contradicts, troll already used this turn, …) emit a `FAILED`
+trace with the engine error code and the same human-readable reason
+the summary tape uses (`P<idx>: [failed] <message>`). No
+action-specific trace (`MOVE`, `PLANT`, …) is emitted for the
+rejected command — the trace records what actually resolved into
+game state, plus the rejection as a `FAILED` event.
+
+Critical errors (unknown command, malformed output, fatal timeouts)
+deactivate the player and are **not** emitted as `FAILED` — they
+surface via `endReason` (`INVALID`, `TIMEOUT`, `TIMEOUT_START`).
+
+The raw output line is preserved in `turns[].output[i]` so analyzers
+can correlate intent (the bot's requested command) with outcome (the
+applied trace, or a matching `FAILED`).
 
 A bot can issue at most one task per troll per turn; the second task
 for the same troll is rejected with an `ALREADY_USED` error and
