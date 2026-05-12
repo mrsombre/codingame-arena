@@ -4,6 +4,7 @@ package games
 import (
 	_ "github.com/mrsombre/codingame-arena/games/spring2020/engine"
 	_ "github.com/mrsombre/codingame-arena/games/spring2021/engine"
+	_ "github.com/mrsombre/codingame-arena/games/spring2026/engine"
 	_ "github.com/mrsombre/codingame-arena/games/winter2026/engine"
 )
 
@@ -16,4 +17,5 @@ var Order = []string{
 	"spring2020",
 	"spring2021",
 	"winter2026",
+	"spring2026",
 }
