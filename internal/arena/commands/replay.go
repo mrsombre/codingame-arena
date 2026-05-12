@@ -167,13 +167,23 @@ func replayFromLeaderboard(opts ReplayOptions, factory arena.GameFactory, stdout
 
 	client := codingame.New()
 
-	apiSlug, puzzleHit, err := resolvePuzzle(client, store, slug)
-	if err != nil {
-		return err
+	challenge := isChallengeLeaderboard(factory)
+	var apiSlug string
+	if challenge {
+		// Community contests under /contests/ have no puzzleLeaderboardId
+		// indirection — the URL slug is the API id.
+		apiSlug = slug
+		_, _ = fmt.Fprintf(stdout, "challenge: %s\n", slug)
+	} else {
+		var puzzleHit bool
+		apiSlug, puzzleHit, err = resolvePuzzle(client, store, slug)
+		if err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintf(stdout, "puzzle: %s -> %s%s\n", slug, apiSlug, cacheTag(puzzleHit))
 	}
-	_, _ = fmt.Fprintf(stdout, "puzzle: %s -> %s%s\n", slug, apiSlug, cacheTag(puzzleHit))
 
-	info, err := resolveAgent(client, store, apiSlug, opts.Username)
+	info, err := resolveAgent(client, store, apiSlug, opts.Username, challenge)
 	if err != nil {
 		return err
 	}
@@ -438,9 +448,18 @@ func resolvePuzzle(client *codingame.Client, store *db.DB, prettyID string) (str
 
 // resolveAgent fetches the player's current leaderboard standing and refreshes
 // the local cache. Always hits the API: rank/division change continuously, so
-// stale cache entries would silently mislabel saved replays.
-func resolveAgent(client *codingame.Client, store *db.DB, apiSlug, nickname string) (codingame.AgentInfo, error) {
-	info, err := client.FindAgent(apiSlug, nickname)
+// stale cache entries would silently mislabel saved replays. challenge selects
+// the community-contest leaderboard endpoint.
+func resolveAgent(client *codingame.Client, store *db.DB, apiSlug, nickname string, challenge bool) (codingame.AgentInfo, error) {
+	var (
+		info codingame.AgentInfo
+		err  error
+	)
+	if challenge {
+		info, err = client.FindChallengeAgent(apiSlug, nickname)
+	} else {
+		info, err = client.FindAgent(apiSlug, nickname)
+	}
 	if err != nil {
 		return codingame.AgentInfo{}, err
 	}
@@ -448,4 +467,11 @@ func resolveAgent(client *codingame.Client, store *db.DB, apiSlug, nickname stri
 		return codingame.AgentInfo{}, fmt.Errorf("cache player: %w", err)
 	}
 	return info, nil
+}
+
+// isChallengeLeaderboard reports whether the factory opts into the CodinGame
+// challenge (community contest) leaderboard API.
+func isChallengeLeaderboard(factory arena.GameFactory) bool {
+	p, ok := factory.(arena.ChallengeLeaderboardProvider)
+	return ok && p.IsChallengeLeaderboard()
 }

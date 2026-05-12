@@ -28,7 +28,13 @@ func (f *factory) PuzzleID() int { return 0 }
 
 func (f *factory) PuzzleTitle() string { return "Troll Farm - Spring Challenge 2026" }
 
-func (f *factory) LeaderboardSlug() string { return "spring-challenge-2026-troller-farm" }
+func (f *factory) LeaderboardSlug() string { return "spring-challenge-2026-troll-farm" }
+
+// IsChallengeLeaderboard tells the replay command this game's leaderboard
+// lives under the CodinGame "challenge" (community contest) API rather than
+// the standard puzzle API. Troll Farm is hosted at /contests/, not
+// /multiplayer/, so the puzzleLeaderboardId resolution step doesn't apply.
+func (f *factory) IsChallengeLeaderboard() bool { return true }
 
 // MaxTurns is the absolute cap (league 3+). Leagues 1-2 stop at 100 turns
 // via the engine's own end-of-game logic.

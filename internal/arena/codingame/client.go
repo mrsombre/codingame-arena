@@ -14,10 +14,11 @@ import (
 
 // Endpoint URLs (POST, application/json).
 const (
-	PuzzleAPI      = "https://www.codingame.com/services/Puzzle/findProgressByPrettyId"
-	LeaderboardAPI = "https://www.codingame.com/services/Leaderboards/getFilteredPuzzleLeaderboard"
-	LastBattlesAPI = "https://www.codingame.com/services/gamesPlayersRanking/findLastBattlesByAgentId"
-	GameResultAPI  = "https://www.codingame.com/services/gameResult/findInformationById"
+	PuzzleAPI               = "https://www.codingame.com/services/Puzzle/findProgressByPrettyId"
+	LeaderboardAPI          = "https://www.codingame.com/services/Leaderboards/getFilteredPuzzleLeaderboard"
+	ChallengeLeaderboardAPI = "https://www.codingame.com/services/Leaderboards/getFilteredChallengeLeaderboard"
+	LastBattlesAPI          = "https://www.codingame.com/services/gamesPlayersRanking/findLastBattlesByAgentId"
+	GameResultAPI           = "https://www.codingame.com/services/gameResult/findInformationById"
 )
 
 // Client wraps an http.Client and exposes typed helpers for the CodinGame
@@ -74,6 +75,18 @@ type AgentInfo struct {
 // FindAgent searches the leaderboard for a nickname and returns the matching
 // AgentInfo for the given puzzle leaderboard slug. Matches case-insensitively.
 func (c *Client) FindAgent(apiSlug, nickname string) (AgentInfo, error) {
+	return c.findAgent(LeaderboardAPI, apiSlug, nickname)
+}
+
+// FindChallengeAgent is the FindAgent variant for community contests under
+// /contests/. Same request shape as FindAgent, but hits the challenge
+// leaderboard endpoint — the puzzle endpoint returns PUZZLE_NOT_FOUND for
+// these.
+func (c *Client) FindChallengeAgent(apiSlug, nickname string) (AgentInfo, error) {
+	return c.findAgent(ChallengeLeaderboardAPI, apiSlug, nickname)
+}
+
+func (c *Client) findAgent(endpoint, apiSlug, nickname string) (AgentInfo, error) {
 	payload, err := json.Marshal([]any{
 		apiSlug,
 		nil,
@@ -83,7 +96,7 @@ func (c *Client) FindAgent(apiSlug, nickname string) (AgentInfo, error) {
 	if err != nil {
 		return AgentInfo{}, err
 	}
-	body, err := c.post(LeaderboardAPI, string(payload))
+	body, err := c.post(endpoint, string(payload))
 	if err != nil {
 		return AgentInfo{}, fmt.Errorf("search leaderboard: %w", err)
 	}

@@ -187,6 +187,16 @@ type RulesProvider interface {
 	Rules() string
 }
 
+// ChallengeLeaderboardProvider signals the game's leaderboard lives under the
+// CodinGame "challenge" (community contest) API rather than the standard
+// puzzle API. When implemented and returning true, replay leaderboard mode
+// skips the puzzleLeaderboardId resolution step (LeaderboardSlug is the
+// challenge id directly) and queries the challenge leaderboard endpoint.
+// Default is the puzzle leaderboard.
+type ChallengeLeaderboardProvider interface {
+	IsChallengeLeaderboard() bool
+}
+
 // TraceProvider returns the bundled trace.md contents for a game so the
 // `arena game trace <game>` subcommand can print the per-game trace-format
 // reference without a sidecar filesystem path. Optional — factories without

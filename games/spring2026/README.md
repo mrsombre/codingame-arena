@@ -1,6 +1,6 @@
 # Troll Farm — Spring Challenge 2026
 
-https://www.codingame.com/contests/spring-challenge-2026-troller-farm
+https://www.codingame.com/contests/spring-challenge-2026-troll-farm
 
 ---
 
