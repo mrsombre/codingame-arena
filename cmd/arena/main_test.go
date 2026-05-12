@@ -76,7 +76,7 @@ func TestExecuteGameRequiresGame(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
 	}
-	if !strings.Contains(stdout.String(), "arena game <game> <action>") {
+	if !strings.Contains(stdout.String(), "arena game <action> <game>") {
 		t.Fatalf("stdout missing game subUsage:\n%s", stdout.String())
 	}
 }
@@ -84,7 +84,7 @@ func TestExecuteGameRequiresGame(t *testing.T) {
 func TestExecuteGameRejectsUnknownGame(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	code := run([]string{"game", "galactic2099", "rules"}, &stdout, &stderr)
+	code := run([]string{"game", "rules", "galactic2099"}, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
 	}
@@ -96,7 +96,7 @@ func TestExecuteGameRejectsUnknownGame(t *testing.T) {
 func TestExecuteGameRejectsUnknownAction(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	code := run([]string{"game", "winter2026", "bogus"}, &stdout, &stderr)
+	code := run([]string{"game", "bogus", "winter2026"}, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
 	}
@@ -108,7 +108,7 @@ func TestExecuteGameRejectsUnknownAction(t *testing.T) {
 func TestExecuteGameRulesEmitsBundledMarkdown(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	code := run([]string{"game", "winter2026", "rules"}, &stdout, &stderr)
+	code := run([]string{"game", "rules", "winter2026"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr.String())
 	}
@@ -120,7 +120,7 @@ func TestExecuteGameRulesEmitsBundledMarkdown(t *testing.T) {
 func TestExecuteGameTraceEmitsBundledMarkdown(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	code := run([]string{"game", "winter2026", "trace"}, &stdout, &stderr)
+	code := run([]string{"game", "trace", "winter2026"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr.String())
 	}
@@ -150,11 +150,11 @@ func TestPopGameRejectsUnknownGame(t *testing.T) {
 }
 
 func TestPopGameUsageIncludesArgsSpec(t *testing.T) {
-	_, _, err := popGame("game", "<game> <action>", nil, []string{"winter2026"})
+	_, _, err := popGame("game serialize", "<game>", nil, []string{"winter2026"})
 	if err == nil {
 		t.Fatal("popGame returned no error for missing positionals")
 	}
-	if !strings.Contains(err.Error(), "usage: arena game <game> <action>") {
+	if !strings.Contains(err.Error(), "usage: arena game serialize <game>") {
 		t.Fatalf("error missing full positional spec: %v", err)
 	}
 }

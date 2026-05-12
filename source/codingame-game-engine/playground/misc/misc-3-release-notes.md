@@ -2,7 +2,20 @@
 
 The CodinGame SDK is regularly updated and improved. This document lets you know what changed in the latest releases.
 
-## Next Release
+## 4.7.8
+
+### 🛠️ Improvements
+
+- More compact output for `SpriteAnimations`. __Contributed by [eulerscheZahl](https://github.com/eulerscheZahl)_
+
+## 4.7.7
+
+### 🎁 Features
+
+- Added `Timebank` mode. _Contributed by [eulerscheZahl](https://github.com/eulerscheZahl)_
+- Updated timeout handling, including a 3-strike rule. _Contributed by [eulerscheZahl](https://github.com/eulerscheZahl)_
+
+## 4.6.0
 
 ### 🎁 Features
 
