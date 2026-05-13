@@ -112,7 +112,7 @@ func (t *TrainTask) Apply(board *Board, concurrent []Task) {
 		t.addParsingError("can't train unit, cell blocked", ErrMoveBlocked, false)
 		return
 	}
-	u := NewUnit(t.Player, t.Talents, t.League)
+	u := board.NewUnit(t.Player, t.Talents, t.League)
 	board.AddUnit(u)
 	t.Applied = true
 	t.Player.AddSummary("trained a troll")

@@ -57,7 +57,6 @@ func loadScenario(t *testing.T, league int, rows []string) (*Board, *Player, *Pl
 	}
 	require.NotNil(t, p0.Shack, "p0 shack missing")
 	require.NotNil(t, p1.Shack, "p1 shack missing")
-	UnitIDCounter = 0
 	return board, p0, p1
 }
 
@@ -65,7 +64,7 @@ func loadScenario(t *testing.T, league int, rows []string) (*Board, *Player, *Pl
 // supplied talents. Bypasses TrainTask cost accounting — tests pay no fruits.
 func spawnUnit(board *Board, player *Player, talents [4]int, x, y int) *Unit {
 	u := &Unit{
-		ID:            UnitIDCounter,
+		ID:            board.AllocateUnitID(),
 		Player:        player,
 		Cell:          board.GetCell(x, y),
 		MovementSpeed: talents[0],
@@ -74,10 +73,28 @@ func spawnUnit(board *Board, player *Player, talents [4]int, x, y int) *Unit {
 		ChopPower:     talents[3],
 		Inv:           NewInventory(),
 	}
-	UnitIDCounter++
 	player.AddUnit(u)
 	board.AddUnit(u)
 	return u
+}
+
+func TestUnitIDAllocatorIsPerBoard(t *testing.T) {
+	boardA, p0A, _ := loadScenario(t, 4, []string{
+		"0.",
+		".1",
+	})
+	boardB, p0B, _ := loadScenario(t, 4, []string{
+		"0.",
+		".1",
+	})
+
+	a0 := spawnUnit(boardA, p0A, [4]int{1, 1, 1, 1}, 0, 0)
+	b0 := spawnUnit(boardB, p0B, [4]int{1, 1, 1, 1}, 0, 0)
+	a1 := spawnUnit(boardA, p0A, [4]int{1, 1, 1, 1}, 0, 1)
+
+	assert.Equal(t, 0, a0.ID)
+	assert.Equal(t, 0, b0.ID)
+	assert.Equal(t, 1, a1.ID)
 }
 
 // plantAt drops a plant of the given kind on (x, y) with the requested

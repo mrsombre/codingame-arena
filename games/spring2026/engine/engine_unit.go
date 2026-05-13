@@ -30,11 +30,6 @@ type Unit struct {
 	Inv           *Inventory
 }
 
-// UnitIDCounter mirrors Java's static Unit.idCounter. Reset to 0 at the start
-// of every map build (Board.createMap), so ids stay deterministic across
-// replays.
-var UnitIDCounter int
-
 /*
 Java: SpringChallenge2026-Troll/src/main/java/engine/Unit.java:24-30
 
@@ -104,12 +99,10 @@ public Unit(Player player, int[] talents, int league) {
 }
 */
 
-// NewUnit charges the player's inventory for the training cost, registers the
+// newUnit charges the player's inventory for the training cost, registers the
 // unit with the player, and seats it on the player's shack. Board.addUnit is
 // the caller's responsibility — Java keeps unit registration on the Board too.
-func NewUnit(player *Player, talents [4]int, league int) *Unit {
-	id := UnitIDCounter
-	UnitIDCounter++
+func newUnit(player *Player, talents [4]int, league, id int) *Unit {
 	costs := GetTrainingCosts(player, talents, league)
 	for i := 0; i < ItemsCount; i++ {
 		player.Inv.SetItem(Item(i), player.Inv.GetItemCount(Item(i))-costs[i])
@@ -128,15 +121,15 @@ func NewUnit(player *Player, talents [4]int, league int) *Unit {
 	return u
 }
 
-func (u *Unit) GetID() int           { return u.ID }
-func (u *Unit) GetPlayer() *Player   { return u.Player }
-func (u *Unit) GetCell() *Cell       { return u.Cell }
-func (u *Unit) SetCell(c *Cell)      { u.Cell = c }
-func (u *Unit) GetChopPower() int    { return u.ChopPower }
-func (u *Unit) GetHarvestPower() int { return u.HarvestPower }
-func (u *Unit) GetMovementSpeed() int { return u.MovementSpeed }
-func (u *Unit) GetCarryCapacity() int { return u.CarryCapacity }
-func (u *Unit) GetInventory() *Inventory { return u.Inv }
+func (u *Unit) GetID() int                { return u.ID }
+func (u *Unit) GetPlayer() *Player        { return u.Player }
+func (u *Unit) GetCell() *Cell            { return u.Cell }
+func (u *Unit) SetCell(c *Cell)           { u.Cell = c }
+func (u *Unit) GetChopPower() int         { return u.ChopPower }
+func (u *Unit) GetHarvestPower() int      { return u.HarvestPower }
+func (u *Unit) GetMovementSpeed() int     { return u.MovementSpeed }
+func (u *Unit) GetCarryCapacity() int     { return u.CarryCapacity }
+func (u *Unit) GetInventory() *Inventory  { return u.Inv }
 func (u *Unit) GetFreeCarryCapacity() int { return u.CarryCapacity - u.Inv.GetTotal() }
 
 /*
