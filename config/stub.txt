@@ -1,5 +1,5 @@
 read width:int height:int
-loop height read line:string(width)
+loop height read line:string(30)
 
 gameloop
 loop 2 read plum:int lemon:int apple:int banana:int iron:int wood:int

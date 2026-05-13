@@ -252,7 +252,12 @@ public class Board {
         }
 
         int[][] shackDist = getDistances(players.get(0).getShack());
-        if (!Arrays.stream(players.get(1).getShack().getNeighbors()).anyMatch(c -> c != null && shackDist[c.getX()][c.getY()] >= 0 && shackDist[c.getX()][c.getY()] < Constants.MAP_MAX_OPP_DIST))
+        int opponentDist = Arrays.stream(players.get(1).getShack().getNeighbors())
+                .filter(c -> c != null && c.isWalkable())
+                .mapToInt(c -> shackDist[c.getX()][c.getY()] + 1)
+                .min()
+                .orElse(Integer.MAX_VALUE);
+        if (opponentDist > Constants.MAP_MAX_OPP_DIST)
             return false;
 
         if (league < 3 && plants.stream().noneMatch(p -> p.getResources() > 0)) return false;
