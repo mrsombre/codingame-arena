@@ -44,13 +44,14 @@ type Board struct {
 	Units   []*Unit
 	Plants  []*Plant
 
-	League         int
-	Turn           int
-	Seed           int64
-	noTreeCounter  int
-	ended          bool
-	stalled        bool
-	Summary        []string
+	nextUnitID    int
+	League        int
+	Turn          int
+	Seed          int64
+	noTreeCounter int
+	ended         bool
+	stalled       bool
+	Summary       []string
 
 	// Traces accumulates per-turn structured events for the current
 	// PerformGameUpdate call, partitioned by player. Reset at
@@ -80,10 +81,20 @@ func newBoard(width, height int, rng Random) *Board {
 }
 
 func (b *Board) GetCell(x, y int) *Cell { return b.Grid[x][y] }
-func (b *Board) AddPlant(p *Plant)       { b.Plants = append(b.Plants, p) }
+func (b *Board) AddPlant(p *Plant)      { b.Plants = append(b.Plants, p) }
 func (b *Board) GetPlants() []*Plant    { return b.Plants }
 func (b *Board) GetPlayers() []*Player  { return b.Players }
-func (b *Board) AddUnit(u *Unit)         { b.Units = append(b.Units, u) }
+func (b *Board) AddUnit(u *Unit)        { b.Units = append(b.Units, u) }
+
+func (b *Board) AllocateUnitID() int {
+	id := b.nextUnitID
+	b.nextUnitID++
+	return id
+}
+
+func (b *Board) NewUnit(player *Player, talents [4]int, league int) *Unit {
+	return newUnit(player, talents, league, b.AllocateUnitID())
+}
 
 func (b *Board) GetUnit(id int) *Unit {
 	for _, u := range b.Units {
@@ -176,15 +187,19 @@ func CreateMap(players []*Player, rng Random, league int) *Board {
 		}
 		board.setCellType(shack, CellSHACK)
 
-		UnitIDCounter = 0
 		shacks := [2]*Cell{
 			shack,
 			board.Grid[width-1-shack.X][height-1-shack.Y],
 		}
 		for i, player := range players {
-			player.InitForGame(shacks[i], league)
+			player.InitForGame(shacks[i])
+			chopPower := 0
+			if league >= 3 {
+				chopPower = 1
+			}
+			unit := board.NewUnit(player, [4]int{1, 1, 1, chopPower}, league)
 			board.Players = append(board.Players, player)
-			board.Units = append(board.Units, player.Units[0])
+			board.Units = append(board.Units, unit)
 			player.SetInventory(inventory)
 			player.RecomputeScore()
 		}
@@ -690,4 +705,3 @@ func MainTurnsForLeague(league int) int {
 	}
 	return GAME_TURNS_LOW_LEAGUE
 }
-

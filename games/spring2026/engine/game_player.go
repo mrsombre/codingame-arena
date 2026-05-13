@@ -52,15 +52,10 @@ public void init(Cell shack, int league) {
 }
 */
 
-func (p *Player) InitForGame(shack *Cell, league int) {
+func (p *Player) InitForGame(shack *Cell) {
 	p.Units = nil
 	p.Inv = NewInventory()
 	p.Shack = shack
-	chopPower := 0
-	if league >= 3 {
-		chopPower = 1
-	}
-	NewUnit(p, [4]int{1, 1, 1, chopPower}, league)
 }
 
 /*
@@ -77,9 +72,9 @@ func (p *Player) SetInventory(inventory []int) {
 	}
 }
 
-func (p *Player) GetUnits() []*Unit  { return p.Units }
-func (p *Player) AddUnit(u *Unit)    { p.Units = append(p.Units, u) }
-func (p *Player) GetShack() *Cell    { return p.Shack }
+func (p *Player) GetUnits() []*Unit        { return p.Units }
+func (p *Player) AddUnit(u *Unit)          { p.Units = append(p.Units, u) }
+func (p *Player) GetShack() *Cell          { return p.Shack }
 func (p *Player) GetInventory() *Inventory { return p.Inv }
 
 /*
@@ -198,7 +193,7 @@ func (p *Player) ConsumeInputLines() []string {
 	p.inputLines = p.inputLines[:0]
 	return lines
 }
-func (p *Player) GetOutputs() []string  { return p.outputs }
+func (p *Player) GetOutputs() []string { return p.outputs }
 func (p *Player) SetOutputs(outputs []string) {
 	p.outputs = outputs
 	p.outputError = nil
