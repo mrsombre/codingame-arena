@@ -20,6 +20,7 @@
     <br>Pour voir les règles complètes, rendez-vous <a href="https://www.codingame.com/demo/1423805f9c28c9654cfd4d57b0208df71315c49">ici</a> et changez de ligue en haut à droite.
   </div>
 
+
   <!-- GOAL -->
   <div class="statement-section statement-goal">
     <h1>
@@ -55,6 +56,7 @@
         <br><br>
         <strong>Déplacement des unités</strong><br>
         Chaque troll possède une <var>movementSpeed</var> déterminant combien de cases il peut <action>MOVE</action> (se déplacer) horizontalement ou verticalement par tour. Chaque case peut contenir au maximum <const>1</const> troll par équipe. Seules les cases <const>GRASS</const> (herbe) sont praticables.
+        La cabane sert également de point d'apparition, mais les trolls ne peuvent pas revenir sur cette case après l'avoir quittée.
         Si la cible est hors de portée ou non praticable, le troll se déplace vers la case accessible la plus proche en direction de celle-ci.
 
         <br><br>
@@ -113,7 +115,7 @@
       <div class="text">
         <ul style="padding-bottom: 0;">
           <li>
-            Vous marquez plus de points que votre adversaire.
+            Vous marquez plus de points que votre adversaire. Chaque fruit dans votre shack rapporte <const>1</const> point
           </li>
         </ul>
       </div>
@@ -153,7 +155,7 @@
         <span class="statement-lineno">Première ligne</span> : <var>width</var> <var>height</var>, la taille de la grille.
         <br>
         <span class="statement-lineno">Les <var>height</var> lignes suivantes</span> : chaque ligne comporte <var>width</var> caractères :
-Dans cette ligue, chaque caractère est <const>.</const> pour <const>GRASS</const>.
+Dans cette ligue, chaque caractère est <const>.</const> pour <const>GRASS</const>, <const>0</const> pour votre <const>SHACK</const> (cabane), <const>1</const> pour le <const>SHACK</const> de votre adversaire.
       </div>
 
       <br>

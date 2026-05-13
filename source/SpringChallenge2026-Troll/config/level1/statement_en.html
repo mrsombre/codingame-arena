@@ -21,6 +21,7 @@
     <br>To see the full rules, go <a href="https://www.codingame.com/demo/1423805f9c28c9654cfd4d57b0208df71315c49">here</a> and switch leagues at the top-right corner.
   </div>
 
+
   <!-- GOAL -->
   <div class="statement-section statement-goal">
     <h1>
@@ -56,6 +57,7 @@
         <br><br>
         <strong>Moving units</strong><br>
         Each troll has a <var>movementSpeed</var> determining how many cells it can <action>MOVE</action> horizontally or vertically per turn. Each cell can hold at most <const>1</const> troll per team. Only <const>GRASS</const> cells are walkable.
+        The shack is also the spawn point, but trolls can't walk back on that cell after leaving it.
         If the target is out of range or not walkable, the troll moves to the nearest reachable cell towards it.
 
         <br><br>
@@ -85,7 +87,7 @@
       <div class="text">
         <ul style="padding-bottom: 0;">
           <li>
-            You score more points than your opponent.
+            You score more points than your opponent. Each fruit in your shack scores <const>1</const> point
           </li>
         </ul>
       </div>
@@ -125,7 +127,7 @@
         <span class="statement-lineno">First line</span>: <var>width</var> <var>height</var>, the grid size.
         <br>
         <span class="statement-lineno">Next <var>height</var> lines</span>: each line has <var>width</var> characters:
-In this league every character is <const>.</const> for <const>GRASS</const>.
+In this league every character is <const>.</const> for <const>GRASS</const>, <const>0</const> for your own <const>SHACK</const>, <const>1</const> for your opponent's <const>SHACK</const>.
       </div>
 
       <br>
