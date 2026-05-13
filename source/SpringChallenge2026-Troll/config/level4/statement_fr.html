@@ -2,6 +2,7 @@
 <div id="statement_back" class="statement_back" style="display:none" xmlns="http://www.w3.org/1999/html"></div>
 <div class="statement-body">
 
+
   <!-- GOAL -->
   <div class="statement-section statement-goal">
     <h1>
@@ -52,6 +53,7 @@
         <br><br>
         <strong>Déplacement des unités</strong><br>
         Chaque troll possède une <var>movementSpeed</var> déterminant combien de cases il peut <action>MOVE</action> (se déplacer) horizontalement ou verticalement par tour. Chaque case peut contenir au maximum <const>1</const> troll par équipe. Seules les cases <const>GRASS</const> (herbe) sont praticables.
+        La cabane sert également de point d'apparition, mais les trolls ne peuvent pas revenir sur cette case après l'avoir quittée.
         Si la cible est hors de portée ou non praticable, le troll se déplace vers la case accessible la plus proche en direction de celle-ci.
 
         <br><br>
@@ -116,8 +118,8 @@
       <div class="text">
         <ul style="padding-bottom: 0;">
           <li>
-            Vous marquez plus de points que votre adversaire.
-            Chaque fruit dans votre shack rapporte <const>1</const> point ; le <const>WOOD</const> rapporte <const>4</const> points. Le <const>IRON</const> n'a aucune valeur de score.
+            Vous marquez plus de points que votre adversaire. Chaque fruit dans votre shack rapporte <const>1</const> point
+            ; le <const>WOOD</const> rapporte <const>4</const> points. Le <const>IRON</const> n'a aucune valeur de score.
           </li>
         </ul>
       </div>
@@ -166,6 +168,7 @@
       </ol>
       Les actions du même type se produisent simultanément. Si les deux équipes récoltent ou coupent le même arbre en même temps, les ressources sont partagées équitablement.<br>
       Puis les deux obtiennent un objet à la fois jusqu'à ce qu'ils ne puissent plus en porter ou que la ressource soit épuisée. Le dernier objet peut être dupliqué. <br>
+      Chaque troll ne peut effectuer qu'une seule action par tour. <br>
     </div>
   </div>
 

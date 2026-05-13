@@ -42,6 +42,21 @@
   </div>
   <!-- END -->
 
+  <!-- BEGIN level3 -->
+  <div style="color: #7c76c5;
+      background-color: rgba(124, 118, 197, .1);
+      padding: 20px;
+      margin-right: 15px;
+      margin-left: 15px;
+      margin-bottom: 10px;
+      text-align: left;">
+      <p style="text-align: center; font-weight: 700; margin-bottom: 6px;">
+        Mise à jour d'équilibrage : la distance maximale entre les cabanes a été augmentée. <br>
+        Pour plus de détails, consultez <a href="https://github.com/eulerscheZahl/Troll-Farm/commits/master/">GitHub</a> ; une <a href="https://github.com/eulerscheZahl/Troll-Farm/releases">nouvelle version</a> destinée aux tests locaux y est également disponible.
+      </p>
+  </div>
+  <!-- END -->
+
   <!-- GOAL -->
   <div class="statement-section statement-goal">
     <h1>
@@ -107,6 +122,7 @@
         <br><br>
         <strong>Déplacement des unités</strong><br>
         Chaque troll possède une <var>movementSpeed</var> déterminant combien de cases il peut <action>MOVE</action> (se déplacer) horizontalement ou verticalement par tour. Chaque case peut contenir au maximum <const>1</const> troll par équipe. Seules les cases <const>GRASS</const> (herbe) sont praticables.
+        La cabane sert également de point d'apparition, mais les trolls ne peuvent pas revenir sur cette case après l'avoir quittée.
         Si la cible est hors de portée ou non praticable, le troll se déplace vers la case accessible la plus proche en direction de celle-ci.
 
         <br><br>
@@ -230,9 +246,9 @@
       <div class="text">
         <ul style="padding-bottom: 0;">
           <li>
-            Vous marquez plus de points que votre adversaire.
+            Vous marquez plus de points que votre adversaire. Chaque fruit dans votre shack rapporte <const>1</const> point
             <!-- BEGIN level3 level4 -->
-            Chaque fruit dans votre shack rapporte <const>1</const> point ; le <const>WOOD</const> rapporte <const>4</const> points. Le <const>IRON</const> n'a aucune valeur de score.
+            ; le <const>WOOD</const> rapporte <const>4</const> points. Le <const>IRON</const> n'a aucune valeur de score.
             <!-- END -->
           </li>
         </ul>
@@ -286,6 +302,7 @@
       </ol>
       Les actions du même type se produisent simultanément. Si les deux équipes récoltent ou coupent le même arbre en même temps, les ressources sont partagées équitablement.<br>
       Puis les deux obtiennent un objet à la fois jusqu'à ce qu'ils ne puissent plus en porter ou que la ressource soit épuisée. Le dernier objet peut être dupliqué. <br>
+      Chaque troll ne peut effectuer qu'une seule action par tour. <br>
     </div>
   </div>
   <!-- END -->
@@ -308,7 +325,7 @@
         <br>
         <span class="statement-lineno">Les <var>height</var> lignes suivantes</span> : chaque ligne comporte <var>width</var> caractères :
 <!-- BEGIN level1 level2 -->
-Dans cette ligue, chaque caractère est <const>.</const> pour <const>GRASS</const>.
+Dans cette ligue, chaque caractère est <const>.</const> pour <const>GRASS</const>, <const>0</const> pour votre <const>SHACK</const> (cabane), <const>1</const> pour le <const>SHACK</const> de votre adversaire.
 <!-- END -->
 <!-- BEGIN level3 level4 -->
   <!-- BEGIN level3 -->

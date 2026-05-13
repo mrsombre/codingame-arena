@@ -16,6 +16,7 @@ public abstract class Task {
     private int unitInitialCarry;
     protected boolean failedParsing = false;
     protected boolean applied;
+    private static HashSet<Unit> usedUnits;
 
     protected Task(Player player, Board board) {
         this.player = player;
@@ -30,6 +31,7 @@ public abstract class Task {
         if (command.trim().equals("")) return null;
         if (command.trim().toUpperCase().equals("WAIT")) return null;
         Task task = null;
+        Task.usedUnits = usedUnits;
         try {
             if (MoveTask.pattern.matcher(command).matches())
                 task = new MoveTask(player, board, command);
@@ -74,8 +76,9 @@ public abstract class Task {
         if (unit == null) addParsingError("Troll " + id + " does not exist", InputError.UNIT_NOT_FOUND, false);
         else {
             unitInitialCarry = unit.getInventory().getTotal();
-            if (unit.getPlayer() == player) unit.setAnimateTask(this);
-            else addParsingError("You don't own troll " + id, InputError.UNIT_NOT_OWNED, false);
+            if (unit.getPlayer() == player) {
+                if (!usedUnits.contains(unit)) unit.setAnimateTask(this);
+            } else addParsingError("You don't own troll " + id, InputError.UNIT_NOT_OWNED, false);
         }
     }
 
