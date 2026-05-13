@@ -28,7 +28,7 @@ public class Constants {
     public static final int MAP_MAX_ROCK = 10;
     public static final int MAP_MIN_TREE = 1;
     public static final int MAP_MAX_TREE = 3;
-    public static final int MAP_MAX_OPP_DIST = 6;
+    public static final int MAP_MAX_OPP_DIST = 16;
 
     public static final int MIN_STARTING_RESOURCE = 2;
     public static final int MAX_STARTING_RESOURCE = 10;
@@ -56,7 +56,7 @@ const (
 	MAP_MAX_ROCK     = 10
 	MAP_MIN_TREE     = 1
 	MAP_MAX_TREE     = 3
-	MAP_MAX_OPP_DIST = 6
+	MAP_MAX_OPP_DIST = 16
 
 	MIN_STARTING_RESOURCE = 2
 	MAX_STARTING_RESOURCE = 10

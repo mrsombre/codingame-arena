@@ -306,14 +306,15 @@ func (b *Board) setCellType(cell *Cell, t CellType) {
 }
 
 /*
-Java: SpringChallenge2026-Troll/src/main/java/engine/Board.java:224-261
+Java: SpringChallenge2026-Troll/src/main/java/engine/Board.java:224-266
 
 private boolean isValid(int league) {
     if (players.get(0).getShack().isNearIron()) return false;
     // shack has at least one walkable neighbour
     // for league > 2: at least one iron has a walkable neighbour
     // all walkable cells are reachable from one of them (BFS)
-    // shack within MAP_MAX_OPP_DIST walking distance of opp's shack neighbourhood
+    // min(shackDist[c]+1 for walkable c in opp shack neighbours) must be
+    //   <= MAP_MAX_OPP_DIST; empty stream -> Integer.MAX_VALUE -> reject
     // league < 3: at least one plant has resources > 0
 }
 */
@@ -365,13 +366,22 @@ func (b *Board) isValid(league int) bool {
 	}
 
 	shackDist := b.GetDistances(b.Players[0].Shack)
-	oppReachable := false
+	// Mirror Java's stream: min over walkable neighbours of opp shack of
+	// shackDist[c]+1. No walkable neighbours -> Integer.MAX_VALUE, which
+	// then fails the `> MAP_MAX_OPP_DIST` guard. The +1 step accounts for
+	// the move from shack onto its neighbour.
+	const intMax = int(^uint(0) >> 1)
+	opponentDist := intMax
 	for _, c := range b.Players[1].Shack.Neighbors {
-		if c != nil && shackDist[c.X][c.Y] >= 0 && shackDist[c.X][c.Y] < MAP_MAX_OPP_DIST {
-			oppReachable = true
+		if c == nil || !c.IsWalkable() {
+			continue
+		}
+		d := shackDist[c.X][c.Y] + 1
+		if d < opponentDist {
+			opponentDist = d
 		}
 	}
-	if !oppReachable {
+	if opponentDist > MAP_MAX_OPP_DIST {
 		return false
 	}
 
