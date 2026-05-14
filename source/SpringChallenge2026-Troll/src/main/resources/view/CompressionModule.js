@@ -92,7 +92,7 @@ export class CompressionModule {
                 }
             }
 
-            let plantIds = Object.keys(currentState).filter(k => currentState[k].objectType === 'plant' && currentState[k].health > 0).sort((a, b) => a - b)
+            let plantIds = Object.keys(currentState).filter(k => currentState[k].objectType === 'plant').sort((a, b) => a - b)
             let unitIds = Object.keys(currentState).filter(k => currentState[k].objectType === 'unit').sort((a, b) => a - b)
 
             // set tooltips
@@ -103,6 +103,7 @@ export class CompressionModule {
                 if (plant.health <= 0) tip = ''
                 frame.tooltips[0][id] = tip
             }
+            plantIds = Object.keys(currentState).filter(k => currentState[k].objectType === 'plant' && currentState[k].health > 0).sort((a, b) => a - b)
             for (let id of unitIds) {
                 let unit = currentState[id]
                 let tip = `TROLL\nid: ${unit.id}\nmovementSpeed: ${unit.moveSpeed}\ncarryCapacity: ${unit.carryCapacity}\nharvestPower: ${unit.harvestPower}\nchopPower: ${unit.chopPower}`

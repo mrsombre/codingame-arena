@@ -97,14 +97,16 @@ func (r *Referee) ParsePlayerOutputs(players []arena.Player) {
 		if player.IsDeactivated() {
 			continue
 		}
-		outputs := player.GetOutputs()
-		if len(outputs) == 0 {
-			// Arena runner already deactivates on output timeout; this is a
-			// defensive path for engines invoked directly (e.g. tests).
-			r.killPlayer(player, "timeout")
-			continue
+		// Java getOutputs().get(0) returns whatever line the bot wrote
+		// (could be ""); parseTasks("") just adds no tasks and the player
+		// stays active. Real bot timeouts are caught upstream (handlePlayer
+		// Commands wraps a hardTimeoutError into Deactivate before this
+		// runs), so empty output here is "no commands this turn", not DQ.
+		var command string
+		if outputs := player.GetOutputs(); len(outputs) > 0 {
+			command = outputs[0]
 		}
-		mgr.ParseTasks(player, r.Board, outputs[0], r.Board.League)
+		mgr.ParseTasks(player, r.Board, command, r.Board.League)
 	}
 	r.pending = &pendingTasks{manager: mgr}
 }

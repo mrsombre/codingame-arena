@@ -147,7 +147,7 @@ func handleReplayGet(replayDir string, resolver factoryResolver) http.HandlerFun
 			gameOptions.Set("league", strconv.Itoa(league))
 		}
 
-		moves := arena.ReplayMovesFromFrames(replay)
+		moves := arena.ResolveTurnModel(factory).ReplayMovesFromFrames(replay)
 		names := arena.ReplayPlayerNames(replay)
 
 		trace, _ := arena.RunReplay(factory, seed, gameOptions, moves, names, 0)
