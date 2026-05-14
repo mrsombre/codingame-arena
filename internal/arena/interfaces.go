@@ -171,12 +171,28 @@ type GameOverFrameReporter interface {
 type TurnModel interface {
 	ExpectedTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int
 	MainTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int
+	// ReplayMovesFromFrames extracts per-side bot outputs for replay. The
+	// implementation decides how empty-stdout frames are treated: FlatTurn
+	// Model keeps them (each frame is a player-decision turn; empty means
+	// the bot replied with nothing or timed out), while PostEnd/Phase
+	// TurnModels drop them (mid-replay empties are engine sub-turns the
+	// engine schedules via ShouldSkipPlayerTurn, not bot outputs to feed).
+	ReplayMovesFromFrames(replay CodinGameReplay[CodinGameReplayFrame]) ReplayMoves
 }
 
 // TurnModeler is the factory-level hook that names which TurnModel a game
 // uses. Factories without this hook fall back to FlatTurnModel.
 type TurnModeler interface {
 	TurnModel() TurnModel
+}
+
+// ResolveTurnModel returns the factory's TurnModel, defaulting to
+// FlatTurnModel for factories that don't implement TurnModeler.
+func ResolveTurnModel(factory GameFactory) TurnModel {
+	if tm, ok := factory.(TurnModeler); ok {
+		return tm.TurnModel()
+	}
+	return FlatTurnModel{}
 }
 
 // RulesProvider returns the bundled rules.md contents for a game so the

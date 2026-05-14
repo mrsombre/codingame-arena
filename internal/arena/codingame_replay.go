@@ -186,13 +186,34 @@ func ParseReplayLeague(questionTitle string) int {
 	return n
 }
 
-// ReplayMovesFromFrames converts replay frames into per-turn bot outputs.
+// ReplayMovesFromFrames converts replay frames into per-turn bot outputs,
+// dropping empty-stdout frames. Suitable for engines whose mid-replay empty
+// frames are engine sub-turns rather than bot outputs (PostEndTurnModel /
+// PhaseTurnModel). FlatTurnModel games need alignment-preserving extraction
+// — call the model's ReplayMovesFromFrames method instead.
 func ReplayMovesFromFrames(replay CodinGameReplay[CodinGameReplayFrame]) ReplayMoves {
 	var moves ReplayMoves
 	for _, f := range replay.GameResult.Frames {
 		if strings.TrimSpace(f.Stdout) == "" {
 			continue
 		}
+		switch f.AgentID {
+		case 0:
+			moves.Left = append(moves.Left, f.Stdout)
+		case 1:
+			moves.Right = append(moves.Right, f.Stdout)
+		}
+	}
+	return moves
+}
+
+// replayMovesPerAgentFrame keeps one entry per agent frame (empties kept as
+// ""). Used by FlatTurnModel where every frame is a player-decision turn,
+// so dropping empties would shift later commands forward and misalign them
+// with the engine's turn counter.
+func replayMovesPerAgentFrame(replay CodinGameReplay[CodinGameReplayFrame]) ReplayMoves {
+	var moves ReplayMoves
+	for _, f := range replay.GameResult.Frames {
 		switch f.AgentID {
 		case 0:
 			moves.Left = append(moves.Left, f.Stdout)
@@ -283,6 +304,10 @@ func (FlatTurnModel) MainTurnCount(replay CodinGameReplay[CodinGameReplayFrame])
 	return mainTurnCount(replay)
 }
 
+func (FlatTurnModel) ReplayMovesFromFrames(replay CodinGameReplay[CodinGameReplayFrame]) ReplayMoves {
+	return replayMovesPerAgentFrame(replay)
+}
+
 func (PostEndTurnModel) ExpectedTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	turns, _ := pairFlushCount(replay)
 	if hasTrailingEngineFrame(replay) {
@@ -293,6 +318,10 @@ func (PostEndTurnModel) ExpectedTraceTurnCount(replay CodinGameReplay[CodinGameR
 
 func (PostEndTurnModel) MainTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	return mainTurnCount(replay)
+}
+
+func (PostEndTurnModel) ReplayMovesFromFrames(replay CodinGameReplay[CodinGameReplayFrame]) ReplayMoves {
+	return ReplayMovesFromFrames(replay)
 }
 
 func (PhaseTurnModel) ExpectedTraceTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
@@ -328,6 +357,10 @@ func (PhaseTurnModel) ExpectedTraceTurnCount(replay CodinGameReplay[CodinGameRep
 
 func (PhaseTurnModel) MainTurnCount(replay CodinGameReplay[CodinGameReplayFrame]) int {
 	return mainTurnCount(replay)
+}
+
+func (PhaseTurnModel) ReplayMovesFromFrames(replay CodinGameReplay[CodinGameReplayFrame]) ReplayMoves {
+	return ReplayMovesFromFrames(replay)
 }
 
 // pairFlushCount runs the shared flat counting loop used by FlatTurnModel

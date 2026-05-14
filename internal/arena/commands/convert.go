@@ -235,30 +235,21 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		return arena.TraceMatch{}, league, fmt.Errorf("%w: blue %q not found in players %v", errReplayPrep, replay.Blue, botNames)
 	}
 
+	turnModel := arena.ResolveTurnModel(factory)
 	trace, _ := arena.RunReplay(
 		factory,
 		seed,
 		gameOptions,
-		arena.ReplayMovesFromFrames(replay),
+		turnModel.ReplayMovesFromFrames(replay),
 		botNames,
 		0,
 	)
 
-	turnModel := resolveTurnModel(factory)
 	if err := verifyReplayTrace(trace, replay, turnModel); err != nil {
 		return trace, league, err
 	}
 
 	return trace, league, nil
-}
-
-// resolveTurnModel returns the factory's TurnModel, defaulting to
-// FlatTurnModel for factories that don't implement TurnModeler.
-func resolveTurnModel(factory arena.GameFactory) arena.TurnModel {
-	if tm, ok := factory.(arena.TurnModeler); ok {
-		return tm.TurnModel()
-	}
-	return arena.FlatTurnModel{}
 }
 
 // verifyReplayTrace checks the engine reproduces the replay across three
