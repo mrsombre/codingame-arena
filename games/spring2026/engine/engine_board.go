@@ -53,6 +53,14 @@ type Board struct {
 	stalled       bool
 	Summary       []string
 
+	// birdPlant / birdCell / birdDied mirror view.BirdView's per-tick state
+	// so Tick can consume the same RNG draws Java's view.update() does.
+	// Set by consumeBoardViewRandoms when the bird+cat creator is placed
+	// (see view.BoardView line 71-74). nil when no bird was rolled.
+	birdPlant *Plant
+	birdCell  *Cell
+	birdDied  bool
+
 	// Traces accumulates per-turn structured events for the current
 	// PerformGameUpdate call, partitioned by player. Reset at
 	// ResetGameTurnData so MSG/WAIT events emitted during ParsePlayerOutputs
@@ -551,6 +559,12 @@ func (b *Board) Tick(turn int, taskManager *TaskManager) {
 	for _, p := range b.Players {
 		p.RecomputeScore()
 	}
+	// Java Board.tick ends with view.update(), which calls birdView.update()
+	// when a bird was placed by BoardView. That draw consumes 2 RNG ints
+	// (idle frame indices) while the bird sits at its tree, or routes a
+	// getNextCell call once the tree dies. Mirroring it keeps the shared
+	// SHA1PRNG aligned with the Java referee through the rest of the match.
+	b.consumeBirdViewUpdate()
 	// Emit one FAILED trace per raw non-critical error so analyzers see the
 	// actual rejection count. PopErrors (called next by the referee) collapses
 	// runs of the same code into a "(N more errors of that type)" summary

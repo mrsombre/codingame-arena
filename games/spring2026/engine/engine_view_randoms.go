@@ -81,6 +81,8 @@ func (b *Board) consumeBoardViewRandoms() {
 						creatorsPlaced[2] = true
 						creatorsPlaced[3] = true
 						birdPlaced = true
+						b.birdPlant = cell.Plant
+						b.birdCell = cell
 					}
 				}
 				// :75 — `else if (random.nextDouble() < 0.3)` runs whenever
@@ -166,5 +168,52 @@ func (b *Board) consumeBoardViewRandoms() {
 				}
 			}
 		}
+	}
+}
+
+// consumeBirdViewUpdate mirrors the RNG draws view.BirdView.update() makes
+// on each engine tick (view.BoardView.update → birdView.update). Called
+// from Board.Tick after game state is settled.
+//
+// Java BirdView.update():
+//   - if birdDied: return.
+//   - if tree.isDead(): pick closest max-size plant as new tree (no RNG).
+//   - if bird is at tree.cell: draw 2 ints (idle1-5, idle1-3) for sprite
+//     frame choice.
+//   - else: getNextCell(cell, tree.cell, 1) — internally uses RNG for tie-
+//     breaks among equally-short moves; advance bird's cell to next.
+//   - if tree is still dead after the search: birdDied = true.
+func (b *Board) consumeBirdViewUpdate() {
+	if b.birdPlant == nil || b.birdDied {
+		return
+	}
+	if b.birdPlant.IsDead() {
+		// Pick closest alive max-size plant as the new tree (no RNG).
+		dist := b.GetDistances(b.birdCell)
+		closest := b.Width * b.Height
+		var newTree *Plant
+		for _, plant := range b.Plants {
+			d := dist[plant.Cell.X][plant.Cell.Y]
+			if d < closest && plant.Size == PLANT_MAX_SIZE {
+				closest = d
+				newTree = plant
+			}
+		}
+		if newTree != nil {
+			b.birdPlant = newTree
+		}
+	}
+	if b.birdCell == b.birdPlant.Cell {
+		// idle frame choice for bird and cat sprites.
+		b.Random.NextIntRange(1, 5)
+		b.Random.NextIntRange(1, 3)
+	} else {
+		// getNextCell draws RNG for the BFS tie-break, then bird advances
+		// one step toward the tree.
+		next := b.getNextCell(b.birdCell, b.birdPlant.Cell, 1)
+		b.birdCell = next
+	}
+	if b.birdPlant.IsDead() {
+		b.birdDied = true
 	}
 }
