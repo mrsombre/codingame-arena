@@ -12,3 +12,6 @@
 
 # scratch folder
 /.tmp/
+
+# local issue tracker
+/.scratch/
