@@ -7,6 +7,7 @@ package sha1prng
 import (
 	"crypto/sha1"
 	"encoding/binary"
+	"math"
 )
 
 const digestSize = 20
@@ -27,6 +28,42 @@ func (r *Random) NextDouble() float64 {
 	hi := int64(r.next(26))
 	lo := int64(r.next(27))
 	return float64(hi<<27+lo) / float64(int64(1)<<53)
+}
+
+// NextFloat mirrors java.util.Random.nextFloat: next(24) / 2^24.
+func (r *Random) NextFloat() float32 {
+	return float32(r.next(24)) / float32(1<<24)
+}
+
+// NextFloatBound mirrors Java 17's RandomGenerator.nextFloat(float bound)
+// default (RandomSupport.boundedNextFloat): nextFloat() * bound, clamped to
+// nextDown(bound) when float rounding lands exactly on the bound.
+func (r *Random) NextFloatBound(bound float32) float32 {
+	// Same negated form as RandomSupport.checkBound, so NaN is rejected too.
+	if !(bound > 0 && bound <= math.MaxFloat32) {
+		panic("bound must be positive and finite")
+	}
+	v := r.NextFloat() * bound
+	if v >= bound {
+		v = math.Nextafter32(bound, -math.MaxFloat32)
+	}
+	return v
+}
+
+// NextBoolean mirrors java.util.Random.nextBoolean: next(1) != 0.
+func (r *Random) NextBoolean() bool {
+	return r.next(1) != 0
+}
+
+// Shuffle mirrors java.util.Collections.shuffle(list, rnd): a backward
+// Fisher-Yates walk consuming one nextInt(i) per position from the end.
+// Java takes the same path for RandomAccess lists and for LinkedList (which
+// is shuffled through a temporary array), so one helper covers both.
+func Shuffle[T any](r *Random, s []T) {
+	for i := len(s); i > 1; i-- {
+		j := r.NextInt(i)
+		s[i-1], s[j] = s[j], s[i-1]
+	}
 }
 
 func (r *Random) NextInt(bound int) int {
