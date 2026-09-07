@@ -2,14 +2,13 @@
 .vscode
 .DS_Store
 
-/.claude/settings.local.json
-**/*/skills
-
 /bin/
+
 /data/
-/tmp/
+/replays/
+/traces/
 
-replays/
-traces/
+/arena.yml
 
-arena.yml
+# scratch folder
+/.tmp/
