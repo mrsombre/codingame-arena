@@ -109,12 +109,22 @@ type Game struct {
 	EnableSideQuest bool
 	ShowSideQuest   bool
 
-	// Per-player placement counters, indexed by player index. Java publishes
-	// them as match metadata; here they feed the arena's MetricsProvider.
+	// Per-player counters, indexed by player index. Java publishes them as
+	// match metadata; here they feed the arena's MetricsProvider.
 	PlacedTracks            [2]int
 	TracksPlacedOnPlains    [2]int
 	TracksPlacedOnRiver     [2]int
 	TracksPlacedOnMountains [2]int
+
+	// ExtraTilesInConnection sums, over every scoring event, how much longer
+	// the connection's path was than the straight-line distance between the
+	// two towns — a measure of how far a player's rails detour.
+	ExtraTilesInConnection [2]int
+	// TrackOwnershipPercentagePerActiveConnection sums the player's share of
+	// each connection it scored on, and ...Total counts those events, so the
+	// average is the ratio of the two. float32, as in Java.
+	TrackOwnershipPercentagePerActiveConnection      [2]float32
+	TrackOwnershipPercentagePerActiveConnectionTotal [2]int
 
 	// Summary collects the lines Java sends to gameManager.addToGameSummary.
 	Summary []string
@@ -199,14 +209,17 @@ public void performGameUpdate(int turn) {
 }
 */
 
-// PerformGameUpdate runs one turn. Autobuild expansion, disruption,
-// instability and scoring are staged in by later work; the turn counter, the
-// income reset, track placement and the end check are live.
+// PerformGameUpdate runs one turn. Autobuild expansion, disruption and
+// instability are staged in by later work; the turn counter, the income
+// reset, track placement, connection scoring and the end check are live.
 func (g *Game) PerformGameUpdate(_ int) {
 	g.Turn++
 
 	g.DoIncome()
 	g.DoActions()
+
+	g.MoveTrains()
+	g.ComputeTileStates()
 
 	if g.IsGameOver() {
 		g.EndGame()
@@ -402,6 +415,140 @@ func moveToBack(order []Coord, coord Coord) []Coord {
 		}
 	}
 	return append(order, coord)
+}
+
+/*
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:301-341
+
+private void moveTrains() {
+    // We're not moving anything, were detecting connected cities and scoring them.
+    for (Town town : grid.towns) {
+        List<Town> previousConnections = new ArrayList<>(town.activeConnections);
+        Map<Integer, List<Coord>> prevTownPaths = town.paths;
+
+        town.paths = new TreeMap<>();
+        town.activeConnections.clear();
+        for (Town other : town.desiredConnections) {
+            List<Coord> path = new TrainBFS(grid, town, other).search();
+
+            if (!path.isEmpty()) {
+                town.activeConnections.add(other);
+                town.paths.put(other.id, path);
+
+                int[] pointsPerPlayer = new int[] { 0, 0 };
+                for (Coord coord : path) {
+                    Tile tile = grid.get(coord);
+                    for (Player p : players)
+                        if (tile.track == p.getIndex()) pointsPerPlayer[p.getIndex()]++;
+                }
+                for (Player p : players) {
+                    if (pointsPerPlayer[p.getIndex()] == 0) continue;
+                    int points = pointsPerPlayer[p.getIndex()];
+                    p.addScore(points);
+                    launchEarnPointsEvent(p, points, town, other);
+                    extraTilesInConnection[p.getIndex()] += path.size() - town.coord.manhattanTo(other.coord);
+                    trackOwnershipPercentagePerActiveConnection[p.getIndex()] += (float) points / (float) path.size();
+                    trackOwnershipPercentagePerActiveConnectionTotal[p.getIndex()]++;
+                }
+                ... newConnections bookkeeping ...
+            }
+        }
+        ... removals ...
+    }
+    ... animations ...
+}
+*/
+
+// MoveTrains moves nothing. It recomputes, for every town, which of its
+// desired counterparts are currently reachable over track, and pays out one
+// point per track the player owns on each such path — every turn the
+// connection stands, not once when it is made.
+//
+// Scoring walks the whole path, towns included, but a town tile carries
+// TRACK_NONE and a contested tile carries TRACK_NEUTRAL, so neither matches a
+// player index and neither scores for anybody.
+//
+// A connection is directional: town A wanting B and town B wanting A are two
+// separate connections and both pay out.
+//
+// Java's newConnections set, the pathHasChanged comparison against the
+// previous turn's paths, and the removal walk over previousConnections exist
+// only to fire viewer animation events and are not ported.
+func (g *Game) MoveTrains() {
+	for _, town := range g.Grid.Towns {
+		town.Paths = map[int][]Coord{}
+		town.ActiveConnections = town.ActiveConnections[:0]
+
+		for _, other := range town.DesiredConnections {
+			path := NewTrainBFS(g.Grid, town, other).Search()
+			if len(path) == 0 {
+				continue
+			}
+
+			town.ActiveConnections = append(town.ActiveConnections, other)
+			town.Paths[other.ID] = path
+
+			var pointsPerPlayer [2]int
+			for _, coord := range path {
+				tile := g.Grid.Get(coord)
+				for _, p := range g.Players {
+					if tile.Track == p.GetIndex() {
+						pointsPerPlayer[p.GetIndex()]++
+					}
+				}
+			}
+
+			for _, p := range g.Players {
+				idx := p.GetIndex()
+				points := pointsPerPlayer[idx]
+				if points == 0 {
+					continue
+				}
+				p.AddScore(points)
+				g.ExtraTilesInConnection[idx] += len(path) - town.Coord.ManhattanTo(other.Coord)
+				g.TrackOwnershipPercentagePerActiveConnection[idx] += float32(points) / float32(len(path))
+				g.TrackOwnershipPercentagePerActiveConnectionTotal[idx]++
+			}
+		}
+	}
+}
+
+/*
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:219-234
+
+private void computeTileStates() {
+    grid.cells.values().forEach(tile -> { tile.activeConnections.clear(); });
+
+    for (Town t : grid.towns) {
+        t.paths.forEach(
+            (Integer toTownId, List<Coord> path) -> {
+                path.forEach(c -> grid.get(c).activeConnections.add(new ScheduleStep(t.id, toTownId)));
+            }
+        );
+    }
+}
+*/
+
+// ComputeTileStates stamps every cell with the connections whose path crosses
+// it, which is what the per-turn serialization reports. Town.Paths is a
+// TreeMap in Java, so the stamps land in ascending destination-town order;
+// the serializer sorts them anyway, but the order is preserved regardless.
+func (g *Game) ComputeTileStates() {
+	for _, tile := range g.Grid.Cells {
+		tile.ActiveConnections = tile.ActiveConnections[:0]
+	}
+
+	for _, t := range g.Grid.Towns {
+		for _, toTownID := range t.SortedPathTownIDs() {
+			for _, c := range t.Paths[toTownID] {
+				tile := g.Grid.Get(c)
+				tile.ActiveConnections = append(tile.ActiveConnections, ScheduleStep{
+					FromTownID: t.ID,
+					ToTownID:   toTownID,
+				})
+			}
+		}
+	}
 }
 
 /*

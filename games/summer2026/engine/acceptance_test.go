@@ -27,10 +27,12 @@ type townSpec struct {
 // scenario is the input to loadScenario. Terrain is required; Regions is an
 // optional parallel layer where each distinct rune is one region, numbered by
 // first appearance in row-major order. With Regions omitted every cell lands
-// in region 0.
+// in region 0. Tracks is an optional parallel layer laying rails down
+// directly, bypassing the paint economy.
 type scenario struct {
 	Terrain []string
 	Regions []string
+	Tracks  []string
 	Towns   []townSpec
 }
 
@@ -62,6 +64,7 @@ func loadScenario(t *testing.T, sc scenario) (*Game, *Player, *Player) {
 	}
 
 	assignRegions(t, grid, sc.Regions)
+	assignTracks(t, grid, sc.Tracks)
 
 	byID := make(map[int]*Town, len(sc.Towns))
 	for _, spec := range sc.Towns {
@@ -121,6 +124,33 @@ func assignRegions(t *testing.T, grid *Grid, regions []string) {
 	grid.Zones = make([]*Zone, len(ids))
 	for id, coords := range coordsByZone {
 		grid.Zones[id] = NewZone(id, coords)
+	}
+}
+
+// assignTracks lays rails from the optional track layer. Characters: '.' no
+// track, '0' and '1' a track owned by that player, 'n' a neutral one.
+func assignTracks(t *testing.T, grid *Grid, tracks []string) {
+	t.Helper()
+	if tracks == nil {
+		return
+	}
+
+	require.Equal(t, grid.Height, len(tracks), "track layer height mismatch")
+	for y, row := range tracks {
+		require.Equalf(t, grid.Width, len(row), "track row %d length mismatch", y)
+		for x, ch := range row {
+			switch ch {
+			case '.':
+			case '0':
+				grid.GetXY(x, y).Track = 0
+			case '1':
+				grid.GetXY(x, y).Track = 1
+			case 'n':
+				grid.GetXY(x, y).Track = TRACK_NEUTRAL
+			default:
+				t.Fatalf("unknown track char %q at %d,%d", ch, x, y)
+			}
+		}
 	}
 }
 
@@ -457,6 +487,268 @@ func TestIntentsAreClearedBetweenTurns(t *testing.T) {
 	runTurn(game, "WAIT", "WAIT")
 
 	assert.Len(t, p0.Intents, 1)
+}
+
+// ——— connections and scoring —————————————————————————————————————————————
+
+func TestConnectionIsDiscoveredWhenTrackLinksATownToItsDesiredCounterpart(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{"....."},
+		Tracks:  []string{".000."},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 4, Y: 0},
+		},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+
+	town0 := game.Grid.Towns[0]
+	require.Len(t, town0.ActiveConnections, 1)
+	assert.Equal(t, 1, town0.ActiveConnections[0].ID)
+	assert.Equal(t,
+		[]Coord{{0, 0}, {1, 0}, {2, 0}, {3, 0}, {4, 0}},
+		town0.Paths[1],
+	)
+}
+
+func TestNoConnectionIsDiscoveredAcrossAGapInTheTrack(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{"....."},
+		Tracks:  []string{".0.0."},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 4, Y: 0},
+		},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+
+	assert.Empty(t, game.Grid.Towns[0].ActiveConnections)
+	assert.Empty(t, game.Grid.Towns[0].Paths)
+}
+
+// Each owned track on the path pays one point per turn, so an unchanged
+// connection keeps paying for as long as it stands.
+func TestEachOwnedTrackOnAConnectionScoresOnePointPerTurn(t *testing.T) {
+	game, p0, p1 := loadScenario(t, scenario{
+		Terrain: []string{"....."},
+		Tracks:  []string{".001."},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 4, Y: 0},
+		},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+	assert.Equal(t, 2, p0.GetScore())
+	assert.Equal(t, 1, p1.GetScore())
+
+	runTurn(game, "WAIT", "WAIT")
+	assert.Equal(t, 4, p0.GetScore())
+	assert.Equal(t, 2, p1.GetScore())
+}
+
+// A path runs over towns and can run over contested track, and neither is
+// owned by a player index, so neither scores for anybody.
+func TestNeutralTrackAndTownsScoreForNobody(t *testing.T) {
+	game, p0, p1 := loadScenario(t, scenario{
+		Terrain: []string{"....."},
+		Tracks:  []string{".nnn."},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 4, Y: 0},
+		},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+
+	require.Len(t, game.Grid.Towns[0].ActiveConnections, 1)
+	assert.Equal(t, 0, p0.GetScore())
+	assert.Equal(t, 0, p1.GetScore())
+}
+
+// DesiredConnections are unilateral. When both towns want each other there
+// are two connections over the same rails, and each pays out separately.
+func TestAMutuallyDesiredPairScoresTwicePerTurn(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{
+		Terrain: []string{"...."},
+		Tracks:  []string{".00."},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 3, Y: 0, Desires: []int{0}},
+		},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+
+	assert.Equal(t, 4, p0.GetScore())
+}
+
+// Scoring is recomputed from scratch each turn, so a connection that is cut
+// simply stops paying.
+func TestABrokenConnectionStopsScoring(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{
+		Terrain: []string{"....."},
+		Tracks:  []string{".000."},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 4, Y: 0},
+		},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+	require.Equal(t, 3, p0.GetScore())
+
+	game.Grid.GetXY(2, 0).Track = TRACK_NONE
+	runTurn(game, "WAIT", "WAIT")
+
+	assert.Equal(t, 3, p0.GetScore())
+	assert.Empty(t, game.Grid.Towns[0].ActiveConnections)
+}
+
+// Both ways round are five cells. NORTH precedes SOUTH in the neighbour scan
+// order, so the northern route is the one that scores — the southern rails
+// earn their owner nothing.
+func TestEqualLengthPathsAreBrokenByNorthEastSouthWestPriority(t *testing.T) {
+	game, p0, p1 := loadScenario(t, scenario{
+		Terrain: []string{
+			"...",
+			"...",
+			"...",
+		},
+		Tracks: []string{
+			"000",
+			"...",
+			"111",
+		},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 1, Desires: []int{1}},
+			{ID: 1, X: 2, Y: 1},
+		},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+
+	assert.Equal(t,
+		[]Coord{{0, 1}, {0, 0}, {1, 0}, {2, 0}, {2, 1}},
+		game.Grid.Towns[0].Paths[1],
+	)
+	assert.Equal(t, 3, p0.GetScore())
+	assert.Equal(t, 0, p1.GetScore())
+}
+
+func TestScoringCountsEveryConnectionATrackParticipatesIn(t *testing.T) {
+	// Both towns 1 and 2 are reachable from town 0 over the same middle
+	// track, and that one cell is paid for once per connection.
+	game, p0, _ := loadScenario(t, scenario{
+		Terrain: []string{"..."},
+		Tracks:  []string{".0."},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 2, Y: 0, Desires: []int{0}},
+		},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+
+	assert.Equal(t, 2, p0.GetScore())
+}
+
+func TestConnectionMetricsRecordDetourLengthAndOwnershipShare(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{
+			"...",
+			"...",
+		},
+		Tracks: []string{
+			"00.",
+			".0.",
+		},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 2, Y: 1},
+		},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+
+	// The path is four cells for a Manhattan distance of three, and player 0
+	// owns three of the four.
+	assert.Equal(t, [2]int{1, 0}, game.ExtraTilesInConnection)
+	assert.Equal(t, [2]int{1, 0}, game.TrackOwnershipPercentagePerActiveConnectionTotal)
+	assert.Equal(t, float32(0.75), game.TrackOwnershipPercentagePerActiveConnection[0])
+}
+
+// ——— connections in the per-turn serialization ————————————————————————————
+
+func TestFrameInfoReportsConnectionsAndScoresAsTheBotSeesThem(t *testing.T) {
+	game, p0, p1 := loadScenario(t, scenario{
+		Terrain: []string{"...."},
+		Tracks:  []string{".01."},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 3, Y: 0},
+		},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+
+	assert.Equal(t, []string{
+		"1", "1",
+		"-1 0 0 0-1",
+		"0 0 0 0-1",
+		"1 0 0 0-1",
+		"-1 0 0 0-1",
+	}, SerializeFrameInfoFor(p0, game))
+
+	// Player 1 reads the same board with the score pair swapped.
+	assert.Equal(t, []string{"1", "1"}, SerializeFrameInfoFor(p1, game)[:2])
+}
+
+func TestFrameInfoReportsCellsOffEveryConnectionWithTheXSentinel(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{
+		Terrain: []string{
+			"...",
+			"...",
+		},
+		Tracks: []string{
+			".0.",
+			"000",
+		},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 2, Y: 0},
+		},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+
+	// The connection runs along the top row, so the bottom row is on no path.
+	lines := SerializeFrameInfoFor(p0, game)
+	assert.Equal(t, "0 0 0 0-1", lines[3])
+	assert.Equal(t, "0 0 0 x", lines[5])
+}
+
+// Tile stamps are rebuilt from scratch every turn, so a connection that goes
+// away leaves nothing behind on the cells it used to cross.
+func TestConnectionStampsAreClearedWhenTheConnectionGoesAway(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{
+		Terrain: []string{"...."},
+		Tracks:  []string{".00."},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 3, Y: 0},
+		},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+	require.Equal(t, "0 0 0 0-1", SerializeFrameInfoFor(p0, game)[3])
+
+	game.Grid.GetXY(1, 0).Track = TRACK_NONE
+	runTurn(game, "WAIT", "WAIT")
+
+	assert.Equal(t, "0 0 0 x", SerializeFrameInfoFor(p0, game)[4])
 }
 
 // ——— game end ————————————————————————————————————————————————————————————
