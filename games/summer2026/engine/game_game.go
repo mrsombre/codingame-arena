@@ -154,6 +154,12 @@ type Game struct {
 
 	// ended mirrors gameManager.endGame() having been called.
 	ended bool
+
+	// rawScores snapshots the points each player earned in play, taken at the
+	// top of OnEnd because OnEnd itself replaces them — with -1 for a
+	// deactivated player, and with the objective verdict in a tutorial league.
+	rawScores    [2]int
+	rawScoresSet bool
 }
 
 func NewGame(random *sha1prng.Random, leagueLevel int) *Game {
@@ -1026,6 +1032,9 @@ public void onEnd() {
 // Otherwise a deactivated player's score becomes -1. The score texts and the
 // end screen are viewer-only.
 func (g *Game) OnEnd() {
+	g.rawScores = g.RawScores()
+	g.rawScoresSet = true
+
 	if g.InTutorial {
 		g.Tutorial.HandleEnd()
 		return
@@ -1051,6 +1060,22 @@ public static String getExpected(String command) {
     return "AUTOPLACE | PLACE_TRACK | DISRUPT | MESSAGE | WAIT";
 }
 */
+
+// RawScores reports the points each player earned in play. Before OnEnd that
+// is simply the live score; afterwards it is the snapshot OnEnd took, since
+// the live score by then carries the end-of-game verdict instead.
+func (g *Game) RawScores() [2]int {
+	if g.rawScoresSet {
+		return g.rawScores
+	}
+	var scores [2]int
+	for _, p := range g.Players {
+		if idx := p.GetIndex(); idx >= 0 && idx < len(scores) {
+			scores[idx] = p.GetScore()
+		}
+	}
+	return scores
+}
 
 func (g *Game) ShouldSkipPlayerTurn(_ *Player) bool { return false }
 
