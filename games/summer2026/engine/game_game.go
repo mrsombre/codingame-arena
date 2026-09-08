@@ -109,6 +109,13 @@ type Game struct {
 	EnableSideQuest bool
 	ShowSideQuest   bool
 
+	// Per-player placement counters, indexed by player index. Java publishes
+	// them as match metadata; here they feed the arena's MetricsProvider.
+	PlacedTracks            [2]int
+	TracksPlacedOnPlains    [2]int
+	TracksPlacedOnRiver     [2]int
+	TracksPlacedOnMountains [2]int
+
 	// Summary collects the lines Java sends to gameManager.addToGameSummary.
 	Summary []string
 
@@ -192,13 +199,14 @@ public void performGameUpdate(int turn) {
 }
 */
 
-// PerformGameUpdate runs one turn. Autobuild expansion, track placement,
-// disruption, instability and scoring are staged in by later work; the turn
-// counter, the income reset and the end check are live.
+// PerformGameUpdate runs one turn. Autobuild expansion, disruption,
+// instability and scoring are staged in by later work; the turn counter, the
+// income reset, track placement and the end check are live.
 func (g *Game) PerformGameUpdate(_ int) {
 	g.Turn++
 
 	g.DoIncome()
+	g.DoActions()
 
 	if g.IsGameOver() {
 		g.EndGame()
@@ -222,6 +230,178 @@ func (g *Game) DoIncome() {
 		player.Dosh = PASSIVE_INCOME
 		player.BlotPoints = BLOT_POINTS_PER_TURN
 	}
+}
+
+/*
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:455-541
+
+private void doActions() {
+    Map<Coord, List<Integer>> tracksPlaced = new TreeMap<>();
+    List<Coord> placementOrder = new ArrayList<>();
+    for (Player player : players) {
+        boolean interruptAutobuild = false;
+        for (Action action : player.intents) {
+            if (interruptAutobuild && action.isGeneratedByAutobuild()) continue;
+            if (action.isPlaceTrack()) {
+                Coord coord = action.getCoord();
+                Tile tile = grid.get(coord);
+                if (!tile.isValid()) { reportPlayerError(player, "Not part of grid: " + coord + ""); continue; }
+                if (tile.isTown()) { reportPlayerError(player, "Cannot place tracks on a town at " + coord); continue; }
+                Zone zone = grid.zones.get(tile.zoneId);
+                if (!canPlaceTrackInZone(zone, player)) { reportPlayerError(player, "Cannot build in region " + zone.getId()); continue; }
+                if (!isFreeOfTracks(coord, player, tracksPlaced)) { reportPlayerError(player, "Cannot place tracks on existing tracks at " + coord); continue; }
+                int railCost = getRailCost(tile);
+                if (player.getDosh() < railCost) {
+                    if (action.isGeneratedByAutobuild()) {
+                        reportPlayerError(player, "Autobuild interrupted: not enough track points to build a track at " + coord + ".");
+                        interruptAutobuild = true;
+                    } else {
+                        reportPlayerError(player, "Not enough track points to build a track at " + coord + ".");
+                    }
+                    continue;
+                }
+                tracksPlaced.computeIfAbsent(coord, k -> new ArrayList<>(2)).add(player.getIndex());
+                placementOrder.remove(coord);
+                placementOrder.add(coord);
+                player.pay(railCost);
+                placedTracks[player.getIndex()]++;
+                if (tile.isMountain()) tracksPlacedOnMountains[player.getIndex()]++;
+                else if (tile.isWater()) tracksPlacedOnRiver[player.getIndex()]++;
+                else if (tile.isPlains()) tracksPlacedOnPlains[player.getIndex()]++;
+            }
+        }
+    }
+    for (Coord coord : placementOrder) {
+        List<Integer> playerIdxs = tracksPlaced.get(coord);
+        Tile tile = grid.get(coord);
+        if (playerIdxs.size() == 1) tile.track = playerIdxs.get(0);
+        else tile.track = Tile.TRACK_NEUTRAL;
+    }
+    ... disruptions ...
+}
+*/
+
+// DoActions resolves both players' intents for the turn. Ownership is only
+// written after both players have been charged, so a cell claimed by both in
+// one turn goes neutral and neither side gets a refund. Illegal placements
+// are reported and skipped; only unparseable output disqualifies, and that
+// already happened in CommandManager. The disruption pass that follows this
+// one in Java arrives with the disruption work.
+func (g *Game) DoActions() {
+	// Java keys a TreeMap by Coord; nothing iterates it, so a plain map is
+	// equivalent. placementOrder is what ordering the resolution pass sees.
+	tracksPlaced := map[Coord][]int{}
+	var placementOrder []Coord
+
+	for _, player := range g.Players {
+		interruptAutobuild := false
+		for _, action := range player.Intents {
+			if interruptAutobuild && action.GeneratedByAutobuild {
+				continue
+			}
+			if !action.IsPlaceTrack() {
+				continue
+			}
+
+			coord := action.Coord
+			tile := g.Grid.Get(coord)
+			if !tile.IsValid() {
+				g.ReportPlayerError(player, "Not part of grid: "+coord.String())
+				continue
+			}
+			if tile.IsTown() {
+				g.ReportPlayerError(player, "Cannot place tracks on a town at "+coord.String())
+				continue
+			}
+
+			zone := g.Grid.Zones[tile.ZoneID]
+			if !canPlaceTrackInZone(zone) {
+				g.ReportPlayerError(player, fmt.Sprintf("Cannot build in region %d", zone.ID))
+				continue
+			}
+
+			if !g.isFreeOfTracks(coord, player, tracksPlaced) {
+				g.ReportPlayerError(player, "Cannot place tracks on existing tracks at "+coord.String())
+				continue
+			}
+
+			railCost := RailCost(tile)
+			if player.GetDosh() < railCost {
+				if action.GeneratedByAutobuild {
+					g.ReportPlayerError(player, "Autobuild interrupted: not enough track points to build a track at "+coord.String()+".")
+					interruptAutobuild = true
+				} else {
+					g.ReportPlayerError(player, "Not enough track points to build a track at "+coord.String()+".")
+				}
+				continue
+			}
+
+			tracksPlaced[coord] = append(tracksPlaced[coord], player.GetIndex())
+			placementOrder = moveToBack(placementOrder, coord)
+
+			player.Pay(railCost)
+			g.PlacedTracks[player.GetIndex()]++
+			switch {
+			case tile.IsMountain():
+				g.TracksPlacedOnMountains[player.GetIndex()]++
+			case tile.IsWater():
+				g.TracksPlacedOnRiver[player.GetIndex()]++
+			case tile.IsPlains():
+				g.TracksPlacedOnPlains[player.GetIndex()]++
+			}
+		}
+	}
+
+	for _, coord := range placementOrder {
+		tile := g.Grid.Get(coord)
+		if playerIdxs := tracksPlaced[coord]; len(playerIdxs) == 1 {
+			tile.Track = playerIdxs[0]
+		} else {
+			tile.Track = TRACK_NEUTRAL
+		}
+	}
+}
+
+/*
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:586-601
+
+private boolean canPlaceTrackInZone(Zone zone, Player player) { return !zone.inked; }
+
+private boolean isFreeOfTracks(Coord coord, Player player, Map<Coord, List<Integer>> tracksPlaced) {
+    Tile t = grid.get(coord);
+    return t.track == Tile.TRACK_NONE && !tracksPlaced.getOrDefault(coord, List.of()).contains(player.getIndex());
+}
+*/
+
+// canPlaceTrackInZone ignores the player Java passes it.
+func canPlaceTrackInZone(zone *Zone) bool { return !zone.Inked }
+
+// isFreeOfTracks rejects a cell that already carried a track before the turn,
+// and a cell this same player has already claimed this turn — but not one the
+// opponent claimed, which is how a contested cell arises.
+func (g *Game) isFreeOfTracks(coord Coord, player *Player, tracksPlaced map[Coord][]int) bool {
+	if g.Grid.Get(coord).Track != TRACK_NONE {
+		return false
+	}
+	for _, idx := range tracksPlaced[coord] {
+		if idx == player.GetIndex() {
+			return false
+		}
+	}
+	return true
+}
+
+// moveToBack reproduces `list.remove(coord); list.add(coord)` — the coord ends
+// up last, and a cell claimed by both players is resolved at the position of
+// the second claim.
+func moveToBack(order []Coord, coord Coord) []Coord {
+	for i, c := range order {
+		if c == coord {
+			order = append(order[:i], order[i+1:]...)
+			break
+		}
+	}
+	return append(order, coord)
 }
 
 /*

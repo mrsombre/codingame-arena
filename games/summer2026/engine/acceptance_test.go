@@ -289,6 +289,167 @@ func TestPaintPointsResetEachTurnAndDoNotAccumulate(t *testing.T) {
 	assert.Equal(t, BLOT_POINTS_PER_TURN, p0.BlotPoints)
 }
 
+func TestTrackCostIsChargedPerTerrain(t *testing.T) {
+	cases := map[string]struct {
+		terrain string
+		cost    int
+	}{
+		"plains":   {".", GRASS_COST_MULTIPLIER * BASE_RAIL_COST},
+		"river":    {"~", RIVER_COST_MULTIPLIER * BASE_RAIL_COST},
+		"mountain": {"^", MOUNTAIN_COST_MULTIPLIER * BASE_RAIL_COST},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			game, p0, _ := loadScenario(t, scenario{Terrain: []string{tc.terrain}})
+
+			runTurn(game, "PLACE_TRACK 0 0", "WAIT")
+
+			assert.Equal(t, PASSIVE_INCOME-tc.cost, p0.Dosh)
+			assert.Equal(t, 0, game.Grid.GetXY(0, 0).Track)
+			assert.Empty(t, game.Summary)
+		})
+	}
+}
+
+// Income assigns rather than accumulates, so a turn spent waiting buys nothing
+// on the next one: three plains tracks a turn is the ceiling however long the
+// player saves.
+func TestUnspentPaintDoesNotCarryIntoTheNextTurn(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{Terrain: []string{"...."}})
+
+	runTurn(game, "WAIT", "WAIT")
+	runTurn(game, "PLACE_TRACK 0 0;PLACE_TRACK 1 0;PLACE_TRACK 2 0;PLACE_TRACK 3 0", "WAIT")
+
+	assert.Equal(t, 0, p0.Dosh)
+	assert.Equal(t, 0, game.Grid.GetXY(2, 0).Track)
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(3, 0).Track)
+	assert.False(t, p0.IsDeactivated())
+	assert.Equal(t, []string{
+		"¤RED¤Player 0 Not enough track points to build a track at (3, 0).§RED§",
+	}, game.Summary)
+}
+
+// ——— placement rejection ——————————————————————————————————————————————————
+
+// Every rejection below is reported and skipped. None of them deactivates the
+// player: only unparseable output does that, which
+// TestUnparseableCommandDisqualifiesWithTheExpectedSyntax covers.
+func TestIllegalPlacementsAreSkippedWithAnErrorAndDoNotDisqualify(t *testing.T) {
+	cases := map[string]struct {
+		setup   func(game *Game)
+		command string
+		summary string
+	}{
+		"off grid": {
+			command: "PLACE_TRACK 9 9",
+			summary: "¤RED¤Player 0 Not part of grid: (9, 9)§RED§",
+		},
+		"on a town": {
+			command: "PLACE_TRACK 0 0",
+			summary: "¤RED¤Player 0 Cannot place tracks on a town at (0, 0)§RED§",
+		},
+		"on an existing track": {
+			setup:   func(game *Game) { game.Grid.GetXY(1, 0).Track = 1 },
+			command: "PLACE_TRACK 1 0",
+			summary: "¤RED¤Player 0 Cannot place tracks on existing tracks at (1, 0)§RED§",
+		},
+		"in an inked region": {
+			setup:   func(game *Game) { game.Grid.Zones[0].Inked = true },
+			command: "PLACE_TRACK 1 0",
+			summary: "¤RED¤Player 0 Cannot build in region 0§RED§",
+		},
+		"without enough paint": {
+			command: "PLACE_TRACK 1 0;PLACE_TRACK 2 0",
+			summary: "¤RED¤Player 0 Not enough track points to build a track at (2, 0).§RED§",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			game, p0, _ := loadScenario(t, scenario{
+				Terrain: []string{".^^"},
+				Towns:   []townSpec{{ID: 0, X: 0, Y: 0}},
+			})
+			if tc.setup != nil {
+				tc.setup(game)
+			}
+			doshBefore := PASSIVE_INCOME
+
+			runTurn(game, tc.command, "WAIT")
+
+			assert.False(t, p0.IsDeactivated())
+			assert.NotEqual(t, -1, p0.GetScore())
+			assert.Contains(t, game.Summary, tc.summary)
+			assert.GreaterOrEqual(t, p0.Dosh, 0)
+			assert.LessOrEqual(t, p0.Dosh, doshBefore)
+		})
+	}
+}
+
+// The same player naming one cell twice pays once; the second attempt reads as
+// a placement onto a track it has already bought this turn.
+func TestPlacingTwiceOnOneCellInATurnIsRejectedTheSecondTime(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{Terrain: []string{"."}})
+
+	runTurn(game, "PLACE_TRACK 0 0;PLACE_TRACK 0 0", "WAIT")
+
+	assert.Equal(t, PASSIVE_INCOME-1, p0.Dosh)
+	assert.Equal(t, 0, game.Grid.GetXY(0, 0).Track)
+	assert.Equal(t, []string{
+		"¤RED¤Player 0 Cannot place tracks on existing tracks at (0, 0)§RED§",
+	}, game.Summary)
+}
+
+// ——— contested placement ——————————————————————————————————————————————————
+
+func TestBothPlayersClaimingOneCellYieldsNeutralOwnershipAndBothPay(t *testing.T) {
+	game, p0, p1 := loadScenario(t, scenario{Terrain: []string{".."}})
+
+	runTurn(game, "PLACE_TRACK 0 0", "PLACE_TRACK 0 0")
+
+	assert.Equal(t, TRACK_NEUTRAL, game.Grid.GetXY(0, 0).Track)
+	assert.Equal(t, PASSIVE_INCOME-1, p0.Dosh)
+	assert.Equal(t, PASSIVE_INCOME-1, p1.Dosh)
+	assert.Empty(t, game.Summary)
+}
+
+// Ownership is written only after both players have been charged, so player 1
+// does not see player 0's claim as an existing track and is not blocked by it.
+func TestContestedCellDoesNotBlockTheSecondPlayersOtherPlacements(t *testing.T) {
+	game, _, p1 := loadScenario(t, scenario{Terrain: []string{".."}})
+
+	runTurn(game, "PLACE_TRACK 0 0", "PLACE_TRACK 0 0;PLACE_TRACK 1 0")
+
+	assert.Equal(t, TRACK_NEUTRAL, game.Grid.GetXY(0, 0).Track)
+	assert.Equal(t, 1, game.Grid.GetXY(1, 0).Track)
+	assert.Equal(t, PASSIVE_INCOME-2, p1.Dosh)
+}
+
+// The distinction the engine has to keep straight: an illegal action costs the
+// offender that action, an unparseable one costs it the match.
+func TestIllegalActionSkipsButUnparseableOutputDisqualifies(t *testing.T) {
+	game, p0, p1 := loadScenario(t, scenario{
+		Terrain: []string{".."},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}},
+	})
+
+	runTurn(game, "PLACE_TRACK 0 0", "PLACE_TRACK 0")
+
+	assert.False(t, p0.IsDeactivated())
+	assert.True(t, p1.IsDeactivated())
+	assert.Equal(t, -1, p1.GetScore())
+}
+
+func TestPlacementCountersAreTalliedPerPlayerAndTerrain(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{Terrain: []string{".~^"}})
+
+	runTurn(game, "PLACE_TRACK 0 0;PLACE_TRACK 1 0", "PLACE_TRACK 2 0")
+
+	assert.Equal(t, [2]int{2, 1}, game.PlacedTracks)
+	assert.Equal(t, [2]int{1, 0}, game.TracksPlacedOnPlains)
+	assert.Equal(t, [2]int{1, 0}, game.TracksPlacedOnRiver)
+	assert.Equal(t, [2]int{0, 1}, game.TracksPlacedOnMountains)
+}
+
 func TestIntentsAreClearedBetweenTurns(t *testing.T) {
 	game, p0, _ := loadScenario(t, scenario{Terrain: []string{"."}})
 
