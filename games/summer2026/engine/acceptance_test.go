@@ -34,6 +34,8 @@ type scenario struct {
 	Regions []string
 	Tracks  []string
 	Towns   []townSpec
+	// League selects the tutorial win condition; zero means the full game.
+	League int
 }
 
 // loadScenario builds a Game on a hand-built grid. Terrain characters:
@@ -84,8 +86,13 @@ func loadScenario(t *testing.T, sc scenario) (*Game, *Player, *Player) {
 		}
 	}
 
+	league := sc.League
+	if league == 0 {
+		league = DEFAULT_LEAGUE
+	}
+
 	p0, p1 := NewPlayer(0), NewPlayer(1)
-	game := NewGame(nil, DEFAULT_LEAGUE)
+	game := NewGame(nil, league)
 	game.Init([]*Player{p0, p1})
 	game.Grid = grid
 
@@ -1097,7 +1104,13 @@ func TestATrackPlacedIntoARegionThatInksThisTurnIsClearedImmediately(t *testing.
 // ——— game end ————————————————————————————————————————————————————————————
 
 func TestGameEndsOnTurn100(t *testing.T) {
-	game, _, _ := loadScenario(t, scenario{Terrain: []string{"."}})
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{"..."},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 2, Y: 0},
+		},
+	})
 
 	for turn := 0; turn < MAX_TURNS-1; turn++ {
 		runTurn(game, "WAIT", "WAIT")
@@ -1107,6 +1120,195 @@ func TestGameEndsOnTurn100(t *testing.T) {
 
 	assert.True(t, game.Ended())
 	assert.Equal(t, MAX_TURNS, game.Turn)
+}
+
+// The early end is checked over terrain, so it fires the moment inking walls
+// off the last desired pair — long before either side could have built the
+// route.
+func TestGameEndsWhenInkingCutsTheLastRouteBetweenDesiredTowns(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{"..."},
+		Regions: []string{"aba"},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 2, Y: 0},
+		},
+	})
+	game.Grid.Zones[1].Instability = INSTABILITY_THRESHOLD_BASE - 1
+
+	runTurn(game, "DISRUPT 1", "WAIT")
+
+	assert.True(t, game.Grid.Zones[1].Inked)
+	assert.True(t, game.Ended())
+	assert.Equal(t, 1, game.Turn)
+}
+
+// A second desired pair that is still routable keeps the match alive, so the
+// end condition is "no connection at all", not "any connection lost".
+func TestGameContinuesWhileOneDesiredPairIsStillRoutable(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{
+			"...",
+			"...",
+		},
+		Regions: []string{
+			"aba",
+			"ccc",
+		},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 2, Y: 0},
+		},
+	})
+	game.Grid.Zones[1].Instability = INSTABILITY_THRESHOLD_BASE - 1
+
+	runTurn(game, "DISRUPT 1", "WAIT")
+
+	assert.True(t, game.Grid.Zones[1].Inked)
+	assert.False(t, game.Ended())
+}
+
+// A grid where nobody wants anything has no possible connection, so the
+// referee ends it on the first turn.
+func TestGameEndsOnTurnOneWhenNoTownWantsAConnection(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{".."},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}, {ID: 1, X: 1, Y: 0}},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+
+	assert.True(t, game.Ended())
+	assert.Equal(t, 1, game.Turn)
+}
+
+// ——— leagues ——————————————————————————————————————————————————————————————
+
+func TestResolveLeagueDefaultsToTheHighest(t *testing.T) {
+	factory := NewFactory().(arena.LeagueResolver)
+
+	assert.Equal(t, DEFAULT_LEAGUE, factory.ResolveLeague(nil))
+	assert.Equal(t, DEFAULT_LEAGUE, factory.ResolveLeague(viper.New()))
+}
+
+func TestResolveLeagueHonoursTheLeagueOption(t *testing.T) {
+	factory := NewFactory().(arena.LeagueResolver)
+	options := viper.New()
+	options.Set("league", "2")
+
+	assert.Equal(t, 2, factory.ResolveLeague(options))
+}
+
+// League 1 asks player 0 for a single point. The match stops the turn it
+// arrives, and the earned points are replaced by the verdict.
+func TestTutorialLeagueOneEndsAsSoonAsPlayerZeroScores(t *testing.T) {
+	game, p0, p1 := loadScenario(t, scenario{
+		League:  1,
+		Terrain: []string{"..."},
+		Tracks:  []string{".0."},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 2, Y: 0},
+		},
+	})
+	require.True(t, game.InTutorial)
+
+	runTurn(game, "WAIT", "WAIT")
+	require.True(t, game.Ended())
+	require.Equal(t, 1, p0.GetScore())
+
+	game.OnEnd()
+
+	assert.Equal(t, 0, p0.GetScore())
+	assert.Equal(t, -1, p1.GetScore())
+}
+
+// Failing the league 1 objective runs the full 100 turns and reverses the
+// verdict.
+func TestTutorialLeagueOneFailsWhenPlayerZeroNeverScores(t *testing.T) {
+	game, p0, p1 := loadScenario(t, scenario{
+		League:  1,
+		Terrain: []string{"..."},
+		Towns: []townSpec{
+			{ID: 0, X: 0, Y: 0, Desires: []int{1}},
+			{ID: 1, X: 2, Y: 0},
+		},
+	})
+
+	for game.Turn < MAX_TURNS {
+		runTurn(game, "WAIT", "WAIT")
+	}
+	require.True(t, game.Ended())
+
+	game.OnEnd()
+
+	assert.Equal(t, -1, p0.GetScore())
+	assert.Equal(t, 0, p1.GetScore())
+}
+
+// League 2 asks player 0 to blot a region and take an opposing track down
+// with it. Inking a region holding only its own tracks does not count.
+func TestTutorialLeagueTwoEndsWhenPlayerZeroInksAnEnemyTrack(t *testing.T) {
+	game, p0, p1 := loadScenario(t, scenario{
+		League:  2,
+		Terrain: []string{"..."},
+		Regions: []string{"aba"},
+		Tracks:  []string{".1."},
+	})
+	game.Grid.Zones[1].Instability = INSTABILITY_THRESHOLD_BASE - 1
+
+	runTurn(game, "DISRUPT 1", "WAIT")
+	require.True(t, game.Ended())
+
+	game.OnEnd()
+
+	assert.Equal(t, 0, p0.GetScore())
+	assert.Equal(t, -1, p1.GetScore())
+}
+
+func TestTutorialLeagueTwoIgnoresAnInkingThatSparesTheOpponent(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		League:  2,
+		Terrain: []string{"..."},
+		Regions: []string{"aba"},
+		Tracks:  []string{".0."},
+	})
+	game.Grid.Zones[1].Instability = INSTABILITY_THRESHOLD_BASE - 1
+
+	runTurn(game, "DISRUPT 1", "WAIT")
+
+	assert.True(t, game.Grid.Zones[1].Inked)
+	assert.False(t, game.Ended())
+}
+
+// The tutorial replaces the end condition rather than adding to it: a grid
+// with no routable connection would end the full game on turn 1, but a
+// tutorial keeps running until its objective resolves.
+func TestTutorialLeagueDoesNotUseTheNoRouteEndCondition(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		League:  1,
+		Terrain: []string{".."},
+	})
+
+	runTurn(game, "WAIT", "WAIT")
+
+	assert.False(t, game.Ended())
+}
+
+// Above the tutorials every league runs the same rules, so the objective
+// machinery stays out of the way entirely.
+func TestLeagueThreeAndAboveRunTheFullGame(t *testing.T) {
+	for _, league := range []int{3, 4, 5} {
+		game, _, _ := loadScenario(t, scenario{
+			League:  league,
+			Terrain: []string{".."},
+		})
+
+		assert.Falsef(t, game.InTutorial, "league %d", league)
+
+		runTurn(game, "WAIT", "WAIT")
+		assert.Truef(t, game.Ended(), "league %d", league)
+	}
 }
 
 // ——— full match through the arena Referee contract ————————————————————————

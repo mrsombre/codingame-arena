@@ -2,6 +2,8 @@
 package engine
 
 import (
+	"strconv"
+
 	"github.com/spf13/viper"
 
 	"github.com/mrsombre/codingame-arena/games/summer2026"
@@ -40,12 +42,25 @@ func (f *factory) MaxTurns() int { return MAX_TURNS }
 
 func (f *factory) TurnModel() arena.TurnModel { return arena.FlatTurnModel{} }
 
-func (f *factory) NewGame(seed int64, _ *viper.Viper) (arena.Referee, []arena.Player) {
+func (f *factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []arena.Player) {
 	p0 := NewPlayer(0)
 	p1 := NewPlayer(1)
 	// SHA1PRNG matches the SDK's MultiplayerGameManager.getRandom().
-	// League is fixed to the full game for now; the tutorial leagues arrive
-	// with TutorialManager and a LeagueResolver.
-	game := NewGame(sha1prng.New(seed), DEFAULT_LEAGUE)
+	game := NewGame(sha1prng.New(seed), f.ResolveLeague(options))
 	return NewReferee(game), []arena.Player{p0, p1}
+}
+
+// ResolveLeague returns the league level the factory will run with for the
+// given options, falling back to the full game when "league" is unset or
+// unparseable. Leagues 1-2 are tutorials whose win condition comes from
+// TutorialManager; 3-5 all run the same rules.
+func (f *factory) ResolveLeague(options *viper.Viper) int {
+	if options != nil {
+		if raw := options.GetString("league"); raw != "" {
+			if value, err := strconv.Atoi(raw); err == nil {
+				return value
+			}
+		}
+	}
+	return DEFAULT_LEAGUE
 }

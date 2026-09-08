@@ -69,7 +69,8 @@ const (
 )
 
 // DEFAULT_LEAGUE is the highest league, the full game. Leagues 1-2 are
-// tutorials routed through TutorialManager and are not modelled yet.
+// tutorials whose win condition comes from TutorialManager; 3-5 differ only
+// in what the CodinGame statement reveals, not in the rules the engine runs.
 const DEFAULT_LEAGUE = 5
 
 /*
@@ -103,11 +104,17 @@ type Game struct {
 	InstabilityThreshold int
 	LeagueLevel          int
 	InTutorial           bool
+	// Tutorial supplies the win condition in leagues 1-2 and is inert above
+	// them. It is always present, so no call site has to nil-check it.
+	Tutorial *TutorialManager
 
 	// EnableSideQuest is hardcoded false upstream, which makes every POI and
 	// side-quest code path inert. Kept as a field to match the source.
 	EnableSideQuest bool
 	ShowSideQuest   bool
+	// SideQuestPoints is 1 once a player has linked the POI to a town. Nothing
+	// reads it while EnableSideQuest is false.
+	SideQuestPoints [2]int
 
 	// Per-player counters, indexed by player index. Java publishes them as
 	// match metadata; here they feed the arena's MetricsProvider.
@@ -153,6 +160,7 @@ func NewGame(random *sha1prng.Random, leagueLevel int) *Game {
 	return &Game{
 		Random:      random,
 		LeagueLevel: leagueLevel,
+		Tutorial:    NewTutorialManager(),
 	}
 }
 
@@ -188,6 +196,8 @@ func (g *Game) Init(players []*Player) {
 	// The real GridMaker (and with it seed parity) lands with the map
 	// generation work; until then Init builds the fixed placeholder grid.
 	g.Grid = MakePlaceholderGrid()
+
+	g.InTutorial = g.Tutorial.InitTutorial(g)
 
 	g.Turn = 0
 	g.InstabilityThreshold = INSTABILITY_THRESHOLD_BASE
@@ -226,8 +236,8 @@ public void performGameUpdate(int turn) {
 }
 */
 
-// PerformGameUpdate runs one turn. Everything but the side quest — inert in
-// this build — and the tutorial objective is live.
+// PerformGameUpdate runs one turn. computeEvents is viewer-only and is not
+// ported; everything else runs in the source's order, which is load-bearing.
 func (g *Game) PerformGameUpdate(_ int) {
 	g.Turn++
 
@@ -238,10 +248,98 @@ func (g *Game) PerformGameUpdate(_ int) {
 
 	g.MoveTrains()
 	g.ComputeTileStates()
+	g.CheckSideQuest()
 
 	if g.IsGameOver() {
 		g.EndGame()
 	}
+}
+
+/*
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:175-192
+
+private void checkSideQuest() {
+    Coord poiCoord = grid.getPoi();
+    if (poiCoord == null) return;
+
+    for (Player p : players) {
+        if (sideQuestPoints[p.getIndex()] > 0) continue;
+        // Flood fill player tracks from poi, see if it reaches a town
+        if (isConnectedToTownByPlayer(poiCoord, p)) sideQuestPoints[p.getIndex()] = 1;
+    }
+}
+*/
+
+// CheckSideQuest awards the one-off side-quest point to a player whose track
+// links the POI to any town. It is inert in this build: EnableSideQuest is
+// hardcoded false upstream, so GridMaker never places a POI and the grid
+// always returns early here. Ported for completeness.
+func (g *Game) CheckSideQuest() {
+	if !g.Grid.HasPOI {
+		return
+	}
+
+	for _, p := range g.Players {
+		if g.SideQuestPoints[p.GetIndex()] > 0 {
+			continue
+		}
+		if g.isConnectedToTownByPlayer(g.Grid.POI, p) {
+			g.SideQuestPoints[p.GetIndex()] = 1
+		}
+	}
+}
+
+/*
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:194-215
+
+private boolean isConnectedToTownByPlayer(Coord coord, Player p) {
+    LinkedList<Coord> fifo = new LinkedList<>();
+    Set<Coord> visited = new HashSet<>();
+    fifo.add(coord);
+    visited.add(coord);
+    while (!fifo.isEmpty()) {
+        Coord current = fifo.poll();
+        if (grid.get(current).isTown()) return true;
+        for (Coord n : grid.getNeighbours(current)) {
+            Tile t = grid.get(n);
+            boolean ownedByPlayer = t.track == p.getIndex() || t.track == Tile.TRACK_NEUTRAL;
+            if (!visited.contains(n) && (ownedByPlayer || t.isTown())) {
+                fifo.add(n);
+                visited.add(n);
+            }
+        }
+    }
+    return false;
+}
+*/
+
+// isConnectedToTownByPlayer floods out from the POI over cells the player can
+// claim — its own track, contested track, and towns — and reports whether it
+// reaches a town. The start cell is enqueued without any such test, so the
+// POI itself need not carry track.
+func (g *Game) isConnectedToTownByPlayer(coord Coord, p *Player) bool {
+	fifo := []Coord{coord}
+	visited := map[Coord]bool{coord: true}
+
+	for len(fifo) > 0 {
+		current := fifo[0]
+		fifo = fifo[1:]
+		if g.Grid.Get(current).IsTown() {
+			return true
+		}
+		for _, n := range g.Grid.Neighbours(current) {
+			if visited[n] {
+				continue
+			}
+			t := g.Grid.Get(n)
+			ownedByPlayer := t.Track == p.GetIndex() || t.Track == TRACK_NEUTRAL
+			if ownedByPlayer || t.IsTown() {
+				fifo = append(fifo, n)
+				visited[n] = true
+			}
+		}
+	}
+	return false
 }
 
 /*
@@ -629,6 +727,13 @@ func (g *Game) DoInstabilityCheck() {
 			tile.Track = TRACK_NONE
 		}
 
+		// The league 2 objective: player 0 blotted this region and the inking
+		// took out at least one of player 1's tracks. Contested tracks in slot
+		// 2 do not count.
+		if blotted, ok := g.SuccessfulBlotsThisTurn[0]; ok && blotted == zone.ID && rekt[1] > 0 {
+			g.Tutorial.SetPlayerOneHasInkedEnemyTrack()
+		}
+
 		for _, p := range g.Players {
 			idx := p.GetIndex()
 			if blotted, ok := g.SuccessfulBlotsThisTurn[idx]; !ok || blotted != zone.ID {
@@ -856,11 +961,46 @@ public boolean isGameOver() {
 }
 */
 
-// IsGameOver currently reports only the turn cap. The tutorial objective and
-// the "no desired connection is reachable any more" early exit both need
-// pathfinding and arrive with the end-condition work.
+// IsGameOver is polled at the end of every turn. Outside the tutorial the
+// match stops at the turn cap or as soon as no desired connection has any
+// route left at all — the second condition is not in the game statement but is
+// in the referee, and it fires when inking has walled off every remaining
+// pair.
 func (g *Game) IsGameOver() bool {
-	return g.Turn >= MAX_TURNS
+	if g.InTutorial {
+		return g.Tutorial.ObjectiveComplete() || g.Turn >= MAX_TURNS
+	}
+	return !g.IsAnyConnectionStillPossible() || g.Turn >= MAX_TURNS
+}
+
+/*
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:716-726
+
+private boolean isAnyConnectionStillPossible() {
+    for (Town town : grid.towns) {
+        for (Town other : town.desiredConnections) {
+            Optional<List<Coord>> path = new TerrainAStar(grid, town, other).search();
+            if (path.isPresent()) return true;
+        }
+    }
+    return false;
+}
+*/
+
+// IsAnyConnectionStillPossible asks whether at least one desired pair could
+// still be joined by rail, ignoring what is built today. It searches terrain
+// rather than track, so an unbuilt route counts; only an inked region blocks
+// one. A grid with no desired connections at all reports false, and so ends
+// the match on turn 1.
+func (g *Game) IsAnyConnectionStillPossible() bool {
+	for _, town := range g.Grid.Towns {
+		for _, other := range town.DesiredConnections {
+			if _, ok := NewTerrainAStar(g.Grid, town, other).Search(); ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (g *Game) EndGame() { g.ended = true }
@@ -880,10 +1020,16 @@ public void onEnd() {
 }
 */
 
-// OnEnd overwrites a deactivated player's score with -1. The score texts and
-// the end screen are viewer-only; the tutorial branch arrives with league
-// support.
+// OnEnd settles the final scores. In a tutorial league both scores are
+// replaced by the objective verdict and deactivation is not consulted at all —
+// a bot that crashed still "wins" if player 0 met the objective before it did.
+// Otherwise a deactivated player's score becomes -1. The score texts and the
+// end screen are viewer-only.
 func (g *Game) OnEnd() {
+	if g.InTutorial {
+		g.Tutorial.HandleEnd()
+		return
+	}
 	for _, p := range g.Players {
 		if p.IsDeactivated() {
 			p.SetScore(-1)
