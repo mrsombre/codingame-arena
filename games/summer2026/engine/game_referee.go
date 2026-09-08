@@ -142,6 +142,13 @@ func (r *Referee) ActivePlayers(players []arena.Player) int {
 	return active
 }
 
+// TurnTraces implements arena.TurnTraceProvider, draining the turn's event
+// buffer. The runner calls it after PerformGameUpdate, so the buffer holds the
+// MESSAGE events parsing emitted plus everything the update resolved.
+func (r *Referee) TurnTraces(_ int, _ []arena.Player) [2][]arena.TurnTrace {
+	return r.Game.TurnTraces()
+}
+
 // RawScores implements arena.RawScoresProvider.
 func (r *Referee) RawScores() [2]int { return r.Game.RawScores() }
 

@@ -2,7 +2,11 @@
 // Source: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/CommandManager.java
 package engine
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/mrsombre/codingame-arena/internal/arena"
+)
 
 /*
 Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/CommandManager.java:19-62
@@ -74,6 +78,9 @@ func (cm *CommandManager) ParseCommands(player *Player, lines []string) {
 			}
 			if action.Type == ACTION_MESSAGE {
 				player.SetMessage(action.Message)
+				cm.game.trace(player.GetIndex(), arena.MakeTurnTrace(
+					TraceMessage, MessageData{Text: player.GetMessage()},
+				))
 			} else {
 				player.Intents = append(player.Intents, action)
 			}

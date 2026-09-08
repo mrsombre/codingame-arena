@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mrsombre/codingame-arena/internal/arena"
 	"github.com/mrsombre/codingame-arena/internal/util/sha1prng"
 )
 
@@ -152,6 +153,12 @@ type Game struct {
 	// Summary collects the lines Java sends to gameManager.addToGameSummary.
 	Summary []string
 
+	// Traces buffers this turn's structured events per player; turnStats is
+	// the ledger they add up to. Both are arena-facing only — no rule reads
+	// them — and both are cleared per turn.
+	Traces    [2][]arena.TurnTrace
+	turnStats [2]turnStats
+
 	// ended mirrors gameManager.endGame() having been called.
 	ended bool
 
@@ -222,6 +229,7 @@ func (g *Game) ResetGameTurnData() {
 	for _, p := range g.Players {
 		p.Reset()
 	}
+	g.ResetTraces()
 }
 
 /*
@@ -246,6 +254,7 @@ public void performGameUpdate(int turn) {
 // ported; everything else runs in the source's order, which is load-bearing.
 func (g *Game) PerformGameUpdate(_ int) {
 	g.Turn++
+	g.turnStats = [2]turnStats{}
 
 	g.DoIncome()
 	g.ComputeAutobuilds()
@@ -259,6 +268,8 @@ func (g *Game) PerformGameUpdate(_ int) {
 	if g.IsGameOver() {
 		g.EndGame()
 	}
+
+	g.emitTurnSummaries()
 }
 
 /*
@@ -364,6 +375,9 @@ func (g *Game) DoIncome() {
 	for _, player := range g.Players {
 		player.Dosh = PASSIVE_INCOME
 		player.BlotPoints = BLOT_POINTS_PER_TURN
+
+		g.turnStats[player.GetIndex()].paintAvailable = player.Dosh
+		g.turnStats[player.GetIndex()].disruptAvailable = player.BlotPoints
 	}
 }
 
@@ -421,9 +435,15 @@ func (g *Game) ComputeAutobuilds() {
 				g.ReportPlayerError(player, "Only one autobuild action allowed per turn.")
 				continue
 			}
-			resolvedIntents = append(resolvedIntents, g.resolveAutobuild(player, intent)...)
+			expanded := g.resolveAutobuild(player, intent)
+			resolvedIntents = append(resolvedIntents, expanded...)
 			autoBuildUsed = true
 			g.AutobuildCalled[player.GetIndex()]++
+			g.trace(player.GetIndex(), arena.MakeTurnTrace(TraceAutoplace, AutoplaceData{
+				From:       [2]int{intent.From.X, intent.From.Y},
+				To:         [2]int{intent.To.X, intent.To.Y},
+				Placements: len(expanded),
+			}))
 		}
 		player.Intents = resolvedIntents
 	}
@@ -556,6 +576,17 @@ func (g *Game) DoActions() {
 
 			player.Pay(railCost)
 			g.PlacedTracks[player.GetIndex()]++
+			g.trace(player.GetIndex(), arena.MakeTurnTrace(TraceTrack, TrackData{
+				Cell:       [2]int{coord.X, coord.Y},
+				Cost:       railCost,
+				Terrain:    terrainName(tile),
+				Autoplaced: action.GeneratedByAutobuild,
+			}))
+			g.turnStats[player.GetIndex()].paintSpent += railCost
+			g.turnStats[player.GetIndex()].tracksPlaced++
+			if action.GeneratedByAutobuild {
+				g.turnStats[player.GetIndex()].tracksAutoplaced++
+			}
 			switch {
 			case tile.IsMountain():
 				g.TracksPlacedOnMountains[player.GetIndex()]++
@@ -573,6 +604,9 @@ func (g *Game) DoActions() {
 			tile.Track = playerIdxs[0]
 		} else {
 			tile.Track = TRACK_NEUTRAL
+			g.traceBoth(arena.MakeTurnTrace(TraceContested, ContestedData{
+				Cell: [2]int{coord.X, coord.Y},
+			}))
 		}
 	}
 
@@ -653,6 +687,11 @@ func (g *Game) doDisruptions() {
 			player.BlotPoints--
 			zone.Instability++
 			g.SuccessfulBlotsThisTurn[player.GetIndex()] = zone.ID
+			g.trace(player.GetIndex(), arena.MakeTurnTrace(TraceDisrupt, DisruptData{
+				Zone:        zone.ID,
+				Instability: zone.Instability,
+			}))
+			g.turnStats[player.GetIndex()].disruptSpent++
 		}
 	}
 }
@@ -740,15 +779,23 @@ func (g *Game) DoInstabilityCheck() {
 			g.Tutorial.SetPlayerOneHasInkedEnemyTrack()
 		}
 
+		var credited []int
 		for _, p := range g.Players {
 			idx := p.GetIndex()
 			if blotted, ok := g.SuccessfulBlotsThisTurn[idx]; !ok || blotted != zone.ID {
 				continue
 			}
+			credited = append(credited, idx)
 			g.ZonesInked[idx]++
 			g.OwnTracksInkedOut[idx] += rekt[idx]
 			g.EnemyTracksInkedOut[idx] += rekt[1-idx]
 		}
+
+		g.traceBoth(arena.MakeTurnTrace(TraceInk, InkData{
+			Zone:       zone.ID,
+			Credited:   credited,
+			TracksLost: rekt,
+		}))
 	}
 }
 
@@ -882,6 +929,15 @@ func (g *Game) MoveTrains() {
 					continue
 				}
 				p.AddScore(points)
+				g.trace(idx, arena.MakeTurnTrace(TraceScore, ScoreData{
+					From:       town.ID,
+					To:         other.ID,
+					Points:     points,
+					PathLength: len(path),
+					Detour:     len(path) - town.Coord.ManhattanTo(other.Coord),
+				}))
+				g.turnStats[idx].connections++
+				g.turnStats[idx].points += points
 				g.ExtraTilesInConnection[idx] += len(path) - town.Coord.ManhattanTo(other.Coord)
 				g.TrackOwnershipPercentagePerActiveConnection[idx] += float32(points) / float32(len(path))
 				g.TrackOwnershipPercentagePerActiveConnectionTotal[idx]++
@@ -1105,8 +1161,11 @@ private void reportPlayerError(Player player, String message) {
 }
 */
 
+// ReportPlayerError is the single funnel for every parseable-but-illegal
+// command, so it is also where the FAILED trace is emitted.
 func (g *Game) ReportPlayerError(player *Player, message string) {
 	g.AddToGameSummary(formatErrorMessage(playerNickname(player) + " " + message))
+	g.trace(player.GetIndex(), arena.MakeTurnTrace(TraceFailed, FailedData{Reason: message}))
 }
 
 func (g *Game) AddToGameSummary(line string) {
