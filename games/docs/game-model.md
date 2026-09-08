@@ -132,16 +132,16 @@ Shared constants in `internal/arena/trace.go`:
 
 ## Per-game capability matrix
 
-| Capability                | winter2026 | spring2020 | spring2021 |
-| ------------------------- | :--------: | :--------: | :--------: |
-| `LeagueResolver`          | ✅         | ✅         | ✅         |
-| `TurnModeler`             | Flat       | PostEnd    | Phase      |
-| `EndReasonProvider`       | ✅         | ✅         | ✅         |
-| `RawScoresProvider`       | ✅         | ✅         | ✅         |
-| `TurnTraceProvider`       | ✅         | ✅         | ✅         |
-| `MetricsProvider`         | ✅         | ✅         | ❌         |
-| `TraceMetricAnalyzer`     | ✅         | ✅         | ❌         |
-| `GameOverFrameReporter`   | ❌         | ✅         | ❌         |
+| Capability                | winter2026 | spring2020 | spring2021 | summer2026 |
+| ------------------------- | :--------: | :--------: | :--------: | :--------: |
+| `LeagueResolver`          | ✅         | ✅         | ✅         | ✅         |
+| `TurnModeler`             | Flat       | PostEnd    | Phase      | Flat       |
+| `EndReasonProvider`       | ✅         | ✅         | ✅         | ✅         |
+| `RawScoresProvider`       | ✅         | ✅         | ✅         | ✅         |
+| `TurnTraceProvider`       | ✅         | ✅         | ✅         | ✅         |
+| `MetricsProvider`         | ✅         | ✅         | ❌         | ✅         |
+| `TraceMetricAnalyzer`     | ✅         | ✅         | ❌         | ✅         |
+| `GameOverFrameReporter`   | ❌         | ✅         | ❌         | ❌         |
 
 ## Replay verification layers
 

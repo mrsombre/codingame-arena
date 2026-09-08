@@ -1019,11 +1019,6 @@ public boolean isGameOver() {
 }
 */
 
-// IsGameOver is polled at the end of every turn. Outside the tutorial the
-// match stops at the turn cap or as soon as no desired connection has any
-// route left at all — the second condition is not in the game statement but is
-// in the referee, and it fires when inking has walled off every remaining
-// pair.
 func (g *Game) IsGameOver() bool {
 	if g.InTutorial {
 		return g.Tutorial.ObjectiveComplete() || g.Turn >= MAX_TURNS
