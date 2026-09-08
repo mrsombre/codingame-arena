@@ -53,6 +53,15 @@ public boolean isAutobuild() { return type == ActionType.AUTOPLACE; }
 public boolean isGeneratedByAutobuild() { return generatedByAutobuild; }
 */
 
+// SetType and SetZoneID exist for one caller: the disruption pass rewrites a
+// DISRUPT_ALT action into a DISRUPT one once it has resolved the coordinate to
+// a region, so everything downstream only has to know the region form.
+func (a *Action) SetType(actionType ActionType) { a.Type = actionType }
+
+func (a *Action) SetZoneID(zoneID int) { a.ZoneID = zoneID }
+
+func (a *Action) GetZoneID() int { return a.ZoneID }
+
 func (a *Action) String() string {
 	return fmt.Sprintf("Action [type=%s, coord=%s, zone=%d]", a.Type, a.Coord, a.ZoneID)
 }

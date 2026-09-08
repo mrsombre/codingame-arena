@@ -895,6 +895,205 @@ func TestConnectionStampsAreClearedWhenTheConnectionGoesAway(t *testing.T) {
 	assert.Equal(t, "0 0 0 x", SerializeFrameInfoFor(p0, game)[4])
 }
 
+// ——— disruption, instability and inking ——————————————————————————————————
+
+// Both DISRUPT forms end up in the same place: DISRUPT names a region
+// directly, DISRUPT x y resolves the region from the cell. Neither is
+// case-sensitive.
+func TestBothDisruptFormsRaiseInstabilityOnTheSameRegion(t *testing.T) {
+	cases := map[string]string{
+		"region id":       "DISRUPT 1",
+		"coordinate":      "DISRUPT 1 0",
+		"lowercase":       "disrupt 1",
+		"lowercase coord": "disrupt 1 0",
+	}
+	for name, command := range cases {
+		t.Run(name, func(t *testing.T) {
+			game, p0, _ := loadScenario(t, scenario{
+				Terrain: []string{".."},
+				Regions: []string{"ab"},
+			})
+
+			runTurn(game, command, "WAIT")
+
+			assert.False(t, p0.IsDeactivated())
+			assert.Equal(t, 0, game.Grid.Zones[0].Instability)
+			assert.Equal(t, 1, game.Grid.Zones[1].Instability)
+			assert.Equal(t, 0, p0.BlotPoints)
+			assert.Empty(t, game.Summary)
+		})
+	}
+}
+
+func TestIllegalDisruptionsAreSkippedWithAnErrorAndDoNotDisqualify(t *testing.T) {
+	cases := map[string]struct {
+		setup   func(game *Game)
+		command string
+		summary string
+	}{
+		"off grid": {
+			command: "DISRUPT 9 9",
+			summary: "¤RED¤Player 0 Not part of grid: (9, 9)§RED§",
+		},
+		"unknown region": {
+			command: "DISRUPT 7",
+			summary: "¤RED¤Player 0 Invalid region id: 7§RED§",
+		},
+		"region holding a town": {
+			command: "DISRUPT 0",
+			summary: "¤RED¤Player 0 Cannot disrupt region0. It contains a town.§RED§",
+		},
+		"already inked region": {
+			setup:   func(game *Game) { game.Grid.Zones[1].Inked = true },
+			command: "DISRUPT 1",
+			summary: "¤RED¤Player 0 Cannot disrupt region1. Already inked out.§RED§",
+		},
+		"out of disruption points": {
+			command: "DISRUPT 1;DISRUPT 1",
+			summary: "¤RED¤Player 0 Not enough disruption points.§RED§",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			game, p0, _ := loadScenario(t, scenario{
+				Terrain: []string{".."},
+				Regions: []string{"ab"},
+				Towns:   []townSpec{{ID: 0, X: 0, Y: 0}},
+			})
+			if tc.setup != nil {
+				tc.setup(game)
+			}
+
+			runTurn(game, tc.command, "WAIT")
+
+			assert.False(t, p0.IsDeactivated())
+			assert.NotEqual(t, -1, p0.GetScore())
+			assert.Contains(t, game.Summary, tc.summary)
+		})
+	}
+}
+
+// Disruption points reset like paint does, so a region needs as many turns to
+// tip over as the threshold demands however the blots are spread.
+func TestInstabilityAccumulatesAcrossTurnsUntilTheThresholdInksTheRegion(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{".."},
+		Regions: []string{"ab"},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}},
+	})
+	zone := game.Grid.Zones[1]
+
+	for turn := 1; turn < INSTABILITY_THRESHOLD_BASE; turn++ {
+		runTurn(game, "DISRUPT 1", "WAIT")
+		require.Equalf(t, turn, zone.Instability, "after %d disruptions", turn)
+		require.Falsef(t, zone.Inked, "inked early after %d disruptions", turn)
+	}
+
+	runTurn(game, "DISRUPT 1", "WAIT")
+
+	assert.Equal(t, INSTABILITY_THRESHOLD_BASE, zone.Instability)
+	assert.True(t, zone.Inked)
+}
+
+// Two players blotting the same region get there twice as fast.
+func TestBothPlayersDisruptingOneRegionStackInstabilityInTheSameTurn(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{".."},
+		Regions: []string{"ab"},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}},
+	})
+
+	runTurn(game, "DISRUPT 1", "DISRUPT 1")
+
+	assert.Equal(t, 2, game.Grid.Zones[1].Instability)
+}
+
+func TestInkingARegionClearsEveryTrackInsideItForBothPlayers(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{"....."},
+		Regions: []string{"abbbb"},
+		Tracks:  []string{".01n."},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}},
+	})
+	game.Grid.Zones[1].Instability = INSTABILITY_THRESHOLD_BASE - 1
+
+	runTurn(game, "DISRUPT 1", "WAIT")
+
+	require.True(t, game.Grid.Zones[1].Inked)
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(1, 0).Track)
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(2, 0).Track)
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(3, 0).Track)
+}
+
+// The blot that tipped the region over is what credits the inking. Slot 2 of
+// the tally is the contested track, which counts for neither side.
+func TestInkAttributionCountsOwnAndEnemyTracksForTheDisruptingPlayer(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{"....."},
+		Regions: []string{"abbbb"},
+		Tracks:  []string{".01n."},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}},
+	})
+	game.Grid.Zones[1].Instability = INSTABILITY_THRESHOLD_BASE - 1
+
+	runTurn(game, "DISRUPT 1", "WAIT")
+
+	assert.Equal(t, [2]int{1, 0}, game.ZonesInked)
+	assert.Equal(t, [2]int{1, 0}, game.OwnTracksInkedOut)
+	assert.Equal(t, [2]int{1, 0}, game.EnemyTracksInkedOut)
+}
+
+// A region holding a town cannot be disrupted, and the check skips it again
+// even when its instability was raised some other way.
+func TestARegionHoldingATownIsNeverInked(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{".."},
+		Regions: []string{"ab"},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}},
+	})
+	game.Grid.Zones[0].Instability = INSTABILITY_THRESHOLD_BASE
+
+	runTurn(game, "WAIT", "WAIT")
+
+	assert.False(t, game.Grid.Zones[0].Inked)
+}
+
+// The rejection path from the placement rules becomes reachable through play:
+// once a region inks, nothing can be built in it again.
+func TestPlacementIntoARegionInkedByPlayIsSkipped(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{
+		Terrain: []string{"..."},
+		Regions: []string{"abb"},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}},
+	})
+	game.Grid.Zones[1].Instability = INSTABILITY_THRESHOLD_BASE - 1
+
+	runTurn(game, "DISRUPT 1", "WAIT")
+	require.True(t, game.Grid.Zones[1].Inked)
+
+	runTurn(game, "PLACE_TRACK 1 0", "WAIT")
+
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(1, 0).Track)
+	assert.Equal(t, PASSIVE_INCOME, p0.Dosh)
+	assert.Contains(t, game.Summary, "¤RED¤Player 0 Cannot build in region 1§RED§")
+}
+
+// Disruptions run after placements, so a track laid this turn into a region
+// that inks this turn is paid for and then immediately wiped.
+func TestATrackPlacedIntoARegionThatInksThisTurnIsClearedImmediately(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{
+		Terrain: []string{"..."},
+		Regions: []string{"abb"},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}},
+	})
+	game.Grid.Zones[1].Instability = INSTABILITY_THRESHOLD_BASE - 1
+
+	runTurn(game, "PLACE_TRACK 1 0;DISRUPT 1", "WAIT")
+
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(1, 0).Track)
+	assert.Equal(t, PASSIVE_INCOME-1, p0.Dosh)
+}
+
 // ——— game end ————————————————————————————————————————————————————————————
 
 func TestGameEndsOnTurn100(t *testing.T) {

@@ -59,3 +59,5 @@ public void addTown(Town t) { containedTowns.add(t); }
 func (z *Zone) Cost() int { return len(z.Coords) * 2 }
 
 func (z *Zone) AddTown(t *Town) { z.ContainedTowns = append(z.ContainedTowns, t) }
+
+func (z *Zone) GetContainedTowns() []*Town { return z.ContainedTowns }

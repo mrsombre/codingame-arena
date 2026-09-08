@@ -117,6 +117,13 @@ type Game struct {
 	TracksPlacedOnMountains [2]int
 	AutobuildCalled         [2]int
 
+	// Ink attribution counters. A region is credited to a player only if that
+	// player's last successful disruption this turn named it, so a region that
+	// tips over on somebody else's blot is credited to nobody.
+	ZonesInked          [2]int
+	OwnTracksInkedOut   [2]int
+	EnemyTracksInkedOut [2]int
+
 	// ExtraTilesInConnection sums, over every scoring event, how much longer
 	// the connection's path was than the straight-line distance between the
 	// two towns — a measure of how far a player's rails detour.
@@ -126,6 +133,14 @@ type Game struct {
 	// average is the ratio of the two. float32, as in Java.
 	TrackOwnershipPercentagePerActiveConnection      [2]float32
 	TrackOwnershipPercentagePerActiveConnectionTotal [2]int
+
+	// SuccessfulBlotsThisTurn maps a player index to the region its last
+	// honoured disruption named. Java (spelling its own field
+	// `succesfulBlotsThisTurn`) builds it in init and never clears it, so an
+	// entry outlives the turn that wrote it and can still credit an inking on
+	// a later turn. Faithful to the source; only the counters above depend on
+	// it, so the divergence cannot reach a score.
+	SuccessfulBlotsThisTurn map[int]int
 
 	// Summary collects the lines Java sends to gameManager.addToGameSummary.
 	Summary []string
@@ -165,6 +180,7 @@ private void initGrid(Random random) {
 */
 
 func (g *Game) Init(players []*Player) {
+	g.SuccessfulBlotsThisTurn = map[int]int{}
 	g.Players = players
 	for _, p := range g.Players {
 		p.Init()
@@ -210,15 +226,15 @@ public void performGameUpdate(int turn) {
 }
 */
 
-// PerformGameUpdate runs one turn. Disruption and instability are staged in
-// by later work; the turn counter, the income reset, autobuild expansion,
-// track placement, connection scoring and the end check are live.
+// PerformGameUpdate runs one turn. Everything but the side quest — inert in
+// this build — and the tutorial objective is live.
 func (g *Game) PerformGameUpdate(_ int) {
 	g.Turn++
 
 	g.DoIncome()
 	g.ComputeAutobuilds()
 	g.DoActions()
+	g.DoInstabilityCheck()
 
 	g.MoveTrains()
 	g.ComputeTileStates()
@@ -372,7 +388,7 @@ private void doActions() {
         if (playerIdxs.size() == 1) tile.track = playerIdxs.get(0);
         else tile.track = Tile.TRACK_NEUTRAL;
     }
-    ... disruptions ...
+    ... disruptions, quoted above doDisruptions ...
 }
 */
 
@@ -380,8 +396,8 @@ private void doActions() {
 // written after both players have been charged, so a cell claimed by both in
 // one turn goes neutral and neither side gets a refund. Illegal placements
 // are reported and skipped; only unparseable output disqualifies, and that
-// already happened in CommandManager. The disruption pass that follows this
-// one in Java arrives with the disruption work.
+// already happened in CommandManager. Disruptions run last, in the same
+// player order, over the board the placements have already settled.
 func (g *Game) DoActions() {
 	// Java keys a TreeMap by Coord; nothing iterates it, so a plain map is
 	// equivalent. placementOrder is what ordering the resolution pass sees.
@@ -453,6 +469,174 @@ func (g *Game) DoActions() {
 			tile.Track = playerIdxs[0]
 		} else {
 			tile.Track = TRACK_NEUTRAL
+		}
+	}
+
+	g.doDisruptions()
+}
+
+/*
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:544-582
+
+// Disruptions
+for (Player player : players) {
+    for (Action action : player.intents) {
+        if (action.getType() == ActionType.DISRUPT_ALT) {
+            // Alternate disrupt command, using coord instead of zone id
+            Tile tile = grid.get(action.getCoord());
+            if (!tile.isValid()) { reportPlayerError(player, "Not part of grid: " + action.getCoord() + ""); continue; }
+            action.setZoneId(tile.zoneId);
+            action.setType(ActionType.DISRUPT);
+        }
+        if (action.isDisrupt()) {
+            if (player.blotPoints <= 0) { reportPlayerError(player, "Not enough disruption points."); continue; }
+            if (action.getZoneId() < 0 || action.getZoneId() >= grid.zones.size()) { reportPlayerError(player, "Invalid region id: " + action.getZoneId()); continue; }
+            Zone zone = grid.zones.get(action.getZoneId());
+            if (zone.inked) { reportPlayerError(player, "Cannot disrupt region" + zone.getId() + ". Already inked out."); continue; }
+            if (!zone.getContainedTowns().isEmpty()) { reportPlayerError(player, "Cannot disrupt region" + zone.getId() + ". It contains a town."); continue; }
+            player.blotPoints--;
+            zone.instability++;
+            launchDisruptEvent(player, zone);
+            succesfulBlotsThisTurn.put(player.getIndex(), zone.id);
+        }
+    }
+}
+*/
+
+// doDisruptions raises instability by one per honoured blot. A player gets
+// BLOT_POINTS_PER_TURN of them a turn, so naming the same region twice in one
+// line only lands once. The DISRUPT_ALT coordinate form is rewritten in place
+// into the region form before the shared checks run, which is also why an
+// out-of-bounds coordinate is the one rejection reported before the budget is
+// even consulted.
+func (g *Game) doDisruptions() {
+	for _, player := range g.Players {
+		for _, action := range player.Intents {
+			if action.Type == ACTION_DISRUPT_ALT {
+				tile := g.Grid.Get(action.Coord)
+				if !tile.IsValid() {
+					g.ReportPlayerError(player, "Not part of grid: "+action.Coord.String())
+					continue
+				}
+				action.SetZoneID(tile.ZoneID)
+				action.SetType(ACTION_DISRUPT)
+			}
+			if !action.IsDisrupt() {
+				continue
+			}
+
+			if player.BlotPoints <= 0 {
+				g.ReportPlayerError(player, "Not enough disruption points.")
+				continue
+			}
+			if action.GetZoneID() < 0 || action.GetZoneID() >= len(g.Grid.Zones) {
+				g.ReportPlayerError(player, fmt.Sprintf("Invalid region id: %d", action.GetZoneID()))
+				continue
+			}
+
+			zone := g.Grid.Zones[action.GetZoneID()]
+			// Both messages are missing the space Java's concatenation never
+			// added; kept verbatim so summaries match the server's.
+			if zone.Inked {
+				g.ReportPlayerError(player, fmt.Sprintf("Cannot disrupt region%d. Already inked out.", zone.ID))
+				continue
+			}
+			if len(zone.GetContainedTowns()) > 0 {
+				g.ReportPlayerError(player, fmt.Sprintf("Cannot disrupt region%d. It contains a town.", zone.ID))
+				continue
+			}
+
+			player.BlotPoints--
+			zone.Instability++
+			g.SuccessfulBlotsThisTurn[player.GetIndex()] = zone.ID
+		}
+	}
+}
+
+/*
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:236-286
+
+private void doInstabilityCheck() {
+    List<Zone> toInk = new ArrayList<>();
+    for (Zone zone : grid.zones) {
+        if (zone.inked) continue;
+        if (!zone.getContainedTowns().isEmpty()) continue;
+        if (zone.instability >= instabilityThreshold) toInk.add(zone);
+    }
+
+    for (Zone zone : toInk) {
+        instabilityThreshold += INSTABILITY_THRESHOLD_INCREASE;
+        zone.inked = true;
+        List<Coord> coordsWithTrackPiece = zone.getCoords().stream().filter(c -> grid.get(c).isTrack()).toList();
+
+        int rekt[] = new int[] { 0, 0, 0 };
+        for (Coord coord : coordsWithTrackPiece) {
+            int trackOwner = grid.get(coord).track;
+            if (trackOwner > -1) rekt[trackOwner]++;
+            grid.get(coord).track = Tile.TRACK_NONE;
+        }
+        launchInkEvent(zone, coordsWithTrackPiece);
+
+        boolean player2GotRekt = rekt[1] > 0;
+        if (succesfulBlotsThisTurn.getOrDefault(0, -1) == zone.id && player2GotRekt)
+            tutorialManager.setPlayerOneHasInkedEnemyTrack();
+
+        for (Player p : players) {
+            if (succesfulBlotsThisTurn.getOrDefault(p.getIndex(), -1) == zone.id) {
+                zonesInked[p.getIndex()]++;
+                ownTracksInkedOut[p.getIndex()] += rekt[p.getIndex()];
+                enemyTracksInkedOut[p.getIndex()] += rekt[1 - p.getIndex()];
+            }
+        }
+    }
+}
+*/
+
+// DoInstabilityCheck inks every region that has reached the threshold, wiping
+// the tracks inside it. Inking is permanent: an inked region can never be
+// built in nor disrupted again.
+//
+// A region holding a town is exempt — it cannot be disrupted in the first
+// place, and the check skips it again in case its instability was raised
+// before the town existed.
+//
+// INSTABILITY_THRESHOLD_INCREASE is 0 in this build, so the threshold this
+// bumps per inking never actually moves.
+func (g *Game) DoInstabilityCheck() {
+	var toInk []*Zone
+	for _, zone := range g.Grid.Zones {
+		if zone.Inked || len(zone.GetContainedTowns()) > 0 {
+			continue
+		}
+		if zone.Instability >= g.InstabilityThreshold {
+			toInk = append(toInk, zone)
+		}
+	}
+
+	for _, zone := range toInk {
+		g.InstabilityThreshold += INSTABILITY_THRESHOLD_INCREASE
+		zone.Inked = true
+
+		// rekt is indexed by the track sentinel itself, so slot 2 collects the
+		// contested tracks nobody is credited for.
+		var rekt [3]int
+		for _, coord := range zone.Coords {
+			tile := g.Grid.Get(coord)
+			if !tile.IsTrack() {
+				continue
+			}
+			rekt[tile.Track]++
+			tile.Track = TRACK_NONE
+		}
+
+		for _, p := range g.Players {
+			idx := p.GetIndex()
+			if blotted, ok := g.SuccessfulBlotsThisTurn[idx]; !ok || blotted != zone.ID {
+				continue
+			}
+			g.ZonesInked[idx]++
+			g.OwnTracksInkedOut[idx] += rekt[idx]
+			g.EnemyTracksInkedOut[idx] += rekt[1-idx]
 		}
 	}
 }
