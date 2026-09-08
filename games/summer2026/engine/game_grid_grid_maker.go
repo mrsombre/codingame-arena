@@ -284,11 +284,7 @@ private void makePOIs(List<Town> towns) {
 }
 */
 
-// makePOIs is inert in this build — Game.enableSideQuest is hardcoded false,
-// so it returns before touching the RNG. It is ported for completeness.
-//
-// Note the isAtNFromSides filter keeps coords that ARE within 3 of a side,
-// which reads inverted; it is what upstream does.
+// The isAtNFromSides filter keeps coords within 3 of a side, despite its name.
 func (m *GridMaker) makePOIs(towns []*Town) {
 	if !m.enableSideQuest {
 		return

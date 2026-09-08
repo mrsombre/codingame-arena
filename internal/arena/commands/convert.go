@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/spf13/viper"
-
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
@@ -210,10 +208,7 @@ func convertReplayTrace(factory arena.GameFactory, replay arena.CodinGameReplay[
 		league = n
 	}
 
-	gameOptions := viper.New()
-	if league > 0 {
-		gameOptions.Set("league", strconv.Itoa(league))
-	}
+	gameOptions := arena.ReplayGameOptions(replay, league)
 
 	if replay.Blue == "" {
 		return arena.TraceMatch{}, league, fmt.Errorf("%w: replay missing blue (re-fetch with `arena replay` so the username is recorded)", errReplayPrep)

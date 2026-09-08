@@ -109,8 +109,6 @@ type Game struct {
 	// them. It is always present, so no call site has to nil-check it.
 	Tutorial *TutorialManager
 
-	// EnableSideQuest is hardcoded false upstream, which makes every POI and
-	// side-quest code path inert. Kept as a field to match the source.
 	EnableSideQuest bool
 	ShowSideQuest   bool
 	// SideQuestPoints is 1 once a player has linked the POI to a town. Nothing
@@ -288,9 +286,7 @@ private void checkSideQuest() {
 */
 
 // CheckSideQuest awards the one-off side-quest point to a player whose track
-// links the POI to any town. It is inert in this build: EnableSideQuest is
-// hardcoded false upstream, so GridMaker never places a POI and the grid
-// always returns early here. Ported for completeness.
+// links the POI to any town.
 func (g *Game) CheckSideQuest() {
 	if !g.Grid.HasPOI {
 		return

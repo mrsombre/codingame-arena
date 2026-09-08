@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 // Replay source tags written into the saved replay's top-level "source" field.
@@ -86,6 +88,20 @@ type CodinGameReplayResult[F any] struct {
 	Ranks        []int                  `json:"ranks"`
 	Agents       []CodinGameReplayAgent `json:"agents"`
 	Frames       []F                    `json:"frames,omitempty"`
+	Metadata     map[string]any         `json:"metadata,omitempty"`
+}
+
+// ReplayGameOptions retains game-owned metadata because it can identify
+// historical rules that differ from the factory's current defaults.
+func ReplayGameOptions[F any](replay CodinGameReplay[F], league int) *viper.Viper {
+	options := viper.New()
+	if league > 0 {
+		options.Set("league", strconv.Itoa(league))
+	}
+	if replay.GameResult.Metadata != nil {
+		options.Set("replay-metadata", replay.GameResult.Metadata)
+	}
+	return options
 }
 
 // UnmarshalJSON unifies the two on-disk replay shapes: new files carry
@@ -514,7 +530,7 @@ type ReplayAnnotations struct {
 var replayStripTopLevel = []string{"viewer", "shareable"}
 
 // gameResult sub-keys with the same "viewer-only" property.
-var replayStripGameResult = []string{"metadata", "tooltips"}
+var replayStripGameResult = []string{"tooltips"}
 
 // Per-frame keys we drop. "view" is the serialized viewer state and is
 // usually the majority of the file size; "gameInformation" / "keyframe" are

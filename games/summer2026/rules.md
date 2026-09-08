@@ -251,7 +251,7 @@ From `com/codingame/game/Game.java`:
    threshold, clearing every track in them.
 5. `moveTrains` — recompute every active connection and award points.
 6. `computeTileStates` — refresh each cell's `partOfActiveConnections`.
-7. `checkSideQuest` — inert in this build (see below).
+7. `checkSideQuest` — records side-quest completion when the map has a POI.
 8. End check — `isGameOver()`.
 
 ## Source-vs-statement notes
@@ -278,10 +278,17 @@ From `com/codingame/game/Game.java`:
 - **Game also ends early when no connection is possible.** `isGameOver`
   returns true when a `TerrainAStar` search finds no remaining route for any
   desired connection, not only at turn 100.
-- **Side quest / POI is inert in this build.** `Game.enableSideQuest` is
-  hardcoded `false`, and `showSideQuest &= enableSideQuest`, so `makePOIs`
-  returns immediately, `TYPE_POI` never generates, and `checkSideQuest` is a
-  no-op. `getRailCost` still handles `TYPE_POI`.
+- **Historical replays can contain POIs.** The current default disables the
+  side quest, but online replay [901942746](https://www.codingame.com/replay/901942746)
+  has POIs at `(18, 3)` and `(18, 6)`, whereas
+  [902038382](https://www.codingame.com/replay/902038382) has none. The factory
+  enables the historical mode when replay metadata contains a
+  `sideQuestPoints_0` or `sideQuestPoints_1` key, including a zero value.
+  POIs cost 3 paint and can change `AUTOPLACE` tie ordering even when they are
+  outside the winning path. The existing A* and Java priority queue reproduce
+  both versions without changes. Replay normalization retains `metadata` for
+  this purpose; old files that discarded it must be re-fetched to recover the
+  historical mode. Missing metadata uses the current default.
 - **Fallback town placement diverges from the statement.** The primary loop in
   `GridMaker.makeTowns` enforces "plains only, not on an edge, at least
   `MIN_TOWN_DISTANCE` from other towns". The fallback loop that runs when the

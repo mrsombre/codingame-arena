@@ -139,9 +139,6 @@ func TestDesiredConnectionsAreNeverReciprocal(t *testing.T) {
 	}
 }
 
-// makePOIs returns before drawing anything while the side quest is disabled,
-// which it always is in this build. Enabling it must not be free — the RNG
-// stream moves — so the guard is asserted rather than assumed.
 func TestPOIsAreNotPlacedWhileTheSideQuestIsDisabled(t *testing.T) {
 	maker := NewGridMaker()
 	maker.Init(sha1prng.New(1), false)

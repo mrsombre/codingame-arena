@@ -47,6 +47,12 @@ func (f *factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []ar
 	p1 := NewPlayer(1)
 	// SHA1PRNG matches the SDK's MultiplayerGameManager.getRandom().
 	game := NewGame(sha1prng.New(seed), f.ResolveLeague(options))
+	// Online replays with POIs publish sideQuestPoints even when it is zero;
+	// the later rules omit those keys and generate no POIs.
+	if options != nil {
+		game.EnableSideQuest = options.IsSet("replay-metadata.sideQuestPoints_0") ||
+			options.IsSet("replay-metadata.sideQuestPoints_1")
+	}
 	return NewReferee(game), []arena.Player{p0, p1}
 }
 

@@ -177,8 +177,7 @@ private void writeMetadata() {
 // Two keys of Java's set are dropped or unguarded: executionTimeMs is the
 // SDK's own timing rather than a game counter and the arena measures its own,
 // and sideQuestPoints is emitted unconditionally rather than behind
-// enableSideQuest, so that a batch aggregates over one stable label set. The
-// side quest is inert in this build, so the value is always 0.
+// enableSideQuest, so that a batch aggregates over one stable label set.
 func (r *Referee) Metrics() []arena.Metric {
 	game := r.Game
 	metrics := make([]arena.Metric, 0, 22)
