@@ -1,10 +1,12 @@
+.DEFAULT_GOAL := build-arena
+
 BIN_DIR := bin
 
 # utility
 .PHONY: clean reset
 
 clean:
-	rm -rf bin/* tmp/* replays/* traces/*
+	rm -rf bin/* .tmp/* replays/* traces/*
 
 reset:
 	rm -rf replays/* traces/*
