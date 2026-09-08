@@ -37,7 +37,10 @@ func TestPrepareReplay_StripsViewerOnlyFields(t *testing.T) {
 		"  \"questionTitle\": \"Winter Challenge\",\n" +
 		"  \"replayId\": 42,\n" +
 		"  \"gameResult\": {\n" +
-		"    \"gameId\": 42\n" +
+		"    \"gameId\": 42,\n" +
+		"    \"metadata\": {\n" +
+		"      \"foo\": \"bar\"\n" +
+		"    }\n" +
 		"  },\n" +
 		"  \"frames\": [\n" +
 		"    {\n" +

@@ -70,3 +70,17 @@ pnpm run bundle                  # Biome check + type-check + build
 make type-check-viewer           # Type-check viewer (pnpm run type-check)
 make bundle-viewer               # Lint and test viewer (pnpm run bundle)
 ```
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as markdown files under `.scratch/<feature>/` in this repo. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical roles, unmapped — label string equals role name. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

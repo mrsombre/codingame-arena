@@ -142,10 +142,7 @@ func handleReplayGet(replayDir string, resolver factoryResolver) http.HandlerFun
 		}
 
 		league := arena.ParseReplayLeague(replay.QuestionTitle)
-		gameOptions := gameOptionsViper(nil)
-		if league > 0 {
-			gameOptions.Set("league", strconv.Itoa(league))
-		}
+		gameOptions := arena.ReplayGameOptions(replay, league)
 
 		moves := arena.ResolveTurnModel(factory).ReplayMovesFromFrames(replay)
 		names := arena.ReplayPlayerNames(replay)

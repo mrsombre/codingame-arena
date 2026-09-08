@@ -1,0 +1,825 @@
+{
+  "seed": "2959575534737297400",
+  "league": 3,
+  "metadata": {
+    "averageTrackOwnershipPercentagePerActiveConnection_1": 0.23542186617851257,
+    "tracksPlacedOnRiver_1": 9.0,
+    "tracksPlacedOnRiver_0": 10.0,
+    "zonesInked_1": 15.0,
+    "tracksPlacedOnMountains_1": 1.0,
+    "enemyTracksInkedOut_1": 26.0,
+    "tracksPlacedOnMountains_0": 1.0,
+    "enemyTracksInkedOut_0": 6.0,
+    "averageTrackOwnershipPercentagePerActiveConnection_0": 0.42801010608673096,
+    "executionTimeMs_1": 0.0,
+    "executionTimeMs_0": 0.0,
+    "tracksPlacedOnPlains_1": 54.0,
+    "tracksPlacedOnPlains_0": 63.0,
+    "zonesInked_0": 5.0,
+    "totalPois": 0.0,
+    "sideQuestPoints_1": 0.0,
+    "sideQuestPoints_0": 0.0,
+    "poisServed_0": 0.0,
+    "tracksPlaced_0": 74.0,
+    "tracksPlaced_1": 66.0,
+    "extraTilesInConnection_0": 1222.0,
+    "extraTilesInConnection_1": 1077.0,
+    "ownTracksInkedOut_0": 8.0,
+    "ownTracksInkedOut_1": 5.0,
+    "poisServed_1": 0.0,
+    "autobuildCalled_1": 42.0,
+    "autobuildCalled_0": 0.0
+  },
+  "setup": [
+    "0",
+    "21",
+    "14",
+    "0 0",
+    "0 0",
+    "1 0",
+    "1 0",
+    "1 0",
+    "1 0",
+    "2 0",
+    "2 2",
+    "2 2",
+    "3 2",
+    "3 2",
+    "3 0",
+    "4 1",
+    "4 0",
+    "5 0",
+    "5 0",
+    "5 0",
+    "12 0",
+    "6 0",
+    "6 2",
+    "6 2",
+    "0 0",
+    "0 0",
+    "0 2",
+    "8 2",
+    "1 0",
+    "1 0",
+    "2 2",
+    "2 2",
+    "2 2",
+    "3 0",
+    "3 0",
+    "3 0",
+    "3 1",
+    "4 0",
+    "4 0",
+    "5 0",
+    "5 0",
+    "12 2",
+    "6 2",
+    "6 2",
+    "6 2",
+    "0 2",
+    "0 2",
+    "0 2",
+    "8 0",
+    "1 0",
+    "8 0",
+    "2 0",
+    "2 0",
+    "2 2",
+    "10 0",
+    "10 0",
+    "11 0",
+    "4 1",
+    "4 0",
+    "4 0",
+    "5 0",
+    "12 0",
+    "12 2",
+    "13 2",
+    "6 0",
+    "6 0",
+    "7 0",
+    "7 2",
+    "7 2",
+    "8 0",
+    "8 0",
+    "8 0",
+    "9 0",
+    "9 0",
+    "9 0",
+    "10 1",
+    "10 1",
+    "11 1",
+    "11 1",
+    "11 0",
+    "11 0",
+    "5 0",
+    "12 0",
+    "12 0",
+    "13 3",
+    "13 0",
+    "6 0",
+    "7 0",
+    "7 0",
+    "7 0",
+    "15 0",
+    "8 0",
+    "9 0",
+    "9 0",
+    "9 0",
+    "9 0",
+    "10 1",
+    "10 0",
+    "11 0",
+    "18 0",
+    "11 0",
+    "18 0",
+    "18 0",
+    "12 0",
+    "19 0",
+    "20 0",
+    "13 0",
+    "13 0",
+    "14 0",
+    "14 0",
+    "14 2",
+    "15 2",
+    "15 0",
+    "15 1",
+    "16 1",
+    "16 1",
+    "16 0",
+    "17 1",
+    "17 0",
+    "17 0",
+    "18 0",
+    "18 0",
+    "18 0",
+    "19 0",
+    "19 0",
+    "19 0",
+    "20 0",
+    "20 0",
+    "13 0",
+    "14 0",
+    "14 2",
+    "14 2",
+    "15 0",
+    "15 1",
+    "15 1",
+    "16 0",
+    "16 1",
+    "16 1",
+    "17 1",
+    "17 0",
+    "24 0",
+    "18 0",
+    "19 0",
+    "19 0",
+    "19 0",
+    "19 0",
+    "20 0",
+    "20 3",
+    "27 0",
+    "13 0",
+    "14 1",
+    "14 1",
+    "21 2",
+    "29 1",
+    "22 1",
+    "15 0",
+    "16 0",
+    "23 0",
+    "23 0",
+    "17 1",
+    "17 1",
+    "24 0",
+    "18 0",
+    "25 0",
+    "26 0",
+    "26 0",
+    "26 0",
+    "20 0",
+    "27 0",
+    "27 0",
+    "27 0",
+    "21 0",
+    "21 1",
+    "21 1",
+    "29 1",
+    "22 0",
+    "22 0",
+    "23 0",
+    "23 0",
+    "24 0",
+    "24 0",
+    "24 1",
+    "24 1",
+    "25 0",
+    "25 0",
+    "25 0",
+    "25 0",
+    "26 0",
+    "26 0",
+    "26 0",
+    "27 0",
+    "27 0",
+    "21 0",
+    "21 0",
+    "21 0",
+    "29 0",
+    "29 0",
+    "22 0",
+    "22 0",
+    "23 0",
+    "23 0",
+    "24 0",
+    "31 0",
+    "31 1",
+    "25 1",
+    "25 1",
+    "32 1",
+    "33 1",
+    "33 0",
+    "26 0",
+    "34 0",
+    "34 0",
+    "34 0",
+    "28 0",
+    "28 0",
+    "28 0",
+    "29 0",
+    "29 0",
+    "22 0",
+    "22 0",
+    "30 0",
+    "31 0",
+    "31 0",
+    "31 0",
+    "31 0",
+    "32 0",
+    "32 0",
+    "32 0",
+    "32 1",
+    "33 0",
+    "33 0",
+    "40 0",
+    "34 0",
+    "34 0",
+    "28 0",
+    "28 0",
+    "35 0",
+    "35 0",
+    "29 0",
+    "22 0",
+    "30 0",
+    "30 0",
+    "30 0",
+    "38 0",
+    "38 0",
+    "31 0",
+    "32 0",
+    "39 0",
+    "32 0",
+    "33 1",
+    "33 1",
+    "33 0",
+    "40 0",
+    "34 0",
+    "41 0",
+    "28 0",
+    "35 0",
+    "35 0",
+    "35 0",
+    "36 0",
+    "36 0",
+    "37 0",
+    "37 0",
+    "30 0",
+    "30 0",
+    "38 0",
+    "39 0",
+    "39 0",
+    "39 0",
+    "39 0",
+    "33 0",
+    "40 1",
+    "40 1",
+    "40 1",
+    "41 1",
+    "41 1",
+    "28 0",
+    "35 0",
+    "36 0",
+    "36 0",
+    "36 0",
+    "37 0",
+    "37 0",
+    "37 0",
+    "37 0",
+    "38 0",
+    "38 0",
+    "38 0",
+    "38 0",
+    "39 0",
+    "39 0",
+    "39 0",
+    "40 0",
+    "40 0",
+    "41 0",
+    "41 0",
+    "41 0",
+    "5",
+    "0 13 1 4",
+    "1 2 4 0",
+    "2 6 6 1",
+    "3 8 8 0,1,2",
+    "4 8 12 1,2,3"
+  ],
+  "scores": [
+    1455,
+    725
+  ],
+  "ranks": [
+    0,
+    1
+  ],
+  "turns": [
+    {
+      "output": [
+        "PLACE_TRACKS 13 2;PLACE_TRACKS 13 3;PLACE_TRACKS 13 4",
+        "AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (12, 4)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 13 5;PLACE_TRACKS 13 6;PLACE_TRACKS 13 7",
+        "AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (11, 6)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 13 8;PLACE_TRACKS 13 9",
+        "DISRUPT 19 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (13, 10)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 8 11;PLACE_TRACKS 8 10;PLACE_TRACKS 8 9",
+        "DISRUPT 19 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (10, 10)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 8 7;PLACE_TRACKS 7 7;PLACE_TRACKS 6 7",
+        "DISRUPT 19 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 3 4;PLACE_TRACKS 4 4;PLACE_TRACKS 5 4;DISRUPT 19",
+        "DISRUPT 19 ; AUTOPLACE 2 4 13 1"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (6, 4)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 6 4;PLACE_TRACKS 6 5",
+        "DISRUPT 23 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "DISRUPT 4",
+        "DISRUPT 9"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region4. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 4",
+        "DISRUPT 9"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region4. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 4",
+        "DISRUPT 9"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region4. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 4",
+        "DISRUPT 9"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region4. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 4 5;PLACE_TRACKS 5 5;DISRUPT 4",
+        "DISRUPT 23 ; AUTOPLACE 2 4 13 1"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region4. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 4",
+        "DISRUPT 23"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region4. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 4",
+        "DISRUPT 23"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region4. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 9 8;PLACE_TRACKS 9 9;PLACE_TRACKS 7 10;DISRUPT 4",
+        "DISRUPT 25 ; AUTOPLACE 2 4 13 1"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (9, 5).",
+        "$0 Cannot disrupt region4. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 10 5;PLACE_TRACKS 9 5;DISRUPT 25",
+        "DISRUPT 25 ; AUTOPLACE 2 4 13 1"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "DISRUPT 18",
+        "DISRUPT 25"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 9 7;DISRUPT 18",
+        "DISRUPT 31 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (9, 7)."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 18",
+        "DISRUPT 17"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "DISRUPT 18",
+        "DISRUPT 17"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 12 3;PLACE_TRACKS 11 4",
+        "DISRUPT 17 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (11, 3)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 11 3",
+        "DISRUPT 11 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 11"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 11"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 11"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 12 1;PLACE_TRACKS 11 1",
+        "DISRUPT 17 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (10, 1)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 6 10;PLACE_TRACKS 6 9;PLACE_TRACKS 5 9",
+        "DISRUPT 31 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (8, 2)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 5 8;PLACE_TRACKS 5 7;PLACE_TRACKS 4 3",
+        "DISRUPT 22 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (7, 2)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 4 2;PLACE_TRACKS 5 2;PLACE_TRACKS 6 2",
+        "DISRUPT 8 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (5, 3)."
+      ]
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 1"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 1"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 1"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 1"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 5 3",
+        "DISRUPT 8 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 8"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 8"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 3 5",
+        "DISRUPT 15 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (16, 3)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 14 10;PLACE_TRACKS 15 10",
+        "DISRUPT 15 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (18, 3)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 16 10;PLACE_TRACKS 16 9;PLACE_TRACKS 16 8",
+        "DISRUPT 15 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (18, 4)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 16 7;PLACE_TRACKS 17 7;PLACE_TRACKS 17 6",
+        "DISRUPT 15 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (18, 6)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 1 4;PLACE_TRACKS 1 5;PLACE_TRACKS 0 5",
+        "DISRUPT 20 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 0 6;PLACE_TRACKS 0 7;DISRUPT 20",
+        "DISRUPT 14 ; AUTOPLACE 2 4 13 1"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (0, 8)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 0 8;PLACE_TRACKS 0 9;PLACE_TRACKS 1 9;DISRUPT 20",
+        "DISRUPT 14 ; AUTOPLACE 2 4 13 1"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (2, 9)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 2 9;PLACE_TRACKS 3 9;PLACE_TRACKS 4 9;DISRUPT 20",
+        "DISRUPT 14 ; AUTOPLACE 2 4 13 1"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 17 8;PLACE_TRACKS 18 8;PLACE_TRACKS 18 7",
+        "DISRUPT 14 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (20, 5)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 20 5;PLACE_TRACKS 20 6;PLACE_TRACKS 20 7",
+        "DISRUPT 26 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (19, 7)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 19 7",
+        "DISRUPT 26 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "DISRUPT 26",
+        "DISRUPT 26 ; AUTOPLACE 2 4 13 1"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 19 8;PLACE_TRACKS 19 9;PLACE_TRACKS 19 10",
+        "DISRUPT 27 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": [
+        "$1 Autobuild interrupted: not enough track points to build a track at (18, 10)."
+      ]
+    },
+    {
+      "output": [
+        "PLACE_TRACKS 18 10;PLACE_TRACKS 17 10",
+        "DISRUPT 27 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "DISRUPT 27",
+        "DISRUPT 27 ; AUTOPLACE 2 4 13 1"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 22 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 22 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 22 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 33 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 33 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 33 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 33 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 31 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "WAIT",
+        "DISRUPT 31 ; AUTOPLACE 13 1 8 12"
+      ],
+      "failed": []
+    }
+  ]
+}

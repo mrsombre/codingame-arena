@@ -1,0 +1,1584 @@
+{
+  "seed": "-5983846119098614000",
+  "league": 3,
+  "metadata": {
+    "averageTrackOwnershipPercentagePerActiveConnection_1": 0.4708139896392822,
+    "tracksPlacedOnRiver_1": 2.0,
+    "tracksPlacedOnRiver_0": 3.0,
+    "zonesInked_1": 3.0,
+    "tracksPlacedOnMountains_1": 0.0,
+    "enemyTracksInkedOut_1": 3.0,
+    "tracksPlacedOnMountains_0": 1.0,
+    "enemyTracksInkedOut_0": 7.0,
+    "averageTrackOwnershipPercentagePerActiveConnection_0": 0.4688972532749176,
+    "executionTimeMs_1": 0.0,
+    "executionTimeMs_0": 0.0,
+    "tracksPlacedOnPlains_1": 55.0,
+    "tracksPlacedOnPlains_0": 47.0,
+    "zonesInked_0": 3.0,
+    "totalPois": 0.0,
+    "poisServed_0": 0.0,
+    "tracksPlaced_0": 51.0,
+    "tracksPlaced_1": 57.0,
+    "extraTilesInConnection_0": 18839.0,
+    "extraTilesInConnection_1": 18170.0,
+    "ownTracksInkedOut_0": 0.0,
+    "ownTracksInkedOut_1": 5.0,
+    "poisServed_1": 0.0,
+    "autobuildCalled_1": 0.0,
+    "autobuildCalled_0": 21.0
+  },
+  "setup": [
+    "0",
+    "29",
+    "19",
+    "0 0",
+    "0 0",
+    "0 0",
+    "0 2",
+    "1 2",
+    "1 2",
+    "1 0",
+    "2 0",
+    "2 0",
+    "2 0",
+    "2 0",
+    "2 0",
+    "3 0",
+    "3 0",
+    "3 0",
+    "3 2",
+    "4 0",
+    "4 0",
+    "5 0",
+    "5 0",
+    "5 0",
+    "6 0",
+    "6 0",
+    "6 0",
+    "6 0",
+    "7 0",
+    "7 0",
+    "7 0",
+    "7 0",
+    "0 0",
+    "0 0",
+    "0 0",
+    "0 0",
+    "1 2",
+    "1 0",
+    "1 0",
+    "2 0",
+    "2 0",
+    "2 0",
+    "2 0",
+    "3 0",
+    "3 0",
+    "11 0",
+    "3 2",
+    "4 2",
+    "4 2",
+    "4 2",
+    "4 2",
+    "5 0",
+    "5 0",
+    "6 0",
+    "6 0",
+    "6 0",
+    "14 0",
+    "7 0",
+    "7 0",
+    "7 0",
+    "7 0",
+    "0 0",
+    "0 0",
+    "0 0",
+    "0 0",
+    "1 0",
+    "1 0",
+    "1 0",
+    "1 0",
+    "10 0",
+    "10 0",
+    "3 0",
+    "3 0",
+    "11 0",
+    "11 0",
+    "12 2",
+    "4 2",
+    "4 2",
+    "4 0",
+    "13 2",
+    "5 0",
+    "5 2",
+    "6 2",
+    "6 0",
+    "14 2",
+    "14 2",
+    "14 2",
+    "7 0",
+    "7 0",
+    "15 0",
+    "8 0",
+    "8 0",
+    "8 0",
+    "8 0",
+    "8 0",
+    "9 0",
+    "9 0",
+    "10 0",
+    "10 0",
+    "10 0",
+    "10 0",
+    "11 0",
+    "11 0",
+    "11 0",
+    "12 0",
+    "12 0",
+    "12 2",
+    "13 2",
+    "13 2",
+    "13 0",
+    "13 2",
+    "13 2",
+    "22 2",
+    "14 2",
+    "14 0",
+    "14 0",
+    "15 0",
+    "15 0",
+    "15 0",
+    "8 0",
+    "16 0",
+    "8 0",
+    "8 0",
+    "9 0",
+    "9 0",
+    "9 0",
+    "9 0",
+    "9 0",
+    "10 0",
+    "10 0",
+    "11 0",
+    "19 0",
+    "11 0",
+    "11 0",
+    "12 2",
+    "12 2",
+    "12 0",
+    "13 0",
+    "13 2",
+    "13 2",
+    "22 2",
+    "22 2",
+    "22 0",
+    "14 0",
+    "14 0",
+    "15 0",
+    "15 0",
+    "15 0",
+    "16 0",
+    "16 0",
+    "16 0",
+    "17 0",
+    "17 0",
+    "17 0",
+    "9 0",
+    "18 0",
+    "18 0",
+    "18 0",
+    "18 0",
+    "19 0",
+    "19 0",
+    "19 0",
+    "20 0",
+    "20 0",
+    "20 2",
+    "12 2",
+    "21 2",
+    "21 2",
+    "21 2",
+    "21 0",
+    "21 0",
+    "22 0",
+    "23 0",
+    "23 0",
+    "23 0",
+    "23 0",
+    "15 0",
+    "16 0",
+    "24 0",
+    "16 2",
+    "17 0",
+    "17 0",
+    "17 0",
+    "9 0",
+    "18 0",
+    "18 0",
+    "18 0",
+    "18 0",
+    "19 0",
+    "19 0",
+    "19 0",
+    "19 0",
+    "20 1",
+    "20 1",
+    "20 2",
+    "20 0",
+    "21 2",
+    "21 0",
+    "21 0",
+    "22 0",
+    "22 0",
+    "22 0",
+    "23 0",
+    "23 0",
+    "23 0",
+    "23 0",
+    "24 0",
+    "24 0",
+    "16 2",
+    "25 2",
+    "25 2",
+    "17 2",
+    "17 0",
+    "26 0",
+    "26 0",
+    "26 0",
+    "26 0",
+    "26 0",
+    "27 0",
+    "27 0",
+    "19 0",
+    "28 1",
+    "20 0",
+    "29 0",
+    "29 0",
+    "29 0",
+    "21 0",
+    "30 0",
+    "22 0",
+    "30 0",
+    "30 0",
+    "31 0",
+    "31 0",
+    "23 0",
+    "31 0",
+    "24 1",
+    "24 1",
+    "24 1",
+    "25 0",
+    "25 2",
+    "25 0",
+    "25 0",
+    "33 0",
+    "34 0",
+    "26 0",
+    "26 0",
+    "26 0",
+    "27 0",
+    "28 0",
+    "28 1",
+    "28 1",
+    "28 0",
+    "28 0",
+    "37 0",
+    "29 0",
+    "29 0",
+    "30 0",
+    "30 0",
+    "30 0",
+    "30 0",
+    "31 0",
+    "31 0",
+    "31 0",
+    "31 0",
+    "24 0",
+    "32 2",
+    "32 1",
+    "32 1",
+    "25 2",
+    "33 0",
+    "25 0",
+    "33 1",
+    "34 1",
+    "34 1",
+    "27 1",
+    "27 1",
+    "27 1",
+    "27 1",
+    "28 1",
+    "36 0",
+    "36 0",
+    "28 0",
+    "37 0",
+    "37 0",
+    "29 0",
+    "29 0",
+    "30 0",
+    "30 0",
+    "39 0",
+    "39 0",
+    "39 0",
+    "39 0",
+    "31 0",
+    "24 2",
+    "32 2",
+    "32 2",
+    "32 1",
+    "25 1",
+    "33 1",
+    "33 1",
+    "33 1",
+    "34 0",
+    "34 0",
+    "34 0",
+    "27 1",
+    "35 0",
+    "35 0",
+    "35 0",
+    "36 0",
+    "36 0",
+    "36 0",
+    "37 0",
+    "37 0",
+    "29 0",
+    "38 0",
+    "38 0",
+    "38 0",
+    "38 0",
+    "38 0",
+    "39 0",
+    "39 0",
+    "39 0",
+    "24 2",
+    "32 0",
+    "32 0",
+    "32 0",
+    "25 0",
+    "41 2",
+    "41 1",
+    "33 0",
+    "34 0",
+    "34 0",
+    "34 0",
+    "27 1",
+    "35 1",
+    "35 0",
+    "35 0",
+    "35 0",
+    "36 0",
+    "36 0",
+    "36 0",
+    "37 0",
+    "37 0",
+    "37 0",
+    "38 0",
+    "38 0",
+    "38 0",
+    "38 0",
+    "47 0",
+    "39 0",
+    "39 0",
+    "40 0",
+    "40 0",
+    "40 0",
+    "40 0",
+    "41 2",
+    "41 2",
+    "33 2",
+    "33 0",
+    "33 0",
+    "42 0",
+    "43 0",
+    "43 0",
+    "43 1",
+    "35 0",
+    "35 0",
+    "44 0",
+    "44 0",
+    "36 0",
+    "45 2",
+    "45 0",
+    "45 2",
+    "45 0",
+    "46 0",
+    "46 0",
+    "46 0",
+    "46 0",
+    "47 0",
+    "47 0",
+    "47 0",
+    "40 0",
+    "40 0",
+    "40 0",
+    "49 0",
+    "41 0",
+    "41 2",
+    "41 0",
+    "42 0",
+    "42 0",
+    "42 0",
+    "42 0",
+    "43 0",
+    "43 1",
+    "43 1",
+    "35 1",
+    "44 1",
+    "44 0",
+    "44 0",
+    "44 2",
+    "45 2",
+    "45 2",
+    "45 2",
+    "46 0",
+    "46 0",
+    "46 0",
+    "47 0",
+    "47 0",
+    "47 0",
+    "47 0",
+    "48 0",
+    "40 0",
+    "40 0",
+    "49 0",
+    "49 0",
+    "41 0",
+    "41 0",
+    "42 0",
+    "42 0",
+    "42 0",
+    "50 0",
+    "43 0",
+    "51 0",
+    "43 0",
+    "44 0",
+    "44 1",
+    "52 0",
+    "44 0",
+    "53 0",
+    "45 0",
+    "53 1",
+    "46 1",
+    "46 1",
+    "54 0",
+    "54 0",
+    "55 0",
+    "55 0",
+    "55 0",
+    "55 0",
+    "48 0",
+    "48 0",
+    "48 0",
+    "48 0",
+    "49 0",
+    "49 0",
+    "50 0",
+    "50 0",
+    "42 0",
+    "50 0",
+    "50 0",
+    "51 0",
+    "51 0",
+    "43 0",
+    "52 0",
+    "52 1",
+    "52 1",
+    "52 1",
+    "53 0",
+    "53 1",
+    "53 1",
+    "46 0",
+    "54 1",
+    "54 1",
+    "54 1",
+    "54 1",
+    "55 1",
+    "55 0",
+    "55 0",
+    "48 0",
+    "48 0",
+    "56 0",
+    "49 0",
+    "49 0",
+    "49 0",
+    "49 0",
+    "50 0",
+    "50 2",
+    "50 0",
+    "50 0",
+    "51 0",
+    "51 0",
+    "43 0",
+    "52 0",
+    "52 0",
+    "52 0",
+    "52 1",
+    "53 1",
+    "53 1",
+    "53 0",
+    "59 0",
+    "59 0",
+    "54 0",
+    "60 0",
+    "54 0",
+    "60 1",
+    "60 0",
+    "55 0",
+    "56 0",
+    "56 0",
+    "56 0",
+    "56 0",
+    "56 0",
+    "56 0",
+    "57 0",
+    "57 2",
+    "57 2",
+    "57 2",
+    "51 0",
+    "51 0",
+    "58 0",
+    "58 0",
+    "58 0",
+    "58 0",
+    "58 0",
+    "58 2",
+    "53 2",
+    "59 2",
+    "59 0",
+    "59 0",
+    "59 0",
+    "54 0",
+    "60 0",
+    "54 0",
+    "60 1",
+    "60 0",
+    "55 0",
+    "56 0",
+    "56 0",
+    "56 0",
+    "56 0",
+    "57 0",
+    "57 0",
+    "57 0",
+    "57 2",
+    "57 2",
+    "57 0",
+    "51 0",
+    "51 0",
+    "58 0",
+    "58 0",
+    "58 0",
+    "58 0",
+    "58 0",
+    "58 0",
+    "59 2",
+    "59 0",
+    "59 0",
+    "59 0",
+    "59 0",
+    "60 0",
+    "60 0",
+    "60 0",
+    "60 1",
+    "55 0",
+    "55 0",
+    "11",
+    "0 8 1 1,3",
+    "1 5 3 9,10",
+    "2 25 4 6",
+    "3 14 6 5,9,10",
+    "4 21 6 0,1,5",
+    "5 6 8 0,1,2,7",
+    "6 27 8 0,3,4",
+    "7 23 10 1,2,3,4,6",
+    "8 17 13 1,2,6",
+    "9 1 16 0,5,6,7,8",
+    "10 23 16 2,7,8"
+  ],
+  "scores": [
+    29694,
+    24486
+  ],
+  "ranks": [
+    0,
+    1
+  ],
+  "turns": [
+    {
+      "output": [
+        "AUTOPLACE 1 16 27 8",
+        "PLACE_TRACKS 1 15;PLACE_TRACKS 1 14;PLACE_TRACKS 2 14"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (5, 16)."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 1 16 27 8;DISRUPT 40",
+        "PLACE_TRACKS 3 14;PLACE_TRACKS 4 14;PLACE_TRACKS 5 14"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (7, 15)."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 1 16 27 8;DISRUPT 40",
+        "PLACE_TRACKS 6 14;PLACE_TRACKS 7 14;PLACE_TRACKS 8 14"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (9, 14)."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 1 16 27 8;DISRUPT 40",
+        "PLACE_TRACKS 9 14;PLACE_TRACKS 10 14;PLACE_TRACKS 11 14"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (13, 15)."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 1 16 27 8;DISRUPT 40",
+        "PLACE_TRACKS 12 14;PLACE_TRACKS 13 14;PLACE_TRACKS 14 14"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (15, 14)."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 1 16 27 8;DISRUPT 41",
+        "PLACE_TRACKS 6 3;PLACE_TRACKS 6 4;PLACE_TRACKS 6 5"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (16, 13)."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 1 16 27 8;DISRUPT 41",
+        "PLACE_TRACKS 23 11;PLACE_TRACKS 22 11;PLACE_TRACKS 21 11"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (18, 11)."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 1 16 27 8;DISRUPT 41",
+        "PLACE_TRACKS 27 9;PLACE_TRACKS 27 10;PLACE_TRACKS 26 10;DISRUPT 43"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (24, 10)."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 1 16 27 8;DISRUPT 41",
+        "PLACE_TRACKS 25 10;PLACE_TRACKS 24 10;PLACE_TRACKS 8 13;DISRUPT 43"
+      ],
+      "failed": []
+    },
+    {
+      "output": [
+        "AUTOPLACE 14 6 1 16;DISRUPT 39",
+        "PLACE_TRACKS 6 6;PLACE_TRACKS 6 7;PLACE_TRACKS 7 8;DISRUPT 43"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (16, 7)."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 14 6 1 16;DISRUPT 39",
+        "PLACE_TRACKS 8 12;PLACE_TRACKS 8 11;PLACE_TRACKS 8 10;DISRUPT 43"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (17, 9)."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 14 6 1 16;DISRUPT 39",
+        "PLACE_TRACKS 7 6;PLACE_TRACKS 8 6;PLACE_TRACKS 9 6"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (14, 16)."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 14 6 1 16;DISRUPT 39",
+        "PLACE_TRACKS 13 6;PLACE_TRACKS 12 6;PLACE_TRACKS 11 6;DISRUPT 20"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (12, 17)."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 14 6 1 16;DISRUPT 9",
+        "PLACE_TRACKS 26 8;PLACE_TRACKS 25 8;PLACE_TRACKS 24 8;DISRUPT 20"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 1 16 8 1;DISRUPT 9",
+        "PLACE_TRACKS 23 8;PLACE_TRACKS 23 9;PLACE_TRACKS 10 6;DISRUPT 42"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (7, 1).",
+        "$0 Cannot disrupt region9. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 1 16 8 1;DISRUPT 9",
+        "PLACE_TRACKS 7 1;DISRUPT 42"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 21 6 8 1;DISRUPT 9",
+        "PLACE_TRACKS 22 6;PLACE_TRACKS 23 6;PLACE_TRACKS 23 7;DISRUPT 42"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 6 8 25 4;DISRUPT 9",
+        "PLACE_TRACKS 23 5;PLACE_TRACKS 23 4;PLACE_TRACKS 24 4;DISRUPT 42"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 1 16 8 1;DISRUPT 9",
+        "PLACE_TRACKS 23 12;PLACE_TRACKS 23 13;PLACE_TRACKS 23 14"
+      ],
+      "failed": [
+        "$0 Autobuild interrupted: not enough track points to build a track at (9, 16).",
+        "$0 Cannot disrupt region9. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 1 16 8 1;DISRUPT 9",
+        "PLACE_TRACKS 23 15"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 48"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town.",
+        "$1 Cannot disrupt region48. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 20"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "DISRUPT 20"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "AUTOPLACE 5 3 1 16;DISRUPT 9",
+        "PLACE_TRACKS 15 8"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "WAIT"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town."
+      ]
+    },
+    {
+      "output": [
+        "DISRUPT 9",
+        "WAIT"
+      ],
+      "failed": [
+        "$0 Cannot disrupt region9. It contains a town."
+      ]
+    }
+  ]
+}

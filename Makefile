@@ -1,10 +1,12 @@
+.DEFAULT_GOAL := build-arena
+
 BIN_DIR := bin
 
 # utility
 .PHONY: clean reset
 
 clean:
-	rm -rf bin/* tmp/* replays/* traces/*
+	rm -rf bin/* .tmp/* replays/* traces/*
 
 reset:
 	rm -rf replays/* traces/*
@@ -39,25 +41,25 @@ build-viewer:
 	cd $(VIEWER_DIR) && pnpm run build
 
 # match runner
-.PHONY: build-spring2026-agents match-spring2026
-SPRING2026_AGENTS := games/spring2026/agents
-SPRING2026_CPPBOT := $(BIN_DIR)/bot-spring2026-cpp
-SPRING2026_PYBOT  := $(BIN_DIR)/bot-spring2026-py
+.PHONY: build-summer2026-agents match-summer2026
+SUMMER2026_AGENTS := games/summer2026/agents
+SUMMER2026_CPPBOT := $(BIN_DIR)/bot-summer2026-cpp
+SUMMER2026_PYBOT  := $(BIN_DIR)/bot-summer2026-py
 
-build-spring2026-agents:
+build-summer2026-agents:
 	rm -f $(BIN_DIR)/bot-*
-	g++ -std=c++17 -O2 -o $(SPRING2026_CPPBOT) $(SPRING2026_AGENTS)/bot.cpp
-	cp -f $(SPRING2026_AGENTS)/bot.py $(SPRING2026_PYBOT)
+	g++ -std=c++17 -O2 -o $(SUMMER2026_CPPBOT) $(SUMMER2026_AGENTS)/bot.cpp
+	cp -f $(SUMMER2026_AGENTS)/bot.py $(SUMMER2026_PYBOT)
 
-match-spring2026:
-	./$(BIN_DIR)/arena run spring2026 --blue=./$(SPRING2026_CPPBOT) --red=./$(SPRING2026_PYBOT) \
-		--seed=100030005000700089 --simulations 50 --trace
+match-summer2026:
+	./$(BIN_DIR)/arena run summer2026 --blue=./$(SUMMER2026_CPPBOT) --red=./$(SUMMER2026_PYBOT) \
+		--seed=468706172918629800 --simulations 50 --trace
 
 # analytics
 .PHONY: replay analyze
 
 replay:
-	./$(BIN_DIR)/arena replay spring2026 mrsombre
+	./$(BIN_DIR)/arena replay summer2026 mrsombre
 
 analyze:
-	./$(BIN_DIR)/arena analyze spring2026
+	./$(BIN_DIR)/arena analyze summer2026
