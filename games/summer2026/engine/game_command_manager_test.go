@@ -5,13 +5,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/mrsombre/codingame-arena/internal/util/sha1prng"
 )
 
 // parse runs one output line through CommandManager against a throwaway game.
-// The grid is irrelevant here — parsing never touches it.
+// The grid is irrelevant here — parsing never touches it — but Init still
+// generates one, so the game needs a real RNG.
 func parse(t *testing.T, line string) (*Game, *Player) {
 	t.Helper()
-	game := NewGame(nil, DEFAULT_LEAGUE)
+	game := NewGame(sha1prng.New(0), DEFAULT_LEAGUE)
 	player := NewPlayer(0)
 	game.Init([]*Player{player, NewPlayer(1)})
 	NewCommandManager(game).ParseCommands(player, []string{line})

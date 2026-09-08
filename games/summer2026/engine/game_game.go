@@ -193,9 +193,9 @@ func (g *Game) Init(players []*Player) {
 	for _, p := range g.Players {
 		p.Init()
 	}
-	// The real GridMaker (and with it seed parity) lands with the map
-	// generation work; until then Init builds the fixed placeholder grid.
-	g.Grid = MakePlaceholderGrid()
+	gridMaker := NewGridMaker()
+	gridMaker.Init(g.Random, g.EnableSideQuest)
+	g.Grid = gridMaker.Make()
 
 	g.InTutorial = g.Tutorial.InitTutorial(g)
 

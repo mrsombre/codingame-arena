@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
+	"github.com/mrsombre/codingame-arena/internal/util/sha1prng"
 )
 
 // Acceptance tests exercise the rules of Back Track King on hand-built grids,
@@ -92,7 +93,9 @@ func loadScenario(t *testing.T, sc scenario) (*Game, *Player, *Player) {
 	}
 
 	p0, p1 := NewPlayer(0), NewPlayer(1)
-	game := NewGame(nil, league)
+	// Init generates a map, which the scenario grid then replaces. The seed
+	// is arbitrary; it only has to be one the generator accepts.
+	game := NewGame(sha1prng.New(0), league)
 	game.Init([]*Player{p0, p1})
 	game.Grid = grid
 

@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mrsombre/codingame-arena/internal/util/sha1prng"
 )
 
 // Rail cost is a multiple of BASE_RAIL_COST chosen by terrain, and the tests
@@ -33,7 +35,7 @@ func TestRailCostScalesWithTerrain(t *testing.T) {
 // charges it — doActions rejects the placement first — but the arithmetic has
 // to stay total.
 func TestRailCostOfAnOffGridTileIsThePlainsPrice(t *testing.T) {
-	game := NewGame(nil, DEFAULT_LEAGUE)
+	game := NewGame(sha1prng.New(0), DEFAULT_LEAGUE)
 	game.Init([]*Player{NewPlayer(0), NewPlayer(1)})
 
 	assert.Equal(t, BASE_RAIL_COST*GRASS_COST_MULTIPLIER, game.RailCostAt(Coord{-1, -1}))

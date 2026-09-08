@@ -9,6 +9,12 @@ import (
 	"slices"
 )
 
+// javaInt is an int usable as a javahash key. Integer.hashCode() returns the
+// value itself, so HashSet<Integer> ordering falls straight out of it.
+type javaInt int
+
+func (v javaInt) JavaHash() int32 { return int32(v) }
+
 // javaTimSortMinMerge is TimSort.MIN_MERGE. Below it, Arrays.sort runs a
 // single countRunAndMakeAscending + binarySort pass and never merges, which
 // is the only path this engine takes: the sorted lists are neighbour lists of
