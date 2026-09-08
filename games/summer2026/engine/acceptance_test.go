@@ -489,6 +489,150 @@ func TestIntentsAreClearedBetweenTurns(t *testing.T) {
 	assert.Len(t, p0.Intents, 1)
 }
 
+// ——— autobuild expansion ——————————————————————————————————————————————————
+
+// AUTOPLACE is rewritten into placements before DoActions runs, so everything
+// downstream — cost, rejection, contested ownership — treats them as if the
+// bot had spelled them out itself.
+func TestAutoplaceExpandsToTheCheapestTrackSequence(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{
+		Terrain: []string{
+			"...",
+			".~.",
+		},
+		Towns: []townSpec{{ID: 0, X: 0, Y: 1}, {ID: 1, X: 2, Y: 1}},
+	})
+
+	// One river crossing costs 2; the dry way round the top costs 3.
+	runTurn(game, "AUTOPLACE 0 1 2 1", "WAIT")
+
+	assert.Equal(t, 0, game.Grid.GetXY(1, 1).Track)
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(0, 0).Track)
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(1, 0).Track)
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(2, 0).Track)
+	assert.Equal(t, PASSIVE_INCOME-RIVER_COST_MULTIPLIER, p0.Dosh)
+	assert.Equal(t, [2]int{1, 0}, game.AutobuildCalled)
+	assert.Empty(t, game.Summary)
+}
+
+func TestAutoplaceThatCannotReachTheGoalPlacesNothing(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{Terrain: []string{"..."}})
+
+	runTurn(game, "AUTOPLACE 0 0 9 9", "WAIT")
+
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(0, 0).Track)
+	assert.Equal(t, PASSIVE_INCOME, p0.Dosh)
+	assert.Equal(t, [2]int{1, 0}, game.AutobuildCalled)
+	assert.Empty(t, game.Summary)
+}
+
+func TestOnlyOneAutoplaceIsHonouredPerTurn(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{
+		Terrain: []string{
+			"..",
+			"..",
+		},
+	})
+
+	runTurn(game, "AUTOPLACE 0 0 1 0;AUTOPLACE 0 1 1 1", "WAIT")
+
+	assert.Equal(t, 0, game.Grid.GetXY(0, 0).Track)
+	assert.Equal(t, 0, game.Grid.GetXY(1, 0).Track)
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(0, 1).Track)
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(1, 1).Track)
+	assert.Equal(t, [2]int{1, 0}, game.AutobuildCalled)
+	assert.Equal(t, []string{
+		"¤RED¤Player 0 Only one autobuild action allowed per turn.§RED§",
+	}, game.Summary)
+	assert.False(t, p0.IsDeactivated())
+}
+
+// The planner ignores the budget, so a plan longer than the turn's paint is
+// cut off where the money runs out. What was already laid stays.
+func TestAutoplaceStopsAtTheLastAffordableTrack(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{
+		Terrain: []string{"......."},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}, {ID: 1, X: 6, Y: 0}},
+	})
+
+	runTurn(game, "AUTOPLACE 1 0 6 0", "WAIT")
+
+	assert.Equal(t, 0, game.Grid.GetXY(1, 0).Track)
+	assert.Equal(t, 0, game.Grid.GetXY(2, 0).Track)
+	assert.Equal(t, 0, game.Grid.GetXY(3, 0).Track)
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(4, 0).Track)
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(5, 0).Track)
+	assert.Equal(t, 0, p0.Dosh)
+	assert.Equal(t, []string{
+		"¤RED¤Player 0 Autobuild interrupted: not enough track points to build a track at (4, 0).§RED§",
+	}, game.Summary)
+}
+
+// The interrupt only silences the rest of the expansion. A manual placement
+// after it is still considered, and still rejected on its own merits.
+func TestAutoplaceInterruptDoesNotSilenceLaterManualActions(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{"......."},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}, {ID: 1, X: 6, Y: 0}},
+	})
+
+	runTurn(game, "AUTOPLACE 1 0 6 0;PLACE_TRACK 5 0", "WAIT")
+
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(5, 0).Track)
+	assert.Equal(t, []string{
+		"¤RED¤Player 0 Autobuild interrupted: not enough track points to build a track at (4, 0).§RED§",
+		"¤RED¤Player 0 Not enough track points to build a track at (5, 0).§RED§",
+	}, game.Summary)
+}
+
+// Expanded placements go through the same rejection gate as manual ones: the
+// planner routes around an inked region rather than into it, and when it
+// cannot, nothing is placed.
+func TestAutoplaceObeysTheInkedRegionRule(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{
+		Terrain: []string{"..."},
+		Regions: []string{"aba"},
+	})
+	game.Grid.Zones[1].Inked = true
+
+	runTurn(game, "AUTOPLACE 0 0 2 0", "WAIT")
+
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(0, 0).Track)
+	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(1, 0).Track)
+	assert.Equal(t, PASSIVE_INCOME, p0.Dosh)
+}
+
+// Two expansions crossing the same cell contest it exactly as two manual
+// placements would.
+func TestAutoplacedTracksCanBeContestedIntoNeutralOwnership(t *testing.T) {
+	game, _, _ := loadScenario(t, scenario{
+		Terrain: []string{"..."},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}, {ID: 1, X: 2, Y: 0}},
+	})
+
+	runTurn(game, "AUTOPLACE 0 0 2 0", "AUTOPLACE 2 0 0 0")
+
+	assert.Equal(t, TRACK_NEUTRAL, game.Grid.GetXY(1, 0).Track)
+	assert.Equal(t, [2]int{1, 1}, game.AutobuildCalled)
+}
+
+// A plan that ends on the opponent's rail block still only pays for the cells
+// it lays itself.
+func TestAutoplaceRidesExistingTrackWhoeverOwnsIt(t *testing.T) {
+	game, p0, _ := loadScenario(t, scenario{
+		Terrain: []string{"......"},
+		Tracks:  []string{"..111."},
+		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}, {ID: 1, X: 5, Y: 0}},
+	})
+
+	runTurn(game, "AUTOPLACE 0 0 5 0", "WAIT")
+
+	assert.Equal(t, 0, game.Grid.GetXY(1, 0).Track)
+	assert.Equal(t, 1, game.Grid.GetXY(2, 0).Track)
+	assert.Equal(t, PASSIVE_INCOME-1, p0.Dosh)
+	assert.Empty(t, game.Summary)
+}
+
 // ——— connections and scoring —————————————————————————————————————————————
 
 func TestConnectionIsDiscoveredWhenTrackLinksATownToItsDesiredCounterpart(t *testing.T) {

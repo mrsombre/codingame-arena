@@ -115,6 +115,7 @@ type Game struct {
 	TracksPlacedOnPlains    [2]int
 	TracksPlacedOnRiver     [2]int
 	TracksPlacedOnMountains [2]int
+	AutobuildCalled         [2]int
 
 	// ExtraTilesInConnection sums, over every scoring event, how much longer
 	// the connection's path was than the straight-line distance between the
@@ -209,13 +210,14 @@ public void performGameUpdate(int turn) {
 }
 */
 
-// PerformGameUpdate runs one turn. Autobuild expansion, disruption and
-// instability are staged in by later work; the turn counter, the income
-// reset, track placement, connection scoring and the end check are live.
+// PerformGameUpdate runs one turn. Disruption and instability are staged in
+// by later work; the turn counter, the income reset, autobuild expansion,
+// track placement, connection scoring and the end check are live.
 func (g *Game) PerformGameUpdate(_ int) {
 	g.Turn++
 
 	g.DoIncome()
+	g.ComputeAutobuilds()
 	g.DoActions()
 
 	g.MoveTrains()
@@ -243,6 +245,86 @@ func (g *Game) DoIncome() {
 		player.Dosh = PASSIVE_INCOME
 		player.BlotPoints = BLOT_POINTS_PER_TURN
 	}
+}
+
+/*
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:667-706
+
+private void computeAutobuilds() {
+    for (Player player : players) {
+        boolean autoBuildUsed = false;
+        List<Action> resolvedIntents = new ArrayList<>();
+        for (Action intent : player.intents) {
+            if (intent.isAutobuild()) {
+                if (autoBuildUsed) {
+                    reportPlayerError(player, "Only one autobuild action allowed per turn.");
+                    continue;
+                }
+                List<Action> actions = resolveAutobuild(player, intent);
+                resolvedIntents.addAll(actions);
+                autoBuildUsed = true;
+                autobuildCalled[player.getIndex()]++;
+            } else {
+                resolvedIntents.add(intent);
+            }
+        }
+        player.intents = resolvedIntents;
+    }
+}
+
+private List<Action> resolveAutobuild(Player player, Action intent) {
+    Coord from = intent.getFrom();
+    Coord to = intent.getTo();
+    AutobuildAStar planner = new AutobuildAStar(grid, player, from, to);
+    Optional<List<AutobuildState>> path = planner.search();
+    if (!path.isPresent()) return List.of();
+    return path.get().stream().map(s -> s.action).filter(v -> !Objects.isNull(v)).toList();
+}
+*/
+
+// ComputeAutobuilds rewrites each player's intent list in place, replacing
+// the turn's one AUTOPLACE with the placements it expands to. Later AUTOPLACEs
+// are reported and dropped; the counter still only counts the honoured one.
+//
+// A plan that cannot be paid for in full is not trimmed here — DoActions runs
+// the expanded placements against the budget and interrupts the rest.
+func (g *Game) ComputeAutobuilds() {
+	for _, player := range g.Players {
+		autoBuildUsed := false
+		resolvedIntents := make([]*Action, 0, len(player.Intents))
+		for _, intent := range player.Intents {
+			if !intent.IsAutobuild() {
+				resolvedIntents = append(resolvedIntents, intent)
+				continue
+			}
+			if autoBuildUsed {
+				g.ReportPlayerError(player, "Only one autobuild action allowed per turn.")
+				continue
+			}
+			resolvedIntents = append(resolvedIntents, g.resolveAutobuild(player, intent)...)
+			autoBuildUsed = true
+			g.AutobuildCalled[player.GetIndex()]++
+		}
+		player.Intents = resolvedIntents
+	}
+}
+
+// resolveAutobuild keeps only the steps of the winning plan that build
+// something; the steps that merely walk the cursor over existing track carry
+// no action and drop out.
+func (g *Game) resolveAutobuild(player *Player, intent *Action) []*Action {
+	path, ok := NewAutobuildAStar(g.Grid, player, intent.From, intent.To).Search()
+	if !ok {
+		return nil
+	}
+
+	actions := make([]*Action, 0, len(path))
+	for _, s := range path {
+		if s.Action != nil {
+			actions = append(actions, s.Action)
+		}
+	}
+	return actions
 }
 
 /*
