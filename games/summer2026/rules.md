@@ -1,8 +1,11 @@
 # Summer Challenge 2026 — Back Track King
 
-Statement as published for **Bronze**, the first league with no special
-objective — the full game scores. Sections below the horizontal rule are
-derived from the local engine dump, not from the contest page.
+This is a league-based challenge. Multiple leagues are available for the
+same game. Once you have proven your skills against the first Boss, you will
+access a higher league and extra rules will become available.
+
+In the first few leagues, your submission only fights the boss in the arena.
+Win a best-of-five to advance.
 
 ## Goal
 
@@ -35,10 +38,15 @@ Some regions will contain a town. Towns can only be found on plain cells.
 ### 🏯 Towns
 
 Each game starts with multiple towns placed randomly across the map. There will
-only be one per region, and no two regions sharing a border will both contain a
-town.
+only be one per region. Usually no two regions sharing a border will both
+contain a town, and no town is on the map edge. On rare maps, where the
+generator cannot place every town under these limits, it places the remaining
+towns with only the distance limit: such a town can be in a region next to
+another town's region, or on the map edge.
 
-Each town has a unique `townId`.
+Two towns are always at least `4` cells apart (Manhattan distance).
+
+Each town has a unique `townId`, from `0` to `townCount - 1`.
 
 Each town has a list of `desiredConnections`: town ids representing all the
 other towns this town would like to be connected to via train tracks placed by
@@ -48,8 +56,9 @@ how players score points.
 Desired connections are **unilateral** — if town `0` spawns with a desired
 connection to town `1`, town `1` will not want to connect to town `0`.
 
-A town can have zero `desiredConnections`, but will always be the subject of at
-least one other town's `desiredConnections`.
+A town can have zero `desiredConnections`, and a town can be missing from the
+`desiredConnections` of every other town. Every town is part of at least one
+desired connection, in one direction or the other.
 
 ### 🛤️ Placing train tracks
 
@@ -68,9 +77,10 @@ It costs:
 A track's owner is the `playerId` (`0`–`1`) of the player that placed it. They
 will be the same colour. If both players place a track on the same turn at the
 same location, the track's owner will be `2`, indicating a **neutral** track
-piece.
+piece. Both players pay the cost of that cell.
 
-A train track cannot be placed on a town or on an existing track.
+A train track cannot be placed on a town, on an existing track, on a cell that
+the same player already placed on this turn, or in an inked-out region.
 
 Once placed, a train track will automatically connect to other tracks and towns
 orthogonally adjacent to it.
@@ -82,7 +92,8 @@ if at least one path between the two exists, the **shortest** such path becomes
 the **active connection** between those towns.
 
 A path is an uninterrupted sequence of orthogonally adjacent cells with a train
-track or a town.
+track or a town. Tracks of both players, neutral tracks and other towns can all
+be part of a path.
 
 If there are multiple shortest paths, the chosen path will always prioritise
 the direction in the following order when moving from the requesting town to
@@ -94,7 +105,9 @@ the desired connected town:
 4. `WEST`
 
 At the end of every turn, each active connection provides **1 point to each
-player for every track they own in the path**.
+player for every track they own in the path**. Neutral tracks and towns give no
+points. Active connections are computed again every turn, and points add up
+over the game.
 
 **Example 1** — there is an active connection from town 0 to town 1 and one
 from town 0 to town 2. Both the red and the blue players gain 3 points for the
@@ -113,7 +126,8 @@ can be used to tamper with the map, giving you an edge over your opponent.
 These points are not retained between turns either.
 
 Players may spend their disruption point each turn to increase the
-`instability` of any region by `1`.
+`instability` of any region by `1`. Both players can disrupt the same region on
+the same turn.
 
 Once a region's instability reaches `4`, that region is **inked out**, washing
 any placed train tracks away and rendering any future placements on it
@@ -121,23 +135,50 @@ impossible. Any active connections via this region will be severed.
 
 It is not possible to disrupt a region that is already inked out.
 
+Regions with a town cannot be disrupted.
+
+A `DISRUPT` action that is skipped does not use the disruption point.
+
 ### 🎬 Actions
 
 Each turn, players must provide at least one action on the standard output.
 Actions must be separated by a semicolon `;` and be one of the following:
 
 - `PLACE_TRACKS x y` — place a track on a free cell.
-- `AUTOPLACE fromX fromY toX toY` — automatically generates a list of actions
-  for the cheapest path from `from` to `to` in terms of paint points. Does
-  nothing if a path already exists. The generated actions replace this command.
+- `AUTOPLACE fromX fromY toX toY` — automatically generates a list of
+  `PLACE_TRACKS` actions for the cheapest path from `from` to `to` in terms of
+  paint points. The generated actions replace this command, at the same
+  position in the action list.
 - `DISRUPT regionId` — increase the instability of a region. `DISRUPT x y` also
   works, to target the region `(x,y)` is part of.
+- `MESSAGE text` — display text in the viewer.
 - `WAIT` — do nothing.
+
+`AUTOPLACE` path search:
+
+- The search uses the map as it is at the start of the turn. It ignores
+  actions given on the same turn.
+- Existing tracks of any owner and towns cost `0`. Other cells cost their
+  terrain cost.
+- The path never goes through a cell of an inked-out region.
+- If `from` is on a track or a town, the path can start from any cell of the
+  network of tracks and towns connected to `from`.
+- If `from` and `to` are already connected by tracks and towns, no action is
+  generated.
+- If `from` or `to` is outside the grid, or no path exists, no action is
+  generated.
+- The search does not limit the path to the paint points of the turn.
 
 ### 🏆 Victory conditions
 
 - Have the most points after 100 turns.
-- Be in the lead if all desired connections become impossible to fulfil.
+- Be in the lead when all desired connections become impossible to fulfil. A
+  desired connection is possible while a route of orthogonally adjacent cells
+  outside inked-out regions exists between its two towns. The route can cross
+  any terrain, with or without tracks. The game checks this at the end of each
+  turn, after scoring.
+
+Equal points at the end of the game give a draw.
 
 ### ⛔ Defeat conditions
 
@@ -146,13 +187,49 @@ Actions must be separated by a semicolon `;` and be one of the following:
 
 ## Technical details
 
-All `PLACE_TRACKS` actions, including those generated by `AUTOPLACE`, are
-performed **before** `DISRUPT` actions. Points are scored at the very end of a
-turn, **after** inking out unstable regions.
+The game's source code is available on GitHub.
 
-Commands that are impossible actions are skipped. If an impossible action is
-part of an `AUTOPLACE`, the rest of the generated actions are skipped even if
-they are possible.
+A command is invalid, and its player is disqualified, when it matches none of
+the action formats:
+
+- Keywords are case-insensitive. The keyword is `PLACE_TRACKS`; `PLACE_TRACK`
+  is invalid.
+- Words in a command are separated by exactly one space. Spaces before and
+  after each command are ignored.
+- `x`, `y`, `fromX`, `fromY`, `toX`, `toY` and `regionId` must be non-negative
+  integers.
+- An empty command is invalid, for example an empty line, `;WAIT` or
+  `WAIT;;WAIT`. Semicolons at the end of the line are ignored.
+- `MESSAGE` must be followed by a space and text. The text cannot contain `;`.
+
+A turn runs in this order:
+
+1. Each player gets 3 paint points and 1 disruption point.
+2. Each `AUTOPLACE` is replaced by its generated actions.
+3. `PLACE_TRACKS` actions are performed: all actions of player 0 in order, then
+   all actions of player 1 in order. Ownership of each cell is decided after
+   both players, so the order between players does not matter.
+4. `DISRUPT` actions are performed: player 0, then player 1.
+5. Regions with instability `4` or more are inked out.
+6. Active connections are computed and points are scored.
+7. The game ends if 100 turns are played or no desired connection is possible.
+
+Commands that are impossible actions are skipped, and the player is not
+disqualified:
+
+- `PLACE_TRACKS` outside the grid, on a town, on an existing track, on a cell
+  the same player already placed on this turn, in an inked-out region, or
+  without enough paint points.
+- `DISRUPT` with a `regionId` that does not exist or with `x y` outside the
+  grid, on an inked-out region, on a region with a town, or without a
+  disruption point left.
+- Each `AUTOPLACE` after the first one on the same turn.
+
+If a generated action of an `AUTOPLACE` is skipped because of not enough paint
+points, the rest of the generated actions are skipped even if they are
+possible. A generated action skipped for any other reason does not stop the
+rest. Actions that are not generated by `AUTOPLACE` are always performed or
+skipped one by one.
 
 ### 🐞 Debugging tips
 
@@ -177,8 +254,8 @@ they are possible.
   - `townId` — unique identifier of this town.
   - `townX` — X position of this town (`0` is left-most).
   - `townY` — Y position of this town (`0` is top-most).
-  - `desiredConnections` — a string of comma-separated `townId`s, e.g. `1,2,4`,
-    or `x` if this town has no desired connections.
+  - `desiredConnections` — a string of comma-separated `townId`s in ascending
+    order, e.g. `1,2,4`, or `x` if this town has no desired connections.
 
 ### Input for one game turn
 
@@ -193,18 +270,19 @@ they are possible.
     otherwise.
   - `partOfActiveConnections` — a string of comma-separated `townId` pairs
     indicating this cell is part of an active connection between those two
-    towns, e.g. `1-2,1-3,4-7`. `x` if this cell is not part of any active
-    connection.
+    towns, e.g. `1-2,1-3,4-7`. In each pair the requesting town comes first.
+    The pairs are sorted as strings, so `10-2` comes before `2-3`. `x` if this
+    cell is not part of any active connection.
 
 ### Output
 
-A single line containing at least one action and at most a single `AUTOPLACE`
-action. All actions must be separated with a semicolon `;` and be one of the
-following:
+A single line containing at least one action. All actions must be separated
+with a semicolon `;` and be one of the following:
 
 - `PLACE_TRACKS x y` — followed by the coordinates of the desired location.
 - `AUTOPLACE fromX fromY toX toY` — followed by two pairs of coordinates, to
-  create the cheapest path between the two.
+  create the cheapest path between the two. Only the first `AUTOPLACE` of a
+  turn is used.
 - `DISRUPT regionId` — followed by the `regionId` of the region you wish to
   disrupt. Replace `regionId` by `x y` coordinates to target the region at that
   location.
@@ -218,118 +296,3 @@ following:
 - `21 ≤ width ≤ 30`
 - `14 ≤ height ≤ 20`
 - `4 ≤ townCount ≤ 12`
-
----
-
-The rest of this document is derived from the local engine dump, not from the
-contest page. It is provisional until the official source is published — see
-[README.md](README.md).
-
-## Constants reference
-
-From `com/codingame/game/Game.java`:
-
-| Name                                        | Value  |
-| ------------------------------------------- | ------ |
-| `MIN_GRID_HEIGHT` / `MAX_GRID_HEIGHT`       | 14 / 20 |
-| `ASPECT_RATIO`                              | 1.5f   |
-| `MIN_TOWN_DISTANCE`                         | 4      |
-| `AVERAGE_TILES_PER_ZONE_COEFF_TO_GRID_HEIGHT` | 2    |
-| `AVERAGE_TILES_PER_TOWN`                    | 50     |
-| `TRAIN_TO_TOWN_RATIO`                       | 0.4f   |
-| `RIVER_SPLIT_PROBA`                         | 0.055f |
-| `RIVER_TO_LAND_MIN_RATIO`                   | 0.07f  |
-| `MIN_RIVER_LENGTH`                          | 3      |
-| `MIN_MOUNTAINS`                             | 2      |
-| `MOUNTAIN_TO_CELL_RATIO`                    | 0.04f  |
-| `BASE_RAIL_COST`                            | 1      |
-| `GRASS_COST_MULTIPLIER`                     | 1      |
-| `RIVER_COST_MULTIPLIER`                     | 2      |
-| `MOUNTAIN_COST_MULTIPLIER`                  | 3      |
-| `POI_COST_MULTIPLIER`                       | 3      |
-| `PASSIVE_INCOME`                            | 3      |
-| `STARTING_DOSH`                             | 0      |
-| `BLOT_POINTS_PER_TURN`                      | 1      |
-| `MAX_TURNS`                                 | 100    |
-| `INSTABILITY_THRESHOLD_BASE`                | 4      |
-| `INSTABILITY_THRESHOLD_INCREASE`            | 0      |
-
-`Tile` type / ownership sentinels: `TYPE_GRASS = 0`, `TYPE_WATER = 1`,
-`TYPE_MOUNTAIN = 2`, `TYPE_POI = 3`; `TRACK_NONE = -1`, `TRACK_NEUTRAL = 2`,
-`TOWN_NONE = -1`.
-
-## Turn order
-
-`Game.performGameUpdate` runs the following, in order:
-
-1. `doIncome` — reset each player's paint points to `PASSIVE_INCOME` (3) and
-   disruption points to `BLOT_POINTS_PER_TURN` (1). Nothing carries over.
-2. `computeAutobuilds` — expand each `AUTOPLACE` into concrete `PLACE_TRACKS`
-   actions. Only the first `AUTOPLACE` per turn is honoured; the rest are
-   reported as errors.
-3. `doActions` — validate and apply track placements for player 0 then player
-   1, then apply disruptions in the same player order.
-4. `doInstabilityCheck` — ink out regions whose instability reached the
-   threshold, clearing every track in them.
-5. `moveTrains` — recompute every active connection and award points.
-6. `computeTileStates` — refresh each cell's `partOfActiveConnections`.
-7. `checkSideQuest` — records side-quest completion when the map has a POI.
-8. End check — `isGameOver()`.
-
-## Source-vs-statement notes
-
-- **Turn cap.** `Game.MAX_TURNS` is `100`, matching the statement.
-  `Referee.init` separately calls `gameManager.setMaxTurns(400)`, which is the
-  SDK's safety ceiling, not the game's rule.
-- **`PLACE_TRACK` is also accepted.** The `ActionType` regex is
-  `^PLACE_TRACKS? (?<x>\d+) (?<y>\d+)`, so the singular spelling works even
-  though the statement only documents `PLACE_TRACKS`. All command patterns are
-  matched case-insensitively.
-- **`DISRUPT` accepts two forms.** `DISRUPT zoneId` and `DISRUPT x y` (which
-  resolves the region from the cell). Both exist in the engine at every league;
-  the Bronze statement documents both.
-- **Regions containing towns are protected.** Despite the statement's "any
-  region" wording, the source rejects disruptions of regions containing a
-  town. The rejected action does not spend a disruption point.
-- **Invalid actions do not always disqualify.** An unparseable command
-  disqualifies the player (score `-1`). A parseable but illegal action —
-  placing off-grid, on a town, on an existing track, in an inked region, or
-  without enough paint points — is only reported to the game summary and
-  skipped. An `AUTOPLACE`-generated action that runs out of paint points also
-  interrupts the remainder of that autobuild. Unlike the broader wording in
-  the statement, other illegal generated placements do not interrupt it in
-  the source. Later manual actions are still processed after an interruption.
-- **Both players may claim the same cell.** `isFreeOfTracks` permits each
-  player to target a cell no one owns yet; if both do so on the same turn the
-  cell becomes neutral (`2`) and both paid.
-- **Game also ends early when no connection is possible.** `isGameOver`
-  returns true when a `TerrainAStar` search finds no remaining route for any
-  desired connection, matching the Bronze statement. This search considers
-  terrain that could still receive tracks, not only existing tracks.
-- **Historical replays can contain POIs.** The current default disables the
-  side quest, but online replay [901942746](https://www.codingame.com/replay/901942746)
-  has POIs at `(18, 3)` and `(18, 6)`, whereas
-  [902038382](https://www.codingame.com/replay/902038382) has none. The factory
-  enables the historical mode when replay metadata contains a
-  `sideQuestPoints_0` or `sideQuestPoints_1` key, including a zero value.
-  POIs cost 3 paint and can change `AUTOPLACE` tie ordering even when they are
-  outside the winning path. The existing A* and Java priority queue reproduce
-  both versions without changes. Replay normalization retains `metadata` for
-  this purpose; old files that discarded it must be re-fetched to recover the
-  historical mode. Missing metadata uses the current default.
-- **Fallback town placement diverges from the statement.** The primary loop in
-  `GridMaker.makeTowns` enforces "plains only, not on an edge, at least
-  `MIN_TOWN_DISTANCE` from other towns". The fallback loop that runs when the
-  primary loop could not place every town enforces only the distance rule, and
-  re-numbers towns from `0` — so it can place a town on a river or mountain
-  cell and can produce duplicate `townId`s. Reachable only when the primary
-  loop exhausts its 100 retries.
-- **Map generation depends on Java `HashSet` iteration order.**
-  `GridMaker.getAvailableNeighbours` collects into a `HashSet<Coord>` and the
-  result is then indexed by `random.nextInt(size)` for both region growth and
-  mountain growth. Seed parity therefore requires reproducing
-  `java.util.HashMap` bucket ordering, not just the RNG stream.
-- **RNG is SHA1PRNG.** Seeding goes through
-  `SecureRandom.getInstance("SHA1PRNG")`. Generation uses `nextInt(bound)`,
-  `nextInt(origin, bound)`, `nextFloat()`, `nextFloat(bound)`, `nextBoolean()`
-  and `Collections.shuffle(list, random)`.

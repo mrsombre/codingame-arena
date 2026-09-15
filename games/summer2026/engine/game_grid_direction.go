@@ -5,7 +5,7 @@ package engine
 import "fmt"
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Direction.java:3-16
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Direction.java:3-11
 
 public enum Direction {
     NORTH(0, -1, "N"),

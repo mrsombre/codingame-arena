@@ -63,7 +63,7 @@ func (c Coord) JavaHash() int32 {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Coord.java:12-18,72-90
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Coord.java:12-18,76-82
 
 public double euclideanTo(int x, int y) { return Math.sqrt(sqrEuclideanTo(x, y)); }
 public double sqrEuclideanTo(double x, double y) { return Math.pow(x - this.x, 2) + Math.pow(y - this.y, 2); }
@@ -105,7 +105,7 @@ func (c Coord) Position() Coord { return c }
 func (c Coord) DistanceMultiplier() float64 { return 1 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Coord.java:102-114
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Coord.java:107-114
 
 public Coord intNormalize() {
     return new Coord((int) Math.signum(x), (int) Math.signum(y));

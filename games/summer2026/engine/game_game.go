@@ -11,7 +11,7 @@ import (
 )
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:45-72
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:47-74
 
 public static final int MIN_GRID_HEIGHT = 14;
 public static final int MAX_GRID_HEIGHT = 20;
@@ -75,19 +75,13 @@ const (
 const DEFAULT_LEAGUE = 5
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:74-106
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:95-102
 
-public boolean canBuy = false;
-public boolean buyOnlyAdjacentToTrack = false;
-public boolean buyOnlyContainingTrack = true;
-public boolean freezeTrackPieceValue = false;
-public boolean enableSideQuest = false;
-public boolean showSideQuest = false;
-...
 List<Player> players;
 Random random;
 Grid grid;
 int turn;
+
 int instabilityThreshold;
 int leagueLevel;
 boolean inTutorial;
@@ -109,6 +103,10 @@ type Game struct {
 	// them. It is always present, so no call site has to nil-check it.
 	Tutorial *TutorialManager
 
+	// EnableSideQuest selects the historical side-quest mode: maps with POIs,
+	// as in replays recorded before the published source. The published Java
+	// has no side quest, so nothing below that uses these fields has a Java
+	// counterpart.
 	EnableSideQuest bool
 	ShowSideQuest   bool
 	// SideQuestPoints is 1 once a player has linked the POI to a town. Nothing
@@ -176,7 +174,7 @@ func NewGame(random *sha1prng.Random, leagueLevel int) *Game {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:108-140
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:107-133
 
 public void init() {
     this.leagueLevel = gameManager.getLeagueLevel();
@@ -190,10 +188,13 @@ public void init() {
     instabilityThreshold = INSTABILITY_THRESHOLD_BASE;
 }
 
-private void initPlayers() { players.forEach(Player::init); }
+private void initPlayers() {
+    players.forEach(Player::init);
+    ...
+}
 
 private void initGrid(Random random) {
-    gridMaker.init(random, enableSideQuest);
+    gridMaker.init(random);
     grid = gridMaker.make();
 }
 */
@@ -215,7 +216,7 @@ func (g *Game) Init(players []*Player) {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:142-145
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:135-138
 
 public void resetGameTurnData() {
     this.players.forEach(Player::reset);
@@ -231,7 +232,7 @@ func (g *Game) ResetGameTurnData() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:147-165
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:140-158
 
 public void performGameUpdate(int turn) {
     this.turn++;
@@ -242,14 +243,15 @@ public void performGameUpdate(int turn) {
     doInstabilityCheck();
     moveTrains();
     computeTileStates();
-    checkSideQuest();
     if (isGameOver()) gameManager.endGame();
     computeEvents();
 }
 */
 
 // PerformGameUpdate runs one turn. computeEvents is viewer-only and is not
-// ported; everything else runs in the source's order, which is load-bearing.
+// ported. The other steps run in the source's order, because scores and map
+// state depend on that order. CheckSideQuest is the historical side-quest step
+// and does nothing without a POI.
 func (g *Game) PerformGameUpdate(_ int) {
 	g.Turn++
 	g.turnStats = [2]turnStats{}
@@ -270,23 +272,9 @@ func (g *Game) PerformGameUpdate(_ int) {
 	g.emitTurnSummaries()
 }
 
-/*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:175-192
-
-private void checkSideQuest() {
-    Coord poiCoord = grid.getPoi();
-    if (poiCoord == null) return;
-
-    for (Player p : players) {
-        if (sideQuestPoints[p.getIndex()] > 0) continue;
-        // Flood fill player tracks from poi, see if it reaches a town
-        if (isConnectedToTownByPlayer(poiCoord, p)) sideQuestPoints[p.getIndex()] = 1;
-    }
-}
-*/
-
 // CheckSideQuest awards the one-off side-quest point to a player whose track
-// links the POI to any town.
+// links the POI to any town. It has no counterpart in the published Java; see
+// EnableSideQuest.
 func (g *Game) CheckSideQuest() {
 	if !g.Grid.HasPOI {
 		return
@@ -303,13 +291,19 @@ func (g *Game) CheckSideQuest() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:194-215
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:167-198
 
 private boolean isConnectedToTownByPlayer(Coord coord, Player p) {
     LinkedList<Coord> fifo = new LinkedList<>();
     Set<Coord> visited = new HashSet<>();
     fifo.add(coord);
     visited.add(coord);
+
+    // quick fix
+    Tile poiT = grid.get(coord);
+    boolean poiCoordOwnedByPoi = poiT.track == p.getIndex() || poiT.track == Tile.TRACK_NEUTRAL;
+    if (!poiCoordOwnedByPoi) return false;
+
     while (!fifo.isEmpty()) {
         Coord current = fifo.poll();
         if (grid.get(current).isTown()) return true;
@@ -329,7 +323,9 @@ private boolean isConnectedToTownByPlayer(Coord coord, Player p) {
 // isConnectedToTownByPlayer floods out from the POI over cells the player can
 // claim — its own track, contested track, and towns — and reports whether it
 // reaches a town. The start cell is enqueued without any such test, so the
-// POI itself need not carry track.
+// POI itself need not carry track. The published Java returns false when the
+// start cell carries no track of the player ("quick fix"), but nothing calls
+// the method there; the historical side-quest replays match without that check.
 func (g *Game) isConnectedToTownByPlayer(coord Coord, p *Player) bool {
 	fifo := []Coord{coord}
 	visited := map[Coord]bool{coord: true}
@@ -356,7 +352,7 @@ func (g *Game) isConnectedToTownByPlayer(coord Coord, p *Player) bool {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:442-447
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:423-428
 
 private void doIncome() {
     for (Player player : players) {
@@ -378,7 +374,7 @@ func (g *Game) DoIncome() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:667-706
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:648-687
 
 private void computeAutobuilds() {
     for (Player player : players) {
@@ -464,7 +460,7 @@ func (g *Game) resolveAutobuild(player *Player, intent *Action) []*Action {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:455-541
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:436-565
 
 private void doActions() {
     Map<Coord, List<Integer>> tracksPlaced = new TreeMap<>();
@@ -610,7 +606,7 @@ func (g *Game) DoActions() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:544-582
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:525-563
 
 // Disruptions
 for (Player player : players) {
@@ -693,7 +689,7 @@ func (g *Game) doDisruptions() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:236-286
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:217-267
 
 private void doInstabilityCheck() {
     List<Zone> toInk = new ArrayList<>();
@@ -796,7 +792,7 @@ func (g *Game) DoInstabilityCheck() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:586-601
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:567-582
 
 private boolean canPlaceTrackInZone(Zone zone, Player player) { return !zone.inked; }
 
@@ -838,7 +834,7 @@ func moveToBack(order []Coord, coord Coord) []Coord {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:301-341
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:282-374
 
 private void moveTrains() {
     // We're not moving anything, were detecting connected cities and scoring them.
@@ -943,7 +939,7 @@ func (g *Game) MoveTrains() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:219-234
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:200-215
 
 private void computeTileStates() {
     grid.cells.values().forEach(tile -> { tile.activeConnections.clear(); });
@@ -981,7 +977,7 @@ func (g *Game) ComputeTileStates() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:649-665
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:630-646
 
 public int getRailCost(Coord c) { return getRailCost(grid.get(c)); }
 
@@ -1010,7 +1006,7 @@ func RailCost(t *Tile) int {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:708-714
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:689-695
 
 public boolean isGameOver() {
     if (inTutorial) return tutorialManager.objectiveComplete() || this.turn >= MAX_TURNS;
@@ -1027,7 +1023,7 @@ func (g *Game) IsGameOver() bool {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:716-726
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:697-707
 
 private boolean isAnyConnectionStillPossible() {
     for (Town town : grid.towns) {
@@ -1061,7 +1057,7 @@ func (g *Game) EndGame() { g.ended = true }
 func (g *Game) Ended() bool { return g.ended }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:728-750
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:709-728
 
 public void onEnd() {
     ...
@@ -1094,7 +1090,7 @@ func (g *Game) OnEnd() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:787-804
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:765-782
 
 public boolean shouldSkipPlayerTurn(Player player) { return false; }
 
@@ -1145,7 +1141,7 @@ func GetExpected(command string) string {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:449-453
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:430-434
 
 private void reportPlayerError(Player player, String message) {
     gameManager.addToGameSummary(GameManager.formatErrorMessage(player.getNicknameToken() + " " + message));

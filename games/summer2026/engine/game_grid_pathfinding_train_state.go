@@ -5,7 +5,7 @@ package engine
 import "fmt"
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/TrainState.java:7-40
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/TrainState.java:7-19,28-40
 
 public class TrainState {
     public Coord coord;

@@ -3,7 +3,7 @@
 package engine
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Player.java:9-27
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Player.java:9-14,19-27
 
 public class Player extends AbstractMultiplayerPlayer {
     List<Action> intents;

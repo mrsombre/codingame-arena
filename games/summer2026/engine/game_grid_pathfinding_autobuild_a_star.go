@@ -47,7 +47,7 @@ func NewAutobuildAStar(grid *Grid, player *Player, from, to Coord) *AutobuildASt
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/AutobuildAStar.java:37-62
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/AutobuildAStar.java:38-62
 
 protected AutobuildState getInitialState() {
     AutobuildState s = new AutobuildState();
@@ -96,7 +96,7 @@ func (a *AutobuildAStar) InitialState() *AutobuildState {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/AutobuildAStar.java:64-67,106-114
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/AutobuildAStar.java:65-67,107-114
 
 protected int tieBreaker(AutobuildState from, AutobuildState to) {
     return Direction.fromCoord(to.cursor.sub(from.cursor)).ordinal();
@@ -135,7 +135,7 @@ func (a *AutobuildAStar) Cost(from, to *AutobuildState) float64 {
 func (a *AutobuildAStar) StateKey(state *AutobuildState) AutobuildStateKey { return state.Key() }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/AutobuildAStar.java:69-104
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/AutobuildAStar.java:70-104
 
 protected boolean isGoal(AutobuildState state) {
     if (state.cursor.equals(to)) return true;
@@ -202,7 +202,7 @@ func (a *AutobuildAStar) isPartOfRailBlock(coord, goal Coord) bool {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/AutobuildAStar.java:116-190
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/AutobuildAStar.java:117-190
 
 protected List<AutobuildState> getSuccessors(AutobuildState state) {
     if (state.cursorState == CursorState.BROKEN) return List.of();

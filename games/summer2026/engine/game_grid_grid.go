@@ -25,7 +25,7 @@ var ADJACENCY_8 = []Coord{
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Grid.java:21-49
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Grid.java:21-27,33-49
 
 public int width, height;
 public LinkedHashMap<Coord, Tile> cells;
@@ -33,7 +33,7 @@ boolean ySymetry;
 public List<Town> towns;
 public List<Coord> rails;
 public List<Zone> zones;
-private Coord poi;
+public List<Coord> pois;
 
 public Grid(int width, int height, boolean ySymetry) {
     ...
@@ -190,7 +190,7 @@ func ClosestTargets[T Positionable](from Coord, targets []T) []T {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Grid.java:106-124
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Grid.java:106-112,118-124
 
 public List<Coord> getCoords() { return cells.keySet().stream().toList(); }
 public Coord opposite(Coord c) { return new Coord(width - c.x - 1, ySymetry ? (height - c.y - 1) : c.y); }
@@ -227,6 +227,8 @@ func (g *Grid) CanTrainPass(coord Coord) bool {
 	return tile.IsTown() || tile.Track != TRACK_NONE
 }
 
+// SetPOI records the POI of a historical side-quest map; a later call replaces
+// the earlier one. Java's pois list and addPoi exist, but nothing calls addPoi.
 func (g *Grid) SetPOI(poi Coord) {
 	g.POI = poi
 	g.HasPOI = true

@@ -43,7 +43,7 @@ func NewAutobuildAction(actionType ActionType, generatedByAutobuild bool) *Actio
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/action/Action.java:44-71,89-95
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/action/Action.java:44-59,69-71,89-91
 
 @Override public String toString() { return "Action [type=" + type + ", coord=" + coord + ", zone=" + zoneId + "]"; }
 public boolean isMessage() { return type == ActionType.MESSAGE; }

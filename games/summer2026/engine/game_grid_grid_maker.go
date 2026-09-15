@@ -17,7 +17,7 @@ func javaRoundFloat(v float32) int {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:20-38
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:22-36
 
 private class River {
     public Coord current; // equal to last item in history
@@ -66,7 +66,7 @@ type GridMaker struct {
 func NewGridMaker() *GridMaker { return &GridMaker{} }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:47-58
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:47-56
 
 private boolean isCorner(int x, int y) {
     return (x == 0 && y == 0) || (x == 0 && y == h - 1) || (x == w - 1 && y == 0) || (x == w - 1 && y == h - 1);
@@ -87,7 +87,7 @@ func (m *GridMaker) isEdge(x, y int) bool {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:60-72
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:58-71
 
 private boolean hasWaterNearby(Grid grid, Coord tile, List<Coord> riverHistory) {
     List<Coord> ignoreCoords = riverHistory.subList(Math.max(riverHistory.size() - 2, 0), riverHistory.size());
@@ -120,7 +120,7 @@ func (m *GridMaker) isAtNFromSides(coord Coord, n int) bool {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:74-90
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:73-89
 
 private List<Coord> getAvailableNeighbours(Grid grid, List<Coord> coords, Predicate<Tile> checkAccessible) {
     Set<Coord> availables = new HashSet<>();
@@ -158,11 +158,10 @@ func (m *GridMaker) getMountainAvailableNeighbours(grid *Grid, mountains []Coord
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:92-97
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:91-95
 
-public void init(Random random, boolean enableSideQuest) {
+public void init(Random random) {
     this.random = random;
-    this.enableSideQuest = enableSideQuest;
     this.h = random.nextInt(Game.MIN_GRID_HEIGHT, Game.MAX_GRID_HEIGHT + 1);
     this.w = Math.round(h * Game.ASPECT_RATIO);
 }
@@ -170,6 +169,8 @@ public void init(Random random, boolean enableSideQuest) {
 
 // Init draws the grid dimensions. h * ASPECT_RATIO is a float32 expression in
 // Java; widening it to float64 changes the rounding for some heights.
+// enableSideQuest has no Java counterpart: it turns on makePOIs for the
+// historical side-quest maps.
 func (m *GridMaker) Init(random *sha1prng.Random, enableSideQuest bool) {
 	m.random = random
 	m.enableSideQuest = enableSideQuest
@@ -178,7 +179,7 @@ func (m *GridMaker) Init(random *sha1prng.Random, enableSideQuest bool) {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:99-121
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:97-117
 
 private void initializeGrid() {
     LinkedList<Coord> freeBorders = new LinkedList<>();
@@ -218,7 +219,7 @@ func (m *GridMaker) initializeGrid() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:123-147
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:119-147
 
 public Grid make() {
     this.makingOf = new ArrayList<>();
@@ -231,7 +232,6 @@ public Grid make() {
     int nTowns = Math.max(4, (h * w) / Game.AVERAGE_TILES_PER_TOWN);
     List<Town> towns = makeTowns(zones, nTowns, averageTilesPerZone);
     makeTownConnections(towns);
-    makePOIs(towns);
     grid.towns = towns;
     grid.zones = zones;
     return grid;
@@ -240,6 +240,8 @@ public Grid make() {
 
 // Make builds the whole map. `makingOf`, a per-step clone list feeding the
 // viewer's generation animation, is not ported: it consumes no randomness.
+// makePOIs has no Java counterpart and does nothing unless enableSideQuest is
+// set.
 func (m *GridMaker) Make() *Grid {
 	m.initializeGrid()
 
@@ -262,29 +264,12 @@ func (m *GridMaker) Make() *Grid {
 	return m.grid
 }
 
-/*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:149-176
-
-private void makePOIs(List<Town> towns) {
-    if (!this.enableSideQuest) return;
-    int nPois = random.nextInt(3) + 2;
-    LinkedList<Coord> sideCoords = new LinkedList<>(
-        grid.cells.values().stream().map(t -> t.coord)
-            .filter(c -> isAtNFromSides(c, 3))
-            .filter(c -> towns.stream().allMatch(t -> t.coord.manhattanTo(c) >= Game.MIN_TOWN_DISTANCE))
-            .filter(c -> !grid.get(c).isWater()).toList());
-    Collections.shuffle(sideCoords, random);
-    for (int i = 0; i < nPois; ++i) {
-        if (!sideCoords.isEmpty()) {
-            Coord coord = sideCoords.poll();
-            grid.get(coord).setType(Tile.TYPE_POI);
-            grid.setPoi(coord);
-        }
-    }
-}
-*/
-
-// The isAtNFromSides filter keeps coords within 3 of a side, despite its name.
+// makePOIs places 2-4 POIs for the historical side-quest maps: it draws
+// nextInt(3) + 2, shuffles the non-water cells within 3 of a side that are at
+// least MIN_TOWN_DISTANCE from every town, and turns the first ones into POIs.
+// The published Java has no makePOIs; only its unused isAtNFromSides helper
+// remains. The isAtNFromSides filter keeps coords within 3 of a side, despite
+// its name.
 func (m *GridMaker) makePOIs(towns []*Town) {
 	if !m.enableSideQuest {
 		return
@@ -323,7 +308,7 @@ func (m *GridMaker) makePOIs(towns []*Town) {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:178-193
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:149-165
 
 private void makeTownConnections(List<Town> towns) {
     for (Town t : towns) {
@@ -376,7 +361,7 @@ func (m *GridMaker) makeTownConnections(towns []*Town) {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:195-269
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:167-247
 
 private List<Town> makeTowns(List<Zone> zones, int nTowns, int averageTilesPerZone) {
     LinkedList<Zone> availableZones = new LinkedList<>(zones);
@@ -413,14 +398,12 @@ private List<Town> makeTowns(List<Zone> zones, int nTowns, int averageTilesPerZo
     for (int i = 0; i < townsLeftToPlace; ++i) {
         if (availableZones.isEmpty()) break;
         Zone z = availableZones.poll();
-        if (blacklist.contains(z)) continue;
         LinkedList<Coord> townCoords = new LinkedList<>(z.getCoords());
         Collections.shuffle(townCoords, random);
         while (!townCoords.isEmpty()) {
             Coord townCoord = townCoords.poll();
             if (towns.stream().allMatch(town -> townCoord.manhattanTo(town.coord) >= Game.MIN_TOWN_DISTANCE)) {
                 towns.add(new Town(i, townCoord));
-                z.getNeighbours().stream().map(zid -> zones.get(zid)).forEach(blacklist::add);
                 break;
             }
         }
@@ -507,9 +490,6 @@ func (m *GridMaker) makeTowns(zones []*Zone, nTowns, averageTilesPerZone int) []
 		}
 		var z *Zone
 		z, availableZones = availableZones[0], availableZones[1:]
-		if contains(blacklist, z) {
-			continue
-		}
 
 		townCoords := make([]Coord, len(z.Coords))
 		copy(townCoords, z.Coords)
@@ -520,9 +500,6 @@ func (m *GridMaker) makeTowns(zones []*Zone, nTowns, averageTilesPerZone int) []
 			townCoord, townCoords = townCoords[0], townCoords[1:]
 			if m.farFromEveryTown(towns, townCoord) {
 				towns = append(towns, NewTown(i, townCoord))
-				for _, zid := range z.Neighbours {
-					blacklist = append(blacklist, zones[zid])
-				}
 				break
 			}
 		}
@@ -553,7 +530,7 @@ func (m *GridMaker) farFromEveryTown(towns []*Town, coord Coord) bool {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:271-340
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:249-317
 
 private List<Zone> makeZones(int nZones) {
     int cols = (int) Math.ceil(Math.sqrt(nZones));
@@ -683,7 +660,7 @@ func (m *GridMaker) makeZones(nZones int) []*Zone {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:342-431
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:319-414
 
 private void makeRivers() {
     int nRiverCells = Math.round(w * h * Game.RIVER_TO_LAND_MIN_RATIO);
@@ -822,7 +799,7 @@ func (m *GridMaker) makeRivers() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:433-444
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:416-427
 
 private void deleteShortRivers(List<River> generatedRivers) {
     for (River river : generatedRivers) {
@@ -854,7 +831,7 @@ func (m *GridMaker) deleteShortRivers(generatedRivers []*river) {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:446-452
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:429-435
 
 private LinkedHashMap<Coord, Float> createRiverFlowWeights(River river, List<Coord> neighs) {
     LinkedHashMap<Coord, Float> weights = new LinkedHashMap<>();
@@ -879,7 +856,7 @@ func (m *GridMaker) createRiverFlowWeights(r *river, neighs []Coord) []coordWeig
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:454-456,458-467,469-475
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:437-456
 
 private boolean isAccessible(Tile t) { return !t.isWater() && t.getType() != Tile.TYPE_MOUNTAIN; }
 
@@ -932,7 +909,7 @@ func (m *GridMaker) getDirectionFromRiverStart(riverStart Coord) Direction {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:477-503
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:458-489
 
 private void makeMountains() {
     int nMountains = Math.max(Game.MIN_MOUNTAINS, Math.round(random.nextFloat(w * h * Game.MOUNTAIN_TO_CELL_RATIO)));
@@ -996,7 +973,7 @@ func (m *GridMaker) makeMountains() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:505-509,511-521
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:491-508
 
 private void createWater(LinkedList<River> riversToExpand, River riverToAdd) {
     riversToExpand.add(riverToAdd);
@@ -1034,7 +1011,7 @@ func (m *GridMaker) getWeight(neig, current Coord, preferredDirection Direction)
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:523-541
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/GridMaker.java:510-530
 
 private Coord getRandomCoord(LinkedHashMap<Coord, Float> weights) {
     float totalWeight = 0f;

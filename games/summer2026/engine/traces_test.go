@@ -52,7 +52,7 @@ func TestTracesRecordATurnOfPlayAndTheTurnThatEndsIt(t *testing.T) {
 
 	// ——— turn 1: three rails, both directions of the connection pay out ———
 
-	runTurn(game, "PLACE_TRACK 1 0;PLACE_TRACK 2 0;PLACE_TRACK 3 0", "MESSAGE hello")
+	runTurn(game, "PLACE_TRACKS 1 0;PLACE_TRACKS 2 0;PLACE_TRACKS 3 0", "MESSAGE hello")
 	traces := game.TurnTraces()
 
 	assert.Equal(t,
@@ -99,7 +99,7 @@ func TestTracesRecordATurnOfPlayAndTheTurnThatEndsIt(t *testing.T) {
 	// One short of the threshold, so player 1's single blot this turn tips it.
 	game.Grid.Zones[1].Instability = INSTABILITY_THRESHOLD_BASE - 1
 
-	runTurn(game, "PLACE_TRACK 1 0", "DISRUPT 1")
+	runTurn(game, "PLACE_TRACKS 1 0", "DISRUPT 1")
 	traces = game.TurnTraces()
 
 	assert.Equal(t, []string{TraceFailed, TraceInk, TraceTurnSummary}, traceTypes(traces[0]))
@@ -182,7 +182,7 @@ func TestTracesRecordContestedPlacement(t *testing.T) {
 		},
 	})
 
-	runTurn(game, "PLACE_TRACK 1 0", "PLACE_TRACK 1 0")
+	runTurn(game, "PLACE_TRACKS 1 0", "PLACE_TRACKS 1 0")
 	traces := game.TurnTraces()
 
 	contested := ContestedData{Cell: [2]int{1, 0}}
@@ -201,7 +201,7 @@ func TestTurnTracesAreClearedEachTurn(t *testing.T) {
 		},
 	})
 
-	runTurn(game, "PLACE_TRACK 1 0", "WAIT")
+	runTurn(game, "PLACE_TRACKS 1 0", "WAIT")
 	require.Equal(t, []string{TraceTrack, TraceTurnSummary}, traceTypes(game.TurnTraces()[0]))
 
 	runTurn(game, "WAIT", "WAIT")
@@ -220,7 +220,7 @@ func TestRefereeTurnTracesAreIndependentCopies(t *testing.T) {
 	})
 	referee := NewReferee(game)
 
-	runTurn(game, "PLACE_TRACK 1 0", "WAIT")
+	runTurn(game, "PLACE_TRACKS 1 0", "WAIT")
 	taken := referee.TurnTraces(1, nil)
 	require.Len(t, taken[0], 2)
 

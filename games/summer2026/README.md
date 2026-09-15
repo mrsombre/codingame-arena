@@ -4,32 +4,18 @@ https://www.codingame.com/contests/summer-challenge-2026-back-track-king
 
 ---
 
-Source: TBD — CodinGame has not published the referee yet.
+Source: https://github.com/CGjupoulton/SummerChallenge2026
 
-The contest is still running (`Challenge/findChallengeMinimalInfoByChallengePublicId`
-reports `rankingCompleted: false`), and no repository exists under the
-`CodinGame/` GitHub org. Past contests were published there within days of the
-event, one repo per contest:
+Published by CGjupoulton (not under the `CodinGame/` GitHub org).
+Imported as a subtree at `source/SummerChallenge2026-BackTrackKing/` from
+upstream commit `23b2a027` (2026-09-09).
 
-| Repo                                       | Created    |
-| ------------------------------------------ | ---------- |
-| `CodinGame/WinterChallenge2026-Exotec`      | 2026-01-08 |
-| `CodinGame/SummerChallenge2025-SoakOverflow`| 2025-07-02 |
-| `CodinGame/WinterChallenge2024-Cellularena` | 2024-12-19 |
+Notes on the upstream source:
 
-Until then this game is developed against a **local pre-release source dump**,
-not a subtree. The dump is not checked in. Caveats:
-
-- `pom.xml` still carries `artifactId: ea-2024-cellularena`, so it is an EA
-  build rather than a tagged release.
-- It bundles its own fork of the game engine SDK under
-  `src/main/java/com/codingame/gameengine/`, which differs from the
-  `source/codingame-game-engine` subtree (`GameManager.java` by 143 lines,
-  `AbstractReferee.java` by 29, `MultiplayerGameManager.java` by 17) and adds
-  gym/RL classes (`GymEnvBase`, `GymResult`, `StateEncoder`) that do not exist
-  upstream.
-
-Once the official repo lands, import it as a subtree under
-`source/SummerChallenge2026-BackTrackKing/` per
-[games/docs/plan.md](../docs/plan.md) phase 1 and re-verify `rules.md` against
-it.
+- `pom.xml` carries `artifactId: unleash-the-geek-2025-rails-tycoon`, not the
+  contest name.
+- The game depends on game engine SDK `4.7.8` through Maven (same as
+  spring2026) and does not bundle an SDK fork under
+  `src/main/java/com/codingame/gameengine/`.
+- `rules.md` follows the final-league statement, corrected to match this
+  subtree where the statement and the Java source disagree.

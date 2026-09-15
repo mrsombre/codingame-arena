@@ -5,7 +5,7 @@ package engine
 import "fmt"
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Tile.java:9-32
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Tile.java:9-27
 
 public static final Tile NO_TILE = new Tile(new Coord(-1, -1), -1);
 

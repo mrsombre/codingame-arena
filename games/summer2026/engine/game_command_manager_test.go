@@ -21,22 +21,18 @@ func parse(t *testing.T, line string) (*Game, *Player) {
 	return game, player
 }
 
-func TestParseAcceptsBothPlaceTrackSpellings(t *testing.T) {
-	for _, line := range []string{"PLACE_TRACK 3 4", "PLACE_TRACKS 3 4"} {
-		t.Run(line, func(t *testing.T) {
-			_, player := parse(t, line)
+func TestParseAcceptsPlaceTracks(t *testing.T) {
+	_, player := parse(t, "PLACE_TRACKS 3 4")
 
-			require.False(t, player.IsDeactivated())
-			require.Len(t, player.Intents, 1)
-			assert.Equal(t, ACTION_PLACE_TRACK, player.Intents[0].Type)
-			assert.Equal(t, Coord{3, 4}, player.Intents[0].Coord)
-		})
-	}
+	require.False(t, player.IsDeactivated())
+	require.Len(t, player.Intents, 1)
+	assert.Equal(t, ACTION_PLACE_TRACK, player.Intents[0].Type)
+	assert.Equal(t, Coord{3, 4}, player.Intents[0].Coord)
 }
 
 func TestParseIsCaseInsensitive(t *testing.T) {
 	cases := map[string]ActionType{
-		"place_track 1 2":   ACTION_PLACE_TRACK,
+		"place_tracks 1 2":  ACTION_PLACE_TRACK,
 		"Place_Tracks 1 2":  ACTION_PLACE_TRACK,
 		"autoplace 0 0 1 1": ACTION_AUTOPLACE,
 		"disrupt 2":         ACTION_DISRUPT,
@@ -55,7 +51,7 @@ func TestParseIsCaseInsensitive(t *testing.T) {
 }
 
 func TestParseSplitsOnSemicolonsAndTrimsEachCommand(t *testing.T) {
-	_, player := parse(t, " PLACE_TRACK 1 1 ; WAIT ;PLACE_TRACK 2 2")
+	_, player := parse(t, " PLACE_TRACKS 1 1 ; WAIT ;PLACE_TRACKS 2 2")
 
 	require.False(t, player.IsDeactivated())
 	require.Len(t, player.Intents, 3)
@@ -67,7 +63,7 @@ func TestParseSplitsOnSemicolonsAndTrimsEachCommand(t *testing.T) {
 // MESSAGE is consumed by the player rather than queued, and its pattern
 // excludes ';' so it cannot swallow the commands that follow it.
 func TestParseMessageIsStoredOnThePlayerAndNotQueuedAsAnIntent(t *testing.T) {
-	_, player := parse(t, "MESSAGE hello there;PLACE_TRACK 0 0")
+	_, player := parse(t, "MESSAGE hello there;PLACE_TRACKS 0 0")
 
 	require.False(t, player.IsDeactivated())
 	assert.Equal(t, "hello there", player.GetMessage())
@@ -77,6 +73,7 @@ func TestParseMessageIsStoredOnThePlayerAndNotQueuedAsAnIntent(t *testing.T) {
 
 func TestParseDisqualifiesWithTheExpectedSyntaxForTheClosestCommand(t *testing.T) {
 	cases := map[string]string{
+		"PLACE_TRACK 3 4":    "Invalid Input: Expected PLACE_TRACK x y but got 'PLACE_TRACK 3 4'",
 		"PLACE_TRACK 1":      "Invalid Input: Expected PLACE_TRACK x y but got 'PLACE_TRACK 1'",
 		"PLACE_TRACK -1 2":   "Invalid Input: Expected PLACE_TRACK x y but got 'PLACE_TRACK -1 2'",
 		"PLACE_TRACKS 1 2 3": "Invalid Input: Expected PLACE_TRACK x y but got 'PLACE_TRACKS 1 2 3'",

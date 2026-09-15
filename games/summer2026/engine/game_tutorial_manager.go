@@ -3,7 +3,7 @@
 package engine
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/TutorialManager.java:10-30
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/TutorialManager.java:9-30
 
 @Singleton
 public class TutorialManager {
@@ -51,7 +51,7 @@ func (m *TutorialManager) InitTutorial(game *Game) bool {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/TutorialManager.java:32-41
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/TutorialManager.java:32-40
 
 public void handleEnd(String[] scoreTexts) {
     if (leagueLevel <= 2) {
@@ -82,7 +82,7 @@ func (m *TutorialManager) HandleEnd() {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/TutorialManager.java:43-54
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/TutorialManager.java:42-54
 
 public boolean objectiveComplete() {
     if (leagueLevel == 1) return game.players.get(0).getScore() >= 1;

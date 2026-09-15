@@ -1,0 +1,28 @@
+STATEMENT
+Connect towns with your train tracks and disrupt the opponent's.
+
+read myId:int
+read width:int
+read height:int
+loop height loop width read regionId:int type:int
+read townCount:int
+loop townCount read townId:int townX:int townY:int desiredConnections:word(256)
+
+gameloop
+
+read myScore:int
+read foeScore:int
+loop height loop width read tracksOwner:int instability:int inked:bool partOfActiveConnections:word(256)
+write WAIT
+
+INPUT
+myId: 0 or 1
+width: map size
+type: 0 (PLAINS), 1 (RIVER), 2 (MOUNTAIN), 3 (POI)
+desiredConnections: comma-separated town ids e.g. 0,1,2,3
+instability: region inked (destroyed) when this >= 3.
+inked: true if region is destroyed.
+partOfActiveConnections: if this cell is part of one or more railway connections, this will be town ids (separated by -) in a list separated by commas. e.g. 0-1,1-2,1-3. "x" otherwise.
+
+OUTPUT
+AUTOPLACE x1 y1 x2 y2 | PLACE_TRACKS x y | DISRUPT regionId | MESSAGE text
