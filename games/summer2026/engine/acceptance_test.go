@@ -342,7 +342,7 @@ func TestTrackCostIsChargedPerTerrain(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			game, p0, _ := loadScenario(t, scenario{Terrain: []string{tc.terrain}})
 
-			runTurn(game, "PLACE_TRACK 0 0", "WAIT")
+			runTurn(game, "PLACE_TRACKS 0 0", "WAIT")
 
 			assert.Equal(t, PASSIVE_INCOME-tc.cost, p0.Dosh)
 			assert.Equal(t, 0, game.Grid.GetXY(0, 0).Track)
@@ -358,7 +358,7 @@ func TestUnspentPaintDoesNotCarryIntoTheNextTurn(t *testing.T) {
 	game, p0, _ := loadScenario(t, scenario{Terrain: []string{"...."}})
 
 	runTurn(game, "WAIT", "WAIT")
-	runTurn(game, "PLACE_TRACK 0 0;PLACE_TRACK 1 0;PLACE_TRACK 2 0;PLACE_TRACK 3 0", "WAIT")
+	runTurn(game, "PLACE_TRACKS 0 0;PLACE_TRACKS 1 0;PLACE_TRACKS 2 0;PLACE_TRACKS 3 0", "WAIT")
 
 	assert.Equal(t, 0, p0.Dosh)
 	assert.Equal(t, 0, game.Grid.GetXY(2, 0).Track)
@@ -381,25 +381,25 @@ func TestIllegalPlacementsAreSkippedWithAnErrorAndDoNotDisqualify(t *testing.T) 
 		summary string
 	}{
 		"off grid": {
-			command: "PLACE_TRACK 9 9",
+			command: "PLACE_TRACKS 9 9",
 			summary: "¤RED¤Player 0 Not part of grid: (9, 9)§RED§",
 		},
 		"on a town": {
-			command: "PLACE_TRACK 0 0",
+			command: "PLACE_TRACKS 0 0",
 			summary: "¤RED¤Player 0 Cannot place tracks on a town at (0, 0)§RED§",
 		},
 		"on an existing track": {
 			setup:   func(game *Game) { game.Grid.GetXY(1, 0).Track = 1 },
-			command: "PLACE_TRACK 1 0",
+			command: "PLACE_TRACKS 1 0",
 			summary: "¤RED¤Player 0 Cannot place tracks on existing tracks at (1, 0)§RED§",
 		},
 		"in an inked region": {
 			setup:   func(game *Game) { game.Grid.Zones[0].Inked = true },
-			command: "PLACE_TRACK 1 0",
+			command: "PLACE_TRACKS 1 0",
 			summary: "¤RED¤Player 0 Cannot build in region 0§RED§",
 		},
 		"without enough paint": {
-			command: "PLACE_TRACK 1 0;PLACE_TRACK 2 0",
+			command: "PLACE_TRACKS 1 0;PLACE_TRACKS 2 0",
 			summary: "¤RED¤Player 0 Not enough track points to build a track at (2, 0).§RED§",
 		},
 	}
@@ -430,7 +430,7 @@ func TestIllegalPlacementsAreSkippedWithAnErrorAndDoNotDisqualify(t *testing.T) 
 func TestPlacingTwiceOnOneCellInATurnIsRejectedTheSecondTime(t *testing.T) {
 	game, p0, _ := loadScenario(t, scenario{Terrain: []string{"."}})
 
-	runTurn(game, "PLACE_TRACK 0 0;PLACE_TRACK 0 0", "WAIT")
+	runTurn(game, "PLACE_TRACKS 0 0;PLACE_TRACKS 0 0", "WAIT")
 
 	assert.Equal(t, PASSIVE_INCOME-1, p0.Dosh)
 	assert.Equal(t, 0, game.Grid.GetXY(0, 0).Track)
@@ -444,7 +444,7 @@ func TestPlacingTwiceOnOneCellInATurnIsRejectedTheSecondTime(t *testing.T) {
 func TestBothPlayersClaimingOneCellYieldsNeutralOwnershipAndBothPay(t *testing.T) {
 	game, p0, p1 := loadScenario(t, scenario{Terrain: []string{".."}})
 
-	runTurn(game, "PLACE_TRACK 0 0", "PLACE_TRACK 0 0")
+	runTurn(game, "PLACE_TRACKS 0 0", "PLACE_TRACKS 0 0")
 
 	assert.Equal(t, TRACK_NEUTRAL, game.Grid.GetXY(0, 0).Track)
 	assert.Equal(t, PASSIVE_INCOME-1, p0.Dosh)
@@ -457,7 +457,7 @@ func TestBothPlayersClaimingOneCellYieldsNeutralOwnershipAndBothPay(t *testing.T
 func TestContestedCellDoesNotBlockTheSecondPlayersOtherPlacements(t *testing.T) {
 	game, _, p1 := loadScenario(t, scenario{Terrain: []string{".."}})
 
-	runTurn(game, "PLACE_TRACK 0 0", "PLACE_TRACK 0 0;PLACE_TRACK 1 0")
+	runTurn(game, "PLACE_TRACKS 0 0", "PLACE_TRACKS 0 0;PLACE_TRACKS 1 0")
 
 	assert.Equal(t, TRACK_NEUTRAL, game.Grid.GetXY(0, 0).Track)
 	assert.Equal(t, 1, game.Grid.GetXY(1, 0).Track)
@@ -472,7 +472,7 @@ func TestIllegalActionSkipsButUnparseableOutputDisqualifies(t *testing.T) {
 		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}},
 	})
 
-	runTurn(game, "PLACE_TRACK 0 0", "PLACE_TRACK 0")
+	runTurn(game, "PLACE_TRACKS 0 0", "PLACE_TRACKS 0")
 
 	assert.False(t, p0.IsDeactivated())
 	assert.True(t, p1.IsDeactivated())
@@ -482,7 +482,7 @@ func TestIllegalActionSkipsButUnparseableOutputDisqualifies(t *testing.T) {
 func TestPlacementCountersAreTalliedPerPlayerAndTerrain(t *testing.T) {
 	game, _, _ := loadScenario(t, scenario{Terrain: []string{".~^"}})
 
-	runTurn(game, "PLACE_TRACK 0 0;PLACE_TRACK 1 0", "PLACE_TRACK 2 0")
+	runTurn(game, "PLACE_TRACKS 0 0;PLACE_TRACKS 1 0", "PLACE_TRACKS 2 0")
 
 	assert.Equal(t, [2]int{2, 1}, game.PlacedTracks)
 	assert.Equal(t, [2]int{1, 0}, game.TracksPlacedOnPlains)
@@ -586,7 +586,7 @@ func TestAutoplaceInterruptDoesNotSilenceLaterManualActions(t *testing.T) {
 		Towns:   []townSpec{{ID: 0, X: 0, Y: 0}, {ID: 1, X: 6, Y: 0}},
 	})
 
-	runTurn(game, "AUTOPLACE 1 0 6 0;PLACE_TRACK 5 0", "WAIT")
+	runTurn(game, "AUTOPLACE 1 0 6 0;PLACE_TRACKS 5 0", "WAIT")
 
 	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(5, 0).Track)
 	assert.Equal(t, []string{
@@ -1081,7 +1081,7 @@ func TestPlacementIntoARegionInkedByPlayIsSkipped(t *testing.T) {
 	runTurn(game, "DISRUPT 1", "WAIT")
 	require.True(t, game.Grid.Zones[1].Inked)
 
-	runTurn(game, "PLACE_TRACK 1 0", "WAIT")
+	runTurn(game, "PLACE_TRACKS 1 0", "WAIT")
 
 	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(1, 0).Track)
 	assert.Equal(t, PASSIVE_INCOME, p0.Dosh)
@@ -1098,7 +1098,7 @@ func TestATrackPlacedIntoARegionThatInksThisTurnIsClearedImmediately(t *testing.
 	})
 	game.Grid.Zones[1].Instability = INSTABILITY_THRESHOLD_BASE - 1
 
-	runTurn(game, "PLACE_TRACK 1 0;DISRUPT 1", "WAIT")
+	runTurn(game, "PLACE_TRACKS 1 0;DISRUPT 1", "WAIT")
 
 	assert.Equal(t, TRACK_NONE, game.Grid.GetXY(1, 0).Track)
 	assert.Equal(t, PASSIVE_INCOME-1, p0.Dosh)

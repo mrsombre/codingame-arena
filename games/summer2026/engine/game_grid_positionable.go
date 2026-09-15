@@ -3,7 +3,7 @@
 package engine
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Positionable.java:3-6
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Positionable.java:3-5
 
 public interface Positionable {
     Coord getPosition();

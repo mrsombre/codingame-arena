@@ -5,7 +5,7 @@ package engine
 import "sort"
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Town.java:8-23
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/Town.java:8-20
 
 public class Town {
     public int id;

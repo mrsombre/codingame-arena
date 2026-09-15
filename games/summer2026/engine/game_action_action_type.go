@@ -8,11 +8,11 @@ import (
 )
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/action/ActionType.java:9-45
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/action/ActionType.java:9-34,42-45
 
 public enum ActionType {
     AUTOPLACE("^AUTOPLACE (?<fromX>\\d+) (?<fromY>\\d+) (?<toX>\\d+) (?<toY>\\d+)", ...),
-    PLACE_TRACK("^PLACE_TRACKS? (?<x>\\d+) (?<y>\\d+)", ...),
+    PLACE_TRACK("^PLACE_TRACKS (?<x>\\d+) (?<y>\\d+)", ...),
     DISRUPT("^DISRUPT (?<zoneId>\\d+)", ...),
     DISRUPT_ALT("^DISRUPT (?<x>\\d+) (?<y>\\d+)", ...),
     MESSAGE("^MESSAGE (?<message>[^;]*)", ...),
@@ -64,7 +64,7 @@ var ActionTypes = [6]ActionType{
 // trailing `$` here. (?i) is Pattern.CASE_INSENSITIVE.
 var actionTypePatterns = [6]*regexp.Regexp{
 	ACTION_AUTOPLACE:   regexp.MustCompile(`(?i)^AUTOPLACE (?P<fromX>\d+) (?P<fromY>\d+) (?P<toX>\d+) (?P<toY>\d+)$`),
-	ACTION_PLACE_TRACK: regexp.MustCompile(`(?i)^PLACE_TRACKS? (?P<x>\d+) (?P<y>\d+)$`),
+	ACTION_PLACE_TRACK: regexp.MustCompile(`(?i)^PLACE_TRACKS (?P<x>\d+) (?P<y>\d+)$`),
 	ACTION_DISRUPT:     regexp.MustCompile(`(?i)^DISRUPT (?P<zoneId>\d+)$`),
 	ACTION_DISRUPT_ALT: regexp.MustCompile(`(?i)^DISRUPT (?P<x>\d+) (?P<y>\d+)$`),
 	ACTION_MESSAGE:     regexp.MustCompile(`(?i)^MESSAGE (?P<message>[^;]*)$`),

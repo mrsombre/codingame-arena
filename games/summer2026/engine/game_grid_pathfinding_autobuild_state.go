@@ -5,7 +5,7 @@ package engine
 import "fmt"
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/AutobuildState.java:9-28
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/AutobuildState.java:9-16,19-28
 
 public class AutobuildState {
     public enum CursorState {

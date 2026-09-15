@@ -8,9 +8,7 @@ import (
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
 
-// Referee drives Game through the arena runner lifecycle. The gym-mode
-// reset/step pair, the debug frame strings and the ByteBuffer observation
-// plumbing are RL-harness only and are not ported.
+// Referee drives Game through the arena runner lifecycle.
 type Referee struct {
 	Game           *Game
 	CommandManager *CommandManager
@@ -21,7 +19,7 @@ func NewReferee(game *Game) *Referee {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Referee.java:47-64
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Referee.java:18-35
 
 @Override
 public void init() {
@@ -47,7 +45,7 @@ func (r *Referee) Init(players []arena.Player) {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Referee.java:71-78,88-94
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Referee.java:42-49,60-62
 
 private void sendGlobalInfo() {
     for (Player player : gameManager.getActivePlayers())
@@ -66,7 +64,7 @@ func (r *Referee) FrameInfoFor(player arena.Player) []string {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Referee.java:105-118
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Referee.java:75-88
 
 private void handlePlayerCommands() {
     for (Player player : gameManager.getActivePlayers()) {
@@ -91,7 +89,7 @@ func (r *Referee) ParsePlayerOutputs(players []arena.Player) {
 }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Referee.java:82-103
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Referee.java:37-40,52-73
 
 public void gameTurn(int turn) {
     game.resetGameTurnData();
@@ -120,7 +118,7 @@ func (r *Referee) Ended() bool { return r.Game.Ended() }
 func (r *Referee) EndGame() { r.Game.EndGame() }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Referee.java:120-123
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Referee.java:90-93
 
 @Override
 public void onEnd() { game.onEnd(); }
@@ -153,13 +151,12 @@ func (r *Referee) TurnTraces(_ int, _ []arena.Player) [2][]arena.TurnTrace {
 func (r *Referee) RawScores() [2]int { return r.Game.RawScores() }
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:752-773
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/Game.java:730-751
 
 private void writeMetadata() {
     for (Player p : players) {
         gameManager.putMetadata("tracksPlaced_" + p.getIndex(), placedTracks[p.getIndex()]);
         ...
-        if (enableSideQuest) gameManager.putMetadata("sideQuestPoints_" + p.getIndex(), sideQuestPoints[p.getIndex()]);
         gameManager.putMetadata(
             "averageTrackOwnershipPercentagePerActiveConnection_" + p.getIndex(),
             trackOwnershipPercentagePerActiveConnectionTotal[p.getIndex()] == 0 ? 0f
@@ -167,17 +164,20 @@ private void writeMetadata() {
                     / (float) trackOwnershipPercentagePerActiveConnectionTotal[p.getIndex()]
         );
         gameManager.putMetadata("executionTimeMs_" + p.getIndex(), executionTimeMs[p.getIndex()]);
+        gameManager.putMetadata("poisServed_" + p.getIndex(), poisConnected.get(p.getIndex()).size());
     }
+    gameManager.putMetadata("totalPois", grid.pois.size());
 }
 */
 
 // Metrics implements arena.MetricsProvider, carrying the counters Java
 // publishes as match metadata under the same key names.
 //
-// Two keys of Java's set are dropped or unguarded: executionTimeMs is the
-// SDK's own timing rather than a game counter and the arena measures its own,
-// and sideQuestPoints is emitted unconditionally rather than behind
-// enableSideQuest, so that a batch aggregates over one stable label set.
+// Java's executionTimeMs is the SDK's own timing rather than a game counter,
+// and the arena measures its own. Java's poisServed and totalPois are always
+// 0, because nothing adds a POI. sideQuestPoints has no key in the published
+// Java; it comes from the historical side-quest metadata and is emitted
+// unconditionally, so that a batch aggregates over one stable label set.
 func (r *Referee) Metrics() []arena.Metric {
 	game := r.Game
 	metrics := make([]arena.Metric, 0, 22)

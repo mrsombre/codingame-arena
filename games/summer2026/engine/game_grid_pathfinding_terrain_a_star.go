@@ -3,7 +3,7 @@
 package engine
 
 /*
-Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/TerrainAStar.java:9-48
+Java: SummerChallenge2026-BackTrackKing/src/main/java/com/codingame/game/grid/pathfinding/TerrainAStar.java:9-12,22-47
 
 public class TerrainAStar extends AbstractAStar<Coord> {
     Grid grid;
