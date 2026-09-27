@@ -31,22 +31,22 @@ traces/             # Match trace files for analysis (gitignored)
 
 ### Mandatory
 
-- NEVER run `go run` directly — use `make build-arena` then run the binary from `bin/`
+- NEVER run `go run` directly — use `make build` then run the binary from `bin/`
 - NEVER modify files under `source/` — these are upstream subtree imports
 - NEVER commit `replays/`, `traces/`, or `bin/` directories
 
 ### Validation
 
-- ALWAYS run `make test-arena` and `make lint-arena` before considering Go changes complete
+- ALWAYS run `make test` and `make lint` before considering Go changes complete
 
 ## Project Commands
 
 ```shell
 # Go
-make test-arena                  # Run arena tests (internal/)
+make test                        # Run arena tests (internal/)
 make test-games                  # Run game engine tests (games/)
-make lint-arena                  # Run golangci-lint
-make build-arena                 # Build arena binary to bin/
+make lint                        # Run golangci-lint
+make build                       # Build arena binary to bin/
 bin/arena help                   # Show help for arena binary
 ```
 

@@ -66,7 +66,7 @@ For Windows, download `arena-windows-amd64.exe` from the [latest release](https:
 ### Build
 
 ```shell
-make build-arena
+make build
 make build-winter2026-agents
 make match-winter2026
 ```

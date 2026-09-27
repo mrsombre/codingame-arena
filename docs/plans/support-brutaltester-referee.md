@@ -52,8 +52,8 @@ Implement brutaltester-compatible referee mode as the v1 contract.
   - Run `arena run winter2026 --engine=embedded` and default subprocess mode on the same seed and compare summary result.
   - Run a fake brutaltester-compatible referee command through `--referee-cmd`.
 - Validation:
-  - `make test-arena`
-  - `make lint-arena`
+  - `make test`
+  - `make lint`
 
 ## Assumptions
 

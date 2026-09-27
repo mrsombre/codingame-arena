@@ -1,4 +1,4 @@
-.DEFAULT_GOAL := build-arena
+.DEFAULT_GOAL := build
 
 BIN_DIR := bin
 
@@ -6,24 +6,24 @@ BIN_DIR := bin
 .PHONY: clean reset
 
 clean:
-	rm -rf bin/* .tmp/* replays/* traces/*
+	rm -rf .tmp/* replays/* traces/*
 
 reset:
 	rm -rf replays/* traces/*
 
 # backend
-.PHONY: test-arena test-games lint-arena build-arena
+.PHONY: test test-games lint build
 
-test-arena:
+test:
 	go test ./cmd/arena ./internal/...
 
 test-games:
 	go test ./games/...
 
-lint-arena:
+lint:
 	golangci-lint run ./cmd/... ./games/... ./internal/...
 
-build-arena:
+build:
 	mkdir -p $(BIN_DIR)
 	go build -ldflags="-w -s" -o $(BIN_DIR)/arena ./cmd/arena
 

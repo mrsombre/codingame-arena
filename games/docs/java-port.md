@@ -170,7 +170,7 @@ package games
 import _ "github.com/mrsombre/codingame-arena/games/<engine>/engine"
 ```
 
-Build with: `make build-arena`.
+Build with: `make build`.
 
 ## Rules Documentation
 
@@ -658,6 +658,6 @@ dependency graph:
 - [ ] Add acceptance tests for all cross-turn rules in `rules.md`
 - [ ] Add seed/parity fixtures for random generation or setup behavior
 - [ ] Verify: `make test-games`
-- [ ] Verify: `make test-arena`
-- [ ] Verify: `make lint-arena`
-- [ ] Verify: `make build-arena`
+- [ ] Verify: `make test`
+- [ ] Verify: `make lint`
+- [ ] Verify: `make build`
