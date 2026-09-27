@@ -9,7 +9,7 @@ Download raw replay JSON from codingame.com. Each freshly-saved replay is **auto
 
 The leaderboard slug is baked into each game engine (e.g. `winter-challenge-2026-snakebyte`, `spring-challenge-2020`), so you don't pass the puzzle URL — the engine is selected by the leading `<game>` positional.
 
-`<username>` is the player you are playing for. It is recorded as the top-level `blue` field in each saved replay so the viewer and the trace know which side is "yours".
+`<username>` is the player you are playing for. It is recorded as the top-level `blue` field in each saved replay so analyze and the trace know which side is "yours".
 
 ## Quick start
 

@@ -37,21 +37,21 @@ func TestTraceGatherEmitsZeroForShadowedAndSeedTrees(t *testing.T) {
 	g := newScenario(4)
 	p0 := g.Players[0]
 	g.Sun.SetOrientation(0)
-	g.placeTree(p0, 0, TREE_TALL)   // casts size-3 shadow on 1, 7, 19
-	g.placeTree(p0, 4, TREE_SMALL)  // not shadowed; shadows 0 with size 1 (1 < 3, not spooky)
-	g.placeTree(p0, 7, TREE_SMALL)  // spooky-shadowed by cell 0 (3 >= 1)
-	g.placeTree(p0, 19, TREE_TALL)  // spooky-shadowed by cell 0 (3 >= 3)
-	g.placeTree(p0, 22, TREE_SEED)  // size 0 — never harvests
+	g.placeTree(p0, 0, TREE_TALL)  // casts size-3 shadow on 1, 7, 19
+	g.placeTree(p0, 4, TREE_SMALL) // not shadowed; shadows 0 with size 1 (1 < 3, not spooky)
+	g.placeTree(p0, 7, TREE_SMALL) // spooky-shadowed by cell 0 (3 >= 1)
+	g.placeTree(p0, 19, TREE_TALL) // spooky-shadowed by cell 0 (3 >= 3)
+	g.placeTree(p0, 22, TREE_SEED) // size 0 — never harvests
 	g.calculateShadows()
 
 	g.giveSun()
 
 	want := []GatherData{
-		{Cell: 0, Sun: TREE_TALL},   // shadowed by size 1 → not spooky → harvests
-		{Cell: 4, Sun: TREE_SMALL},  // unshadowed → harvests
-		{Cell: 7, Sun: 0},           // spooky → 0
-		{Cell: 19, Sun: 0},          // spooky → 0
-		{Cell: 22, Sun: 0},          // seed → 0
+		{Cell: 0, Sun: TREE_TALL},  // shadowed by size 1 → not spooky → harvests
+		{Cell: 4, Sun: TREE_SMALL}, // unshadowed → harvests
+		{Cell: 7, Sun: 0},          // spooky → 0
+		{Cell: 19, Sun: 0},         // spooky → 0
+		{Cell: 22, Sun: 0},         // seed → 0
 	}
 	require.Len(t, g.traces[0], len(want), "one GATHER per tree in TreeOrder")
 	for i, ev := range g.traces[0] {

@@ -37,7 +37,7 @@ the 5th gameplay RNG call diverged.
 - `analyze` shows divergent MOVE / tie-break outcomes starting mid-game
   rather than turn 1 — coincidental agreement on power-of-two tie-breaks
   is common at first.
-- `make test-arena` and seed-parity tests are green (map terrain is
+- `make test` and seed-parity tests are green (map terrain is
   identical) but live-replay verification mismatches.
 
 **How to diagnose**

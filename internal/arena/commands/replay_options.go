@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 )
 
 // AddReplayFlags registers flags used by the "replay" command on fs.
@@ -39,7 +38,7 @@ type ReplayOptions struct {
 	Force    bool
 }
 
-func parseReplayOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (ReplayOptions, error) {
+func parseReplayOptions(args []string, fs *pflag.FlagSet) (ReplayOptions, error) {
 	if err := fs.Parse(args); err != nil {
 		return ReplayOptions{}, err
 	}
@@ -72,21 +71,21 @@ func parseReplayOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (Repla
 	}
 	opts.IDs = ids
 
-	opts.OutDir = v.GetString("out")
+	opts.OutDir, _ = fs.GetString("out")
 	if opts.OutDir == "" {
 		opts.OutDir = "replays"
 	}
-	opts.TraceDir = v.GetString("trace-dir")
+	opts.TraceDir, _ = fs.GetString("trace-dir")
 	if opts.TraceDir == "" {
 		opts.TraceDir = "traces"
 	}
-	opts.League = v.GetInt("league")
+	opts.League, _ = fs.GetInt("league")
 	if opts.League < 0 {
 		return ReplayOptions{}, fmt.Errorf("--league must be >= 0")
 	}
-	opts.Limit = v.GetInt("limit")
-	opts.Delay = v.GetDuration("delay")
-	opts.Force = v.GetBool("force")
+	opts.Limit, _ = fs.GetInt("limit")
+	opts.Delay, _ = fs.GetDuration("delay")
+	opts.Force, _ = fs.GetBool("force")
 
 	return opts, nil
 }

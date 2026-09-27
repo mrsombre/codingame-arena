@@ -1,10 +1,6 @@
 package arena
 
-import (
-	"encoding/json"
-
-	"github.com/spf13/viper"
-)
+import "encoding/json"
 
 // Referee drives the game through a standard protocol.
 // Match calls these methods in order during the game loop.
@@ -57,7 +53,7 @@ type GameFactory interface {
 	// command can resolve a player's last battles without the caller
 	// passing the URL on each invocation.
 	LeaderboardSlug() string
-	NewGame(seed int64, options *viper.Viper) (Referee, []Player)
+	NewGame(seed int64, options GameOptions) (Referee, []Player)
 	MaxTurns() int
 }
 
@@ -122,12 +118,23 @@ type RawScoresProvider interface {
 	RawScores() [2]int
 }
 
+// GameOptions carries the per-match settings a factory reads when it builds
+// a game.
+type GameOptions struct {
+	// League is the league level; 0 selects the game's default league.
+	League int
+	// ReplayMetadata is the gameResult.metadata of the replay being
+	// re-simulated, nil for self-play. Some games detect historical rules
+	// from its keys.
+	ReplayMetadata map[string]any
+}
+
 // LeagueResolver returns the league level a factory will run with for the
-// given options (applying its game-specific default when "league" is unset).
+// given options (applying its game-specific default when League is 0).
 // Optional — if a GameFactory implements this, match stamps the resolved
 // value onto each trace as "league".
 type LeagueResolver interface {
-	ResolveLeague(options *viper.Viper) int
+	ResolveLeague(options GameOptions) int
 }
 
 // EndReasonProvider returns a categorized reason for why the match ended.

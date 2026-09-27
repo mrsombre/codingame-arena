@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
@@ -76,13 +75,13 @@ Output channels:
 
 Tracing:
   --trace writes one JSON file per match to --trace-dir (default ./traces).
-  Trace files feed ` + "`arena analyze`" + ` and the web viewer (` + "`arena serve`" + `).`
+  Trace files feed ` + "`arena analyze`" + `.`
 	return arena.CommandUsage("run <game>", "Play a batch of head-to-head matches between two bot binaries.", fs, extra)
 }
 
 // Run is the entry point for the "run" subcommand.
-func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	opts, err := parseRunOptions(args, fs, v)
+func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet) error {
+	opts, err := parseRunOptions(args, fs)
 	if err != nil {
 		return err
 	}
@@ -92,7 +91,7 @@ func Run(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.F
 	if opts.Debug {
 		debugSink = &debugTraceCapture{traceID: startedAt.Unix()}
 	}
-	results := runMatches(factory, opts, v, startedAt, debugSink)
+	results := runMatches(factory, opts, startedAt, debugSink)
 	elapsed := time.Since(startedAt)
 
 	return writeRunOutput(stdout, opts, results, elapsed, debugSink)
@@ -116,14 +115,14 @@ func (c *debugTraceCapture) WriteMatch(m arena.TraceMatch) error {
 	return nil
 }
 
-func runMatches(factory arena.GameFactory, opts RunOptions, v *viper.Viper, startedAt time.Time, debugSink *debugTraceCapture) []arena.MatchResult {
+func runMatches(factory arena.GameFactory, opts RunOptions, startedAt time.Time, debugSink *debugTraceCapture) []arena.MatchResult {
 	matchOpts := arena.MatchOptions{
 		MaxTurns:    opts.MaxTurns,
 		BlueBotBin:  opts.BlueBotBin,
 		RedBotBin:   opts.RedBotBin,
 		Debug:       opts.Debug,
 		NoSwap:      opts.NoSwap,
-		GameOptions: v,
+		GameOptions: arena.GameOptions{League: opts.League},
 	}
 	switch {
 	case debugSink != nil:

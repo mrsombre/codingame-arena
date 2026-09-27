@@ -145,7 +145,7 @@ Output is the raw lines a bot reads from stdin:
 |----------------|------------------------|---------------------------------------------------------------------------------------------------|
 | `-s, --seed`   | current Unix nanoseconds | RNG seed as int64. Same seed → same map every time. Accepts an optional `seed=` prefix.          |
 | `--player`     | `0`                    | Player perspective (`0` or `1`)                                                                   |
-| `-l, --league` | game-specific          | League level                                                                                      |
+| `-l, --league` | `0` (game default)     | League level                                                                                      |
 
 Passing a bare positional (e.g. `serialize 42`) is rejected so the seed source is always explicit.
 

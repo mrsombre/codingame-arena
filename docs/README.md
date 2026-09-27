@@ -13,7 +13,6 @@ For a project overview, see the [top-level README](../README.md).
 | [`trace`](trace.md)     | On-disk trace file format produced by `run` and `replay` |
 | [`analyze`](analyze.md) | Aggregate trace outcomes and game-owned metrics          |
 | [`game`](game.md)       | Per-game helpers: `rules`, `trace`, `serialize`, `list`  |
-| [`serve`](serve.md)     | Serve the embedded web viewer                            |
 
 ## Typical flow
 
@@ -25,11 +24,10 @@ arena game rules <game>                  ─▶ bundled rules.md to stdout
 arena game trace <game>                  ─▶ bundled per-game trace.md to stdout
 arena game serialize <game> [--seed N]   ─▶ first-turn stdin (timestamp seed unless --seed is given)
 arena game list                          ─▶ every engine currently linked into the binary
-arena serve                              ─▶ web viewer over both dirs
 ```
 
-`run`, `replay`, and `analyze` take the game slug as their first positional argument. Game-specific helpers live under `arena game <action> <game>` — action first, game second, matching the rest of the CLI (currently `rules`, `trace`, `serialize`) — see [game.md](game.md). The standalone `arena game list` introspects the live registry; the banner shown by `bin/arena` uses the chronological order pinned in `games/game.go`. `serve` lists every registered game.
+`run`, `replay`, and `analyze` take the game slug as their first positional argument. Game-specific helpers live under `arena game <action> <game>` — action first, game second, matching the rest of the CLI (currently `rules`, `trace`, `serialize`) — see [game.md](game.md). The standalone `arena game list` introspects the live registry; the banner shown by `bin/arena` uses the chronological order pinned in `games/game.go`.
 
 ## Configuration
 
-Flags can be supplied via CLI, environment variables (`ARENA_<FLAG>`, hyphens become underscores), or an `arena.yml` config file in the current directory.
+Every setting is a command-line flag. Arena reads no environment variables and no config file.

@@ -3,8 +3,6 @@ package arena
 import (
 	"path/filepath"
 	"strings"
-
-	"github.com/spf13/viper"
 )
 
 // ReplayMoves holds per-turn outputs for each side during a replay.
@@ -31,7 +29,7 @@ type ReplayMoves struct {
 func RunReplay(
 	factory GameFactory,
 	seed int64,
-	gameOptions *viper.Viper,
+	gameOptions GameOptions,
 	moves ReplayMoves,
 	botNames [2]string,
 	maxTurns int,
@@ -218,20 +216,20 @@ func RunReplay(
 	}
 
 	return TraceMatch{
-		MatchID:     0,
-		PuzzleName:  factory.Name(),
-		PuzzleID:    factory.PuzzleID(),
-		Seed:        seed,
-		EndReason:   endReason,
+		MatchID:      0,
+		PuzzleName:   factory.Name(),
+		PuzzleID:     factory.PuzzleID(),
+		Seed:         seed,
+		EndReason:    endReason,
 		Disqualified: disqualified,
-		Scores:      [2]TraceScore{TraceScore(rawTraceScores[0]), TraceScore(rawTraceScores[1])},
-		FinalScores: [2]TraceScore{TraceScore(finalTraceScores[0]), TraceScore(finalTraceScores[1])},
-		Ranks:       RanksFromWinner(winner),
-		Setup:       traceSetup,
-		Players:     [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
-		Timing:      &TraceTiming{},
-		Turns:       traceTurns,
-		MainTurns:   countMainTurns(traceTurns),
+		Scores:       [2]TraceScore{TraceScore(rawTraceScores[0]), TraceScore(rawTraceScores[1])},
+		FinalScores:  [2]TraceScore{TraceScore(finalTraceScores[0]), TraceScore(finalTraceScores[1])},
+		Ranks:        RanksFromWinner(winner),
+		Setup:        traceSetup,
+		Players:      [2]string{filepath.Base(botNames[0]), filepath.Base(botNames[1])},
+		Timing:       &TraceTiming{},
+		Turns:        traceTurns,
+		MainTurns:    countMainTurns(traceTurns),
 	}, finalScores
 }
 

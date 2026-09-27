@@ -2,10 +2,6 @@
 package engine
 
 import (
-	"strconv"
-
-	"github.com/spf13/viper"
-
 	"github.com/mrsombre/codingame-arena/games/summer2026"
 	"github.com/mrsombre/codingame-arena/internal/arena"
 	"github.com/mrsombre/codingame-arena/internal/util/sha1prng"
@@ -42,17 +38,16 @@ func (f *factory) MaxTurns() int { return MAX_TURNS }
 
 func (f *factory) TurnModel() arena.TurnModel { return arena.FlatTurnModel{} }
 
-func (f *factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []arena.Player) {
+func (f *factory) NewGame(seed int64, options arena.GameOptions) (arena.Referee, []arena.Player) {
 	p0 := NewPlayer(0)
 	p1 := NewPlayer(1)
 	// SHA1PRNG matches the SDK's MultiplayerGameManager.getRandom().
 	game := NewGame(sha1prng.New(seed), f.ResolveLeague(options))
 	// Online replays with POIs publish sideQuestPoints even when it is zero;
 	// the later rules omit those keys and generate no POIs.
-	if options != nil {
-		game.EnableSideQuest = options.IsSet("replay-metadata.sideQuestPoints_0") ||
-			options.IsSet("replay-metadata.sideQuestPoints_1")
-	}
+	_, sideQuest0 := options.ReplayMetadata["sideQuestPoints_0"]
+	_, sideQuest1 := options.ReplayMetadata["sideQuestPoints_1"]
+	game.EnableSideQuest = sideQuest0 || sideQuest1
 	return NewReferee(game), []arena.Player{p0, p1}
 }
 
@@ -60,13 +55,9 @@ func (f *factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []ar
 // given options, falling back to the full game when "league" is unset or
 // unparseable. Leagues 1-2 are tutorials whose win condition comes from
 // TutorialManager; 3-5 all run the same rules.
-func (f *factory) ResolveLeague(options *viper.Viper) int {
-	if options != nil {
-		if raw := options.GetString("league"); raw != "" {
-			if value, err := strconv.Atoi(raw); err == nil {
-				return value
-			}
-		}
+func (f *factory) ResolveLeague(options arena.GameOptions) int {
+	if options.League > 0 {
+		return options.League
 	}
 	return DEFAULT_LEAGUE
 }

@@ -65,7 +65,7 @@ type PickData struct {
 // [PLUM, LEMON, APPLE, BANANA, IRON, WOOD]. The sum equals the carry total
 // the unit emptied.
 type DropData struct {
-	Unit  int           `json:"unit"`
+	Unit  int             `json:"unit"`
 	Items [ItemsCount]int `json:"items"`
 }
 
@@ -130,22 +130,22 @@ type FailedData struct {
 // before PerformGameUpdate — values reflect what bots saw on stdin this turn,
 // not the state after their commands resolve.
 type TraceTurnState struct {
-	Turn        int                  `json:"turn"`
-	Inventories [2][ItemsCount]int   `json:"inventories"`
-	Units       [2][]TraceUnit       `json:"units"`
-	Plants      []TracePlantState         `json:"plants,omitempty"`
+	Turn        int                `json:"turn"`
+	Inventories [2][ItemsCount]int `json:"inventories"`
+	Units       [2][]TraceUnit     `json:"units"`
+	Plants      []TracePlantState  `json:"plants,omitempty"`
 }
 
 // TraceUnit captures one troll's snapshot for the per-turn state. Carry[i]
 // counts items in the unit's own inventory indexed by Item ordinal.
 type TraceUnit struct {
-	ID            int               `json:"id"`
-	Pos           [2]int            `json:"pos"`
-	MoveSpeed     int               `json:"moveSpeed"`
-	CarryCapacity int               `json:"carryCapacity"`
-	HarvestPower  int               `json:"harvestPower"`
-	ChopPower     int               `json:"chopPower"`
-	Carry         [ItemsCount]int   `json:"carry"`
+	ID            int             `json:"id"`
+	Pos           [2]int          `json:"pos"`
+	MoveSpeed     int             `json:"moveSpeed"`
+	CarryCapacity int             `json:"carryCapacity"`
+	HarvestPower  int             `json:"harvestPower"`
+	ChopPower     int             `json:"chopPower"`
+	Carry         [ItemsCount]int `json:"carry"`
 }
 
 // TracePlantState captures one live plant on the board. Plants killed earlier this

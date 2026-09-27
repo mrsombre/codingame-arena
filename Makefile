@@ -1,4 +1,4 @@
-.DEFAULT_GOAL := build-arena
+.DEFAULT_GOAL := build
 
 BIN_DIR := bin
 
@@ -6,39 +6,26 @@ BIN_DIR := bin
 .PHONY: clean reset
 
 clean:
-	rm -rf bin/* .tmp/* replays/* traces/*
+	rm -rf .tmp/* replays/* traces/*
 
 reset:
 	rm -rf replays/* traces/*
 
 # backend
-.PHONY: test-arena test-games lint-arena build-arena build-viewer clean
+.PHONY: test test-games lint build
 
-test-arena:
+test:
 	go test ./cmd/arena ./internal/...
 
 test-games:
 	go test ./games/...
 
-lint-arena:
+lint:
 	golangci-lint run ./cmd/... ./games/... ./internal/...
 
-build-arena:
+build:
 	mkdir -p $(BIN_DIR)
 	go build -ldflags="-w -s" -o $(BIN_DIR)/arena ./cmd/arena
-
-# frontend
-.PHONY: type-check-viewer lint-viewer build-viewer
-VIEWER_DIR := viewer
-
-type-check-viewer:
-	cd $(VIEWER_DIR) && pnpm run type-check
-
-bundle-viewer:
-	cd $(VIEWER_DIR) && pnpm run bundle
-
-build-viewer:
-	cd $(VIEWER_DIR) && pnpm run build
 
 # match runner
 .PHONY: build-summer2026-agents match-summer2026

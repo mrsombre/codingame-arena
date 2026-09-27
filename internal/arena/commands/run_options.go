@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
@@ -25,7 +24,7 @@ func AddRunFlags(fs *pflag.FlagSet) {
 	fs.StringP("seed", "s", "", "Base RNG seed as int64 (default: current Unix nanoseconds)")
 	fs.Int("seedx", 1, "Per-match seed stride: seed_i = seed + i*seedx (i = 0..simulations-1)")
 	fs.Int("max-turns", 200, "Hard cap on turns per match before the engine ends the game")
-	fs.StringP("league", "l", "", "League level (game-specific; check the game's docs for valid values)")
+	fs.IntP("league", "l", 0, "League level (0 = game default; game-specific, check the game's docs for valid values)")
 	fs.Bool("no-swap", false, "Disable automatic side swapping (blue is locked to the engine's left slot)")
 	fs.Bool("trace", false, "Write one JSON trace file per match to --trace-dir")
 	fs.String("trace-dir", "./traces", "Output directory for trace files (used with --trace; created if missing)")
@@ -40,6 +39,7 @@ type RunOptions struct {
 	BlueBotBin string
 	RedBotBin  string
 	MaxTurns   int
+	League     int
 	TraceDir   string
 	Trace      bool
 	Debug      bool
@@ -47,14 +47,14 @@ type RunOptions struct {
 	Verbose    bool
 }
 
-func parseRunOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (RunOptions, error) {
+func parseRunOptions(args []string, fs *pflag.FlagSet) (RunOptions, error) {
 	if err := fs.Parse(args); err != nil {
 		return RunOptions{}, err
 	}
 
-	opts := runOptionsFromConfig(v)
+	opts := runOptionsFromFlags(fs)
 
-	if raw := v.GetString("seed"); raw != "" {
+	if raw, _ := fs.GetString("seed"); raw != "" {
 		n, err := arena.ParseSeed(raw)
 		if err != nil {
 			return RunOptions{}, fmt.Errorf("invalid integer for --seed: %s", raw)
@@ -75,23 +75,23 @@ func parseRunOptions(args []string, fs *pflag.FlagSet, v *viper.Viper) (RunOptio
 	return opts, nil
 }
 
-func runOptionsFromConfig(v *viper.Viper) RunOptions {
-	return RunOptions{
-		BatchOptions: arena.BatchOptions{
-			Simulations:   v.GetInt("simulations"),
-			Parallel:      v.GetInt("parallel"),
-			SeedIncrement: int64(v.GetInt("seedx")),
-			OutputMatches: v.GetBool("output-matches"),
-		},
-		BlueBotBin: v.GetString("blue"),
-		RedBotBin:  v.GetString("red"),
-		MaxTurns:   v.GetInt("max-turns"),
-		TraceDir:   v.GetString("trace-dir"),
-		Trace:      v.GetBool("trace"),
-		Debug:      v.GetBool("debug"),
-		NoSwap:     v.GetBool("no-swap"),
-		Verbose:    v.GetBool("verbose"),
-	}
+func runOptionsFromFlags(fs *pflag.FlagSet) RunOptions {
+	var opts RunOptions
+	opts.Simulations, _ = fs.GetInt("simulations")
+	opts.Parallel, _ = fs.GetInt("parallel")
+	seedx, _ := fs.GetInt("seedx")
+	opts.SeedIncrement = int64(seedx)
+	opts.OutputMatches, _ = fs.GetBool("output-matches")
+	opts.BlueBotBin, _ = fs.GetString("blue")
+	opts.RedBotBin, _ = fs.GetString("red")
+	opts.MaxTurns, _ = fs.GetInt("max-turns")
+	opts.League, _ = fs.GetInt("league")
+	opts.TraceDir, _ = fs.GetString("trace-dir")
+	opts.Trace, _ = fs.GetBool("trace")
+	opts.Debug, _ = fs.GetBool("debug")
+	opts.NoSwap, _ = fs.GetBool("no-swap")
+	opts.Verbose, _ = fs.GetBool("verbose")
+	return opts
 }
 
 func validateRunOptions(opts RunOptions) error {
@@ -100,6 +100,9 @@ func validateRunOptions(opts RunOptions) error {
 	}
 	if opts.Parallel < 1 {
 		return fmt.Errorf("--parallel must be >= 1")
+	}
+	if opts.League < 0 {
+		return fmt.Errorf("--league must be >= 0")
 	}
 	if opts.MaxTurns < 1 {
 		return fmt.Errorf("--max-turns must be >= 1")

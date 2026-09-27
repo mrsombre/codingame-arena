@@ -178,7 +178,7 @@ This closes the loop: replays → traces → metrics → rendered report.
 Before declaring a phase complete, run the project gates:
 
 ```
-make test-arena && make test-games && make lint-arena && make build-arena
+make test && make test-games && make lint && make build
 ```
 
 Phases 9 and 11 also require a clean run of `bin/arena replay …` and the

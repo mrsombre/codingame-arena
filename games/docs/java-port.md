@@ -170,7 +170,7 @@ package games
 import _ "github.com/mrsombre/codingame-arena/games/<engine>/engine"
 ```
 
-Build with: `make build-arena`.
+Build with: `make build`.
 
 ## Rules Documentation
 
@@ -205,7 +205,7 @@ See `internal/arena/interfaces.go` for the full signatures.
 ```go
 type GameFactory interface {
     Name() string
-    NewGame(seed int64, options *viper.Viper) (Referee, []Player)
+    NewGame(seed int64, options GameOptions) (Referee, []Player)
     MaxTurns() int
 }
 ```
@@ -213,9 +213,9 @@ type GameFactory interface {
 - `Name` returns the CLI game id, matching the directory name.
 - `NewGame` creates a fresh game state from a seed and CLI options.
 - `MaxTurns` returns the hard turn limit for this game.
-- `options` is the viper instance carrying flags, config, env, and any
-  `--key value` pairs not consumed by the arena core. Read game-specific
-  keys via the standard viper API (`options.GetString`, `GetInt`, …).
+- `options` is an `arena.GameOptions` struct: `League` (0 selects the
+  game's default league) and `ReplayMetadata` (the replay's
+  `gameResult.metadata` during re-simulation, nil for self-play).
 
 ### Referee
 
@@ -658,6 +658,6 @@ dependency graph:
 - [ ] Add acceptance tests for all cross-turn rules in `rules.md`
 - [ ] Add seed/parity fixtures for random generation or setup behavior
 - [ ] Verify: `make test-games`
-- [ ] Verify: `make test-arena`
-- [ ] Verify: `make lint-arena`
-- [ ] Verify: `make build-arena`
+- [ ] Verify: `make test`
+- [ ] Verify: `make lint`
+- [ ] Verify: `make build`

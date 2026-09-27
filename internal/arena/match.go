@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/spf13/viper"
 )
 
 // MatchOptions configures a single match execution.
@@ -20,7 +18,7 @@ type MatchOptions struct {
 	Debug       bool
 	NoSwap      bool
 	TraceSink   TraceSink
-	GameOptions *viper.Viper
+	GameOptions GameOptions
 }
 
 // Runner executes matches using a GameFactory.
@@ -322,23 +320,23 @@ func (runner *Runner) RunMatch(simulationID int, seed int64) MatchResult {
 			endReason = erp.EndReason(turn, players, deactivationTurns, firstOutputTurns)
 		}
 		traceMatch := TraceMatch{
-			MatchID:     simulationID,
-			PuzzleName:  runner.Factory.Name(),
-			PuzzleID:    runner.Factory.PuzzleID(),
-			Seed:        seed,
-			Blue:        filepath.Base(runner.Options.BlueBotBin),
-			League:      league,
-			CreatedAt:   time.Now().UTC().Format(time.RFC3339),
-			EndReason:   endReason,
+			MatchID:      simulationID,
+			PuzzleName:   runner.Factory.Name(),
+			PuzzleID:     runner.Factory.PuzzleID(),
+			Seed:         seed,
+			Blue:         filepath.Base(runner.Options.BlueBotBin),
+			League:       league,
+			CreatedAt:    time.Now().UTC().Format(time.RFC3339),
+			EndReason:    endReason,
 			Disqualified: disqualified,
-			Scores:      [2]TraceScore{TraceScore(rawTraceScores[0]), TraceScore(rawTraceScores[1])},
-			FinalScores: [2]TraceScore{TraceScore(finalTraceScores[0]), TraceScore(finalTraceScores[1])},
-			Ranks:       RanksFromWinner(traceWinner),
-			Setup:       traceSetup,
-			Players:     [2]string{filepath.Base(sideOptions.BlueBotBin), filepath.Base(sideOptions.RedBotBin)},
-			Timing:      traceTiming,
-			Turns:       traceTurns,
-			MainTurns:   countMainTurns(traceTurns),
+			Scores:       [2]TraceScore{TraceScore(rawTraceScores[0]), TraceScore(rawTraceScores[1])},
+			FinalScores:  [2]TraceScore{TraceScore(finalTraceScores[0]), TraceScore(finalTraceScores[1])},
+			Ranks:        RanksFromWinner(traceWinner),
+			Setup:        traceSetup,
+			Players:      [2]string{filepath.Base(sideOptions.BlueBotBin), filepath.Base(sideOptions.RedBotBin)},
+			Timing:       traceTiming,
+			Turns:        traceTurns,
+			MainTurns:    countMainTurns(traceTurns),
 		}
 		if err := runner.Options.TraceSink.WriteMatch(traceMatch); err != nil {
 			panic(err)

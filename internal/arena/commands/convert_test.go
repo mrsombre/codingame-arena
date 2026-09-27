@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -139,7 +138,7 @@ func (f *fakeConvertFactory) PuzzleTitle() string { return "" }
 
 func (f *fakeConvertFactory) LeaderboardSlug() string { return "" }
 
-func (f *fakeConvertFactory) NewGame(_ int64, _ *viper.Viper) (arena.Referee, []arena.Player) {
+func (f *fakeConvertFactory) NewGame(_ int64, _ arena.GameOptions) (arena.Referee, []arena.Player) {
 	panic(fmt.Sprintf("fakeConvertFactory.NewGame called for %s", f.Name()))
 }
 

@@ -9,7 +9,6 @@ import (
 	"sort"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
@@ -55,8 +54,8 @@ Notes:
 }
 
 // Analyze is the entry point for the "analyze" subcommand.
-func Analyze(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	opts, err := parseAnalyzeOptions(args, fs, v)
+func Analyze(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet) error {
+	opts, err := parseAnalyzeOptions(args, fs)
 	if err != nil {
 		return err
 	}

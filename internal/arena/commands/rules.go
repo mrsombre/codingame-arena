@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
@@ -37,7 +36,7 @@ Use cases:
 }
 
 // Rules is the entry point for `arena game rules <game>`.
-func Rules(_ []string, stdout io.Writer, factory arena.GameFactory, _ *pflag.FlagSet, _ *viper.Viper) error {
+func Rules(_ []string, stdout io.Writer, factory arena.GameFactory, _ *pflag.FlagSet) error {
 	provider, ok := factory.(arena.RulesProvider)
 	if !ok {
 		return fmt.Errorf("game %q does not bundle rules", factory.Name())

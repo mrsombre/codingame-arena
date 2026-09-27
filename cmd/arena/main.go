@@ -9,14 +9,13 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	gamespkg "github.com/mrsombre/codingame-arena/games"
 	"github.com/mrsombre/codingame-arena/internal/arena"
 	"github.com/mrsombre/codingame-arena/internal/arena/commands"
 )
 
-type handlerFunc func(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error
+type handlerFunc func(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet) error
 
 type commandSpec struct {
 	addFlags     func(*pflag.FlagSet)
@@ -126,12 +125,7 @@ func runHandler(spec commandSpec, path string, args []string, stdout io.Writer, 
 		return err
 	}
 
-	v, err := arena.NewViper(fs)
-	if err != nil {
-		return fmt.Errorf("config error: %w", err)
-	}
-
-	return spec.handler(args, stdout, factory, fs, v)
+	return spec.handler(args, stdout, factory, fs)
 }
 
 // registry is the dispatch table built once at package init. Lookups are
@@ -150,11 +144,6 @@ var registry = map[string]commandSpec{
 		needsFactory: true,
 		argsSpec:     "<game>",
 		usage:        commands.AnalyzeUsage,
-	},
-	"serve": {
-		addFlags: commands.AddServeFlags,
-		handler:  commands.Serve,
-		usage:    commands.ServeUsage,
 	},
 	"game": {
 		subcommands: map[string]commandSpec{

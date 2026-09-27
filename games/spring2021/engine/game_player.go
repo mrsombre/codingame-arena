@@ -168,7 +168,7 @@ func (p *Player) SetOutputs(lines []string) {
 	p.outputs = lines
 	p.outputError = nil
 }
-func (p *Player) GetOutputError() error      { return p.outputError }
+func (p *Player) GetOutputError() error { return p.outputError }
 func (p *Player) SetExecuteFunc(fn func() error) {
 	p.executeFunc = fn
 }

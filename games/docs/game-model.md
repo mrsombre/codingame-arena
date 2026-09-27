@@ -182,7 +182,7 @@ parsing it from summary text would be fragile and game-specific.
 5. Register the factory in `games/game.go`.
 6. Verify end-to-end:
    ```
-   make test-arena && make test-games && make lint-arena && make build-arena
+   make test && make test-games && make lint && make build
    bin/arena replay <name> <username> -n 5 -f
    ```
    Saved traces should report `0 skipped-mismatch`.

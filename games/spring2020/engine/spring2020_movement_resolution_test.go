@@ -22,4 +22,3 @@ func TestMovementResolutionTracksMovedAndBlocked(t *testing.T) {
 	assert.Equal(t, c, mr.BlockerOf(b))
 	assert.Nil(t, mr.BlockerOf(a))
 }
-

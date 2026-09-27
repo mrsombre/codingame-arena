@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
@@ -39,13 +38,13 @@ Use cases:
 // Serialize is the entry point for the "serialize" subcommand. It creates a
 // game for the given seed and prints the initial global info followed by the
 // first frame info for the selected player.
-func Serialize(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	opts, err := parseSerializeOptions(args, fs, v)
+func Serialize(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet) error {
+	opts, err := parseSerializeOptions(args, fs)
 	if err != nil {
 		return err
 	}
 
-	referee, players := factory.NewGame(opts.Seed, v)
+	referee, players := factory.NewGame(opts.Seed, arena.GameOptions{League: opts.League})
 	referee.Init(players)
 
 	player := players[opts.Player]

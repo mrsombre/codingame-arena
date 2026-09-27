@@ -27,22 +27,3 @@ updates:
           - "*"
     commit-message:
       prefix: "tech: Dependency Go update"
-
-  - package-ecosystem: npm
-    directory: /viewer
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-      semver-major-days: 30
-    groups:
-      pnpm:
-        patterns:
-          - "*"
-    ignore:
-      - dependency-name: "vite"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@vitejs/plugin-react"
-        update-types: ["version-update:semver-major"]
-    commit-message:
-      prefix: "tech: Dependency pnpm update"
