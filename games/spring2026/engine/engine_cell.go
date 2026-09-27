@@ -74,10 +74,10 @@ func (c *Cell) GetID() int { return c.X + (c.Y << 16) }
 func (c *Cell) GetX() int { return c.X }
 func (c *Cell) GetY() int { return c.Y }
 
-func (c *Cell) GetType() CellType    { return c.Type }
-func (c *Cell) SetType(t CellType)   { c.Type = t }
-func (c *Cell) GetPlant() *Plant     { return c.Plant }
-func (c *Cell) SetPlant(p *Plant)    { c.Plant = p }
+func (c *Cell) GetType() CellType       { return c.Type }
+func (c *Cell) SetType(t CellType)      { c.Type = t }
+func (c *Cell) GetPlant() *Plant        { return c.Plant }
+func (c *Cell) SetPlant(p *Plant)       { c.Plant = p }
 func (c *Cell) GetNeighbor(i int) *Cell { return c.Neighbors[i] }
 func (c *Cell) GetNeighbors() [4]*Cell  { return c.Neighbors }
 

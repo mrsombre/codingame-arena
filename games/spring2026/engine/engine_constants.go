@@ -66,8 +66,8 @@ const (
 
 // Per-tree-type tables. Indexed by Item ordinal for PLUM/LEMON/APPLE/BANANA.
 var (
-	PLANT_COOLDOWN              = [4]int{8, 8, 9, 6}
-	PLANT_WATER_COOLDOWN_BOOST  = [4]int{5, 5, 7, 2}
-	PLANT_FINAL_HEALTH          = [4]int{12, 12, 20, 6}
-	PLANT_DELTA_HEALTH          = [4]int{2, 2, 3, 1}
+	PLANT_COOLDOWN             = [4]int{8, 8, 9, 6}
+	PLANT_WATER_COOLDOWN_BOOST = [4]int{5, 5, 7, 2}
+	PLANT_FINAL_HEALTH         = [4]int{12, 12, 20, 6}
+	PLANT_DELTA_HEALTH         = [4]int{2, 2, 3, 1}
 )

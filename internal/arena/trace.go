@@ -93,8 +93,8 @@ type TraceMatch struct {
 	// TraceGlobalInfoProducer; otherwise the runner falls back to
 	// GlobalInfoFor(players[0]). Format is game-specific — see each game's
 	// trace.md for the line schema.
-	Setup       []string      `json:"setup,omitempty"`
-	Timing      *TraceTiming  `json:"timing,omitempty"`
+	Setup  []string     `json:"setup,omitempty"`
+	Timing *TraceTiming `json:"timing,omitempty"`
 	// MainTurns is the count of player-decision trace turns. Excludes
 	// non-decision phase turns (Spring 2021 GATHERING/SUN_MOVE) and
 	// post-end frames (Spring 2020 gameOverFrame). Populated going forward
@@ -253,9 +253,9 @@ type TraceTiming struct {
 // games marshal a typed struct describing whatever board/scoring/phase
 // info downstream consumers need.
 type TraceTurn struct {
-	Turn      int              `json:"turn"`
-	GameInput []string         `json:"gameInput,omitempty"`
-	Output    [2]string        `json:"output,omitzero"`
+	Turn      int       `json:"turn"`
+	GameInput []string  `json:"gameInput,omitempty"`
+	Output    [2]string `json:"output,omitzero"`
 	// IsOutputTurn[i] records whether side i was prompted for output this
 	// turn (i.e., the runner asked the bot for a command). Independent of
 	// game-specific phase rules: false on engine-only frames (Spring 2021

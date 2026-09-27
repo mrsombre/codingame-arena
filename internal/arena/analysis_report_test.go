@@ -57,9 +57,9 @@ func TestAnalysisReportSummarizesGenericMatchStats(t *testing.T) {
 		}},
 		{Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
-			EndReason:   EndReasonTimeout,
+			EndReason:    EndReasonTimeout,
 			Disqualified: [2]bool{true, false},
-			Scores:      [2]TraceScore{0, 7}, Ranks: [2]int{1, 0},
+			Scores:       [2]TraceScore{0, 7}, Ranks: [2]int{1, 0},
 			Turns: testTurns(1),
 		}},
 		{Trace: TraceMatch{
@@ -92,15 +92,15 @@ func TestAnalysisReportEndReasonsAttributeBlueFault(t *testing.T) {
 	files := []TraceFile{
 		{Name: "replay-100.json", Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
-			EndReason:   EndReasonTimeout,
+			EndReason:    EndReasonTimeout,
 			Disqualified: [2]bool{true, false},
-			Scores:      [2]TraceScore{0, 5}, Ranks: [2]int{1, 0},
+			Scores:       [2]TraceScore{0, 5}, Ranks: [2]int{1, 0},
 		}},
 		{Name: "replay-200.json", Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},
-			EndReason:   EndReasonInvalid,
+			EndReason:    EndReasonInvalid,
 			Disqualified: [2]bool{false, true},
-			Scores:      [2]TraceScore{6, 0}, Ranks: [2]int{0, 1},
+			Scores:       [2]TraceScore{6, 0}, Ranks: [2]int{0, 1},
 		}},
 		{Name: "replay-300.json", Trace: TraceMatch{
 			Blue: "us", Players: [2]string{"us", "rival"},

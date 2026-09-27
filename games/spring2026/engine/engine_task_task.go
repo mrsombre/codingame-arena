@@ -53,11 +53,11 @@ type TaskBase struct {
 	Applied       bool
 }
 
-func (t *TaskBase) GetPlayer() *Player    { return t.Player }
-func (t *TaskBase) GetUnit() *Unit        { return t.Unit }
+func (t *TaskBase) GetPlayer() *Player     { return t.Player }
+func (t *TaskBase) GetUnit() *Unit         { return t.Unit }
 func (t *TaskBase) HasFailedParsing() bool { return t.FailedParsing }
-func (t *TaskBase) WasApplied() bool      { return t.Applied }
-func (t *TaskBase) GetCell() *Cell        { return nil } // default; tasks override
+func (t *TaskBase) WasApplied() bool       { return t.Applied }
+func (t *TaskBase) GetCell() *Cell         { return nil } // default; tasks override
 
 // GetDeltaCarry mirrors Java Task.getDeltaCarry: current carry total minus the
 // snapshot captured by parseUnit. Used for game-summary text only.
@@ -65,8 +65,8 @@ func (t *TaskBase) GetDeltaCarry() int {
 	return t.Unit.Inv.GetTotal() - t.InitialCarry
 }
 
-func (t *TaskBase) markApplied() { t.Applied = true }
-func (t *TaskBase) failParse()   { t.FailedParsing = true }
+func (t *TaskBase) markApplied()    { t.Applied = true }
+func (t *TaskBase) failParse()      { t.FailedParsing = true }
 func (t *TaskBase) base() *TaskBase { return t }
 
 // addParsingError mirrors Java Task.addParsingError: the first error per task

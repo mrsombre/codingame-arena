@@ -19,9 +19,9 @@ var Path = filepath.Join(os.TempDir(), "cg-arena-db.sqlite3")
 
 // DB wraps a *sql.DB and exposes typed repositories for each domain.
 type DB struct {
-	sql      *sql.DB
-	Puzzles  *PuzzleRepo
-	Players  *PlayerRepo
+	sql     *sql.DB
+	Puzzles *PuzzleRepo
+	Players *PlayerRepo
 }
 
 // Open opens (or creates) the SQLite database at path and applies the

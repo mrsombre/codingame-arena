@@ -95,7 +95,7 @@ func TestNextBooleanMatchesJava(t *testing.T) {
 
 func TestShuffleMatchesJavaCollectionsShuffle(t *testing.T) {
 	cases := []struct {
-		seed                     int64
+		seed                       int64
 		want10, wantLinked7, want2 string
 	}{
 		{-8937286792422418000, "3 7 8 6 9 2 0 4 1 5", "6 4 0 2 5 3 1", "0 1"},

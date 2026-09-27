@@ -136,6 +136,7 @@ func (p *Player) Deactivate(reason string) {
 func (p *Player) DeactivationReason() string { return p.deactivationReason }
 func (p *Player) IsTimedOut() bool           { return p.timedOut }
 func (p *Player) SetTimedOut(timedOut bool)  { p.timedOut = timedOut }
+
 /*
 Java: WinterChallenge2026-Exotec/src/main/java/com/codingame/game/Player.java:33-36
 

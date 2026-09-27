@@ -17,12 +17,12 @@ package engine
 //
 // Layout constants come straight from BoardView.java.
 const (
-	viewSpriteSize  = 72
-	viewSpriteR     = viewSpriteSize - 66 // 6  — rock sprite jitter range
-	viewSpriteGD    = viewSpriteSize - 16 // 56 — grass / decor jitter range
-	viewExplosionMaxX  = 1840
-	viewExplosionMinY  = 120
-	viewExplosionMaxY  = 1000
+	viewSpriteSize    = 72
+	viewSpriteR       = viewSpriteSize - 66 // 6  — rock sprite jitter range
+	viewSpriteGD      = viewSpriteSize - 16 // 56 — grass / decor jitter range
+	viewExplosionMaxX = 1840
+	viewExplosionMinY = 120
+	viewExplosionMaxY = 1000
 )
 
 // consumeBoardViewRandoms drains the same RNG sequence Java's BoardView

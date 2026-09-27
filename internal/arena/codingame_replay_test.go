@@ -268,10 +268,10 @@ func TestPeekReplayPuzzleID(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name    string
-		body    string
-		want    int
-		wantOK  bool
+		name   string
+		body   string
+		want   int
+		wantOK bool
 	}{
 		{"present non-zero", `{"puzzleId":42,"gameResult":{}}`, 42, true},
 		{"present zero", `{"puzzleId":0,"gameResult":{}}`, 0, true},

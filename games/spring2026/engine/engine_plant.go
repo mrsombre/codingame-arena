@@ -89,11 +89,11 @@ func (p *Plant) GetGrowthCooldown() int {
 	return c
 }
 
-func (p *Plant) GetType() Item   { return p.Type }
-func (p *Plant) GetCell() *Cell  { return p.Cell }
+func (p *Plant) GetType() Item     { return p.Type }
+func (p *Plant) GetCell() *Cell    { return p.Cell }
 func (p *Plant) GetResources() int { return p.Resources }
-func (p *Plant) GetHealth() int  { return p.Health }
-func (p *Plant) GetSize() int    { return p.Size }
+func (p *Plant) GetHealth() int    { return p.Health }
+func (p *Plant) GetSize() int      { return p.Size }
 
 /*
 Java: SpringChallenge2026-Troll/src/main/java/engine/Plant.java:69-76
