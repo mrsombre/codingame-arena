@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 	"github.com/mrsombre/codingame-arena/internal/arena/codingame"
@@ -133,8 +132,8 @@ Files:
 // downloads every replay from the player's last battles list on the active
 // game's leaderboard; with one or more IDs/URLs it downloads only those games.
 // Each freshly-downloaded replay is immediately converted to a trace file.
-func Replay(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet, v *viper.Viper) error {
-	opts, err := parseReplayOptions(args, fs, v)
+func Replay(args []string, stdout io.Writer, factory arena.GameFactory, fs *pflag.FlagSet) error {
+	opts, err := parseReplayOptions(args, fs)
 	if err != nil {
 		return err
 	}

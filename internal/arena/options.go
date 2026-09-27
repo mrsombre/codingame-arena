@@ -1,14 +1,12 @@
 package arena
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 )
 
 // NewBaseFlagSet returns a flag set pre-populated with flags shared by
@@ -19,31 +17,6 @@ func NewBaseFlagSet(name string) *pflag.FlagSet {
 	fs.SortFlags = false
 	fs.SetOutput(io.Discard)
 	return fs
-}
-
-// NewViper returns a viper instance bound to the given flag set, configured
-// with the ARENA_ env prefix, and populated from an "arena" config file
-// (yaml/json/toml) in the current directory if present. A missing file is
-// not an error; a malformed one is.
-func NewViper(fs *pflag.FlagSet) (*viper.Viper, error) {
-	v := viper.New()
-	v.SetEnvPrefix("ARENA")
-	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	v.AutomaticEnv()
-
-	v.SetConfigName("arena")
-	v.AddConfigPath(".")
-	if err := v.ReadInConfig(); err != nil {
-		var notFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &notFound) {
-			return nil, err
-		}
-	}
-
-	if err := v.BindPFlags(fs); err != nil {
-		return nil, err
-	}
-	return v, nil
 }
 
 // Usage returns the top-level help text, listing available commands.
@@ -58,10 +31,7 @@ Commands:
   analyze     <game>            Analyze trace outcomes and game-owned metrics
   game        <action> [<game>] Per-game helpers (rules, trace, serialize, list)
 
-Use "arena help <command>" for more information about a command.
-
-Env vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_SEED).
-Config: arena.yml in current directory.`, strings.Join(games, ", ")))
+Use "arena help <command>" for more information about a command.`, strings.Join(games, ", ")))
 }
 
 // CommandUsage returns help text for a specific subcommand using fs.FlagUsages().
@@ -74,9 +44,7 @@ func CommandUsage(command, description string, fs *pflag.FlagSet, extra string) 
 		sb.WriteString(extra)
 		sb.WriteString("\n")
 	}
-	sb.WriteString("\nEnv vars: ARENA_<FLAG> (hyphens become underscores, e.g. ARENA_SEED).\n")
-	sb.WriteString("Config: arena.yml in current directory.")
-	return sb.String()
+	return strings.TrimRight(sb.String(), "\n")
 }
 
 func ParseSeed(value string) (int64, error) {

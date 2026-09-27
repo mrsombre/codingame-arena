@@ -3,8 +3,6 @@ package arena
 import (
 	"path/filepath"
 	"strings"
-
-	"github.com/spf13/viper"
 )
 
 // ReplayMoves holds per-turn outputs for each side during a replay.
@@ -31,7 +29,7 @@ type ReplayMoves struct {
 func RunReplay(
 	factory GameFactory,
 	seed int64,
-	gameOptions *viper.Viper,
+	gameOptions GameOptions,
 	moves ReplayMoves,
 	botNames [2]string,
 	maxTurns int,

@@ -10,8 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
-
 	"github.com/mrsombre/codingame-arena/internal/arena"
 	"github.com/mrsombre/codingame-arena/internal/util/sha1prng"
 )
@@ -81,10 +79,7 @@ func TestDebug_InspectReplay(t *testing.T) {
 
 	dumpInitialState(t, seed, league)
 
-	gameOptions := viper.New()
-	if league > 0 {
-		gameOptions.Set("league", strconv.Itoa(league))
-	}
+	gameOptions := arena.GameOptions{League: max(league, 0)}
 	moves := arena.ReplayMovesFromFrames(replay)
 	names := arena.ReplayPlayerNames(replay)
 

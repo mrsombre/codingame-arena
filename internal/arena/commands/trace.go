@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
@@ -41,7 +40,7 @@ Use cases:
 }
 
 // Trace is the entry point for `arena game trace <game>`.
-func Trace(_ []string, stdout io.Writer, factory arena.GameFactory, _ *pflag.FlagSet, _ *viper.Viper) error {
+func Trace(_ []string, stdout io.Writer, factory arena.GameFactory, _ *pflag.FlagSet) error {
 	provider, ok := factory.(arena.TraceProvider)
 	if !ok {
 		return fmt.Errorf("game %q does not bundle trace docs", factory.Name())

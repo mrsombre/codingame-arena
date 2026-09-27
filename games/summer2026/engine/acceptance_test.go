@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1190,16 +1189,12 @@ func TestGameEndsOnTurnOneWhenNoTownWantsAConnection(t *testing.T) {
 func TestResolveLeagueDefaultsToTheHighest(t *testing.T) {
 	factory := NewFactory().(arena.LeagueResolver)
 
-	assert.Equal(t, DEFAULT_LEAGUE, factory.ResolveLeague(nil))
-	assert.Equal(t, DEFAULT_LEAGUE, factory.ResolveLeague(viper.New()))
+	assert.Equal(t, DEFAULT_LEAGUE, factory.ResolveLeague(arena.GameOptions{}))
 }
 
 func TestResolveLeagueHonoursTheLeagueOption(t *testing.T) {
 	factory := NewFactory().(arena.LeagueResolver)
-	options := viper.New()
-	options.Set("league", "2")
-
-	assert.Equal(t, 2, factory.ResolveLeague(options))
+	assert.Equal(t, 2, factory.ResolveLeague(arena.GameOptions{League: 2}))
 }
 
 // League 1 asks player 0 for a single point. The match stops the turn it
@@ -1321,7 +1316,7 @@ func TestLeagueThreeAndAboveRunTheFullGame(t *testing.T) {
 func waitBots(t *testing.T) (arena.Referee, []arena.Player, int) {
 	t.Helper()
 	factory := NewFactory()
-	referee, players := factory.NewGame(42, viper.New())
+	referee, players := factory.NewGame(42, arena.GameOptions{})
 	referee.Init(players)
 
 	for _, player := range players {
@@ -1366,7 +1361,7 @@ func TestTwoWaitBotsPlayAFullMatchAndFinishScorelessDraw(t *testing.T) {
 
 func TestFrameInfoLineCountMatchesTheGridEveryTurn(t *testing.T) {
 	factory := NewFactory()
-	referee, players := factory.NewGame(1, viper.New())
+	referee, players := factory.NewGame(1, arena.GameOptions{})
 	referee.Init(players)
 
 	global := referee.GlobalInfoFor(players[0])

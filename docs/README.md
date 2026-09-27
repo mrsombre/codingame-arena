@@ -30,4 +30,4 @@ arena game list                          ─▶ every engine currently linked in
 
 ## Configuration
 
-Flags can be supplied via CLI, environment variables (`ARENA_<FLAG>`, hyphens become underscores), or an `arena.yml` config file in the current directory.
+Every setting is a command-line flag. Arena reads no environment variables and no config file.

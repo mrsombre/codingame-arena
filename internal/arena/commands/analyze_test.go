@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -75,9 +74,9 @@ func TestAnalyzeFiltersTraceFilesByGame(t *testing.T) {
 	factory := &recordingAnalyzeFactory{name: gameA}
 	arena.Register(factory)
 
-	fs, v := newTestAnalyzeCtx(t)
+	fs := newTestAnalyzeCtx(t)
 	var out bytes.Buffer
-	err := Analyze([]string{"--trace-dir", traceDir}, &out, factory, fs, v)
+	err := Analyze([]string{"--trace-dir", traceDir}, &out, factory, fs)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"trace-a.json"}, factory.files)
@@ -143,7 +142,7 @@ func (f *recordingAnalyzeFactory) PuzzleTitle() string { return "" }
 
 func (f *recordingAnalyzeFactory) LeaderboardSlug() string { return "" }
 
-func (f *recordingAnalyzeFactory) NewGame(_ int64, _ *viper.Viper) (arena.Referee, []arena.Player) {
+func (f *recordingAnalyzeFactory) NewGame(_ int64, _ arena.GameOptions) (arena.Referee, []arena.Player) {
 	panic("not used")
 }
 

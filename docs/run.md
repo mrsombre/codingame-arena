@@ -27,7 +27,7 @@ bin/arena run winter2026 \
 | `-s, --seed`          | current time     | Base RNG seed (deterministic when set)                       |
 | `--seedx`             | `1`              | Seed increment per match (`seed_i = seed + i*seedx`)         |
 | `--max-turns`         | `200`            | Maximum turns per match                                      |
-| `-l, --league`        | game-specific    | League level                                                 |
+| `-l, --league`        | `0` (game default) | League level                                                 |
 | `--no-swap`           | `false`          | Disable automatic side swapping (see below)                  |
 | `--trace`             | `false`          | Write per-match JSON trace files                             |
 | `--trace-dir`         | `./traces`       | Directory for trace files                                    |

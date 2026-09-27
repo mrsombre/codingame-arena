@@ -2,10 +2,6 @@
 package engine
 
 import (
-	"strconv"
-
-	"github.com/spf13/viper"
-
 	"github.com/mrsombre/codingame-arena/games/spring2020"
 	"github.com/mrsombre/codingame-arena/internal/arena"
 )
@@ -41,7 +37,7 @@ func (f *Factory) MaxTurns() int { return MaxTurns }
 // replay's trailing empty stdout as that frame.
 func (f *Factory) TurnModel() arena.TurnModel { return arena.PostEndTurnModel{} }
 
-func (f *Factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []arena.Player) {
+func (f *Factory) NewGame(seed int64, options arena.GameOptions) (arena.Referee, []arena.Player) {
 	game := NewGame(seed, f.ResolveLeague(options))
 	players := []arena.Player{NewPlayer(0), NewPlayer(1)}
 	return NewReferee(game), players
@@ -50,13 +46,9 @@ func (f *Factory) NewGame(seed int64, options *viper.Viper) (arena.Referee, []ar
 // ResolveLeague returns the league level the factory will run with for the
 // given options, falling back to the Spring 2020 default of 4 when the
 // "league" option is unset or unparseable.
-func (f *Factory) ResolveLeague(options *viper.Viper) int {
-	if options != nil {
-		if raw := options.GetString("league"); raw != "" {
-			if value, err := strconv.Atoi(raw); err == nil {
-				return value
-			}
-		}
+func (f *Factory) ResolveLeague(options arena.GameOptions) int {
+	if options.League > 0 {
+		return options.League
 	}
 	return 4
 }
