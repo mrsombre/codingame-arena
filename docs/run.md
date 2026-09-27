@@ -51,7 +51,7 @@ Win/loss/draw counts are from blue's (our) perspective.
 
 **Verbose JSON** (`--verbose`): full summary with per-metric averages, runner metadata, bad-command list, and the five worst losses for blue.
 
-**Debug** (`--debug`): forces `--simulations=1` and `--parallel=1`, locks sides (no swap), and emits the match's full trace JSON to stdout — same shape as the files [`--trace`](trace.md) writes (`type: "trace"`, populated `setup` / `gameInput` / `state` / `traces`). Nothing is written to `--trace-dir` even if `--trace` is also set; pipe to `jq` to inspect, or to a file (`> traces/debug.json`) and load it in [`arena serve`](serve.md).
+**Debug** (`--debug`): forces `--simulations=1` and `--parallel=1`, locks sides (no swap), and emits the match's full trace JSON to stdout — same shape as the files [`--trace`](trace.md) writes (`type: "trace"`, populated `setup` / `gameInput` / `state` / `traces`). Nothing is written to `--trace-dir` even if `--trace` is also set; pipe to `jq` to inspect, or to a file (`> traces/debug.json`).
 
 Each turn, anything either bot writes to its own stderr is captured and printed to your terminal under a header:
 
@@ -69,4 +69,4 @@ By default blue and red alternate left/right engine slots across matches to neut
 
 ## Tracing
 
-`--trace` writes one JSON file per match to `--trace-dir` (default `./traces/`). Trace files are inputs to `arena analyze` and the web viewer (`arena serve`).
+`--trace` writes one JSON file per match to `--trace-dir` (default `./traces/`). Trace files are inputs to `arena analyze`.

@@ -1,9 +1,0 @@
-packages:
-  - packages/shared
-  - packages/winter2026
-
-strictDepBuilds: true
-allowBuilds:
-  "@biomejs/biome": true
-  "esbuild": true
-  "msw": true

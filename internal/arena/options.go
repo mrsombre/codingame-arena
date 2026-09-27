@@ -56,7 +56,6 @@ Commands:
   run         <game>            Run one or more match simulations against a player binary
   replay      <game>            Download replay JSON for a player and convert it to traces
   analyze     <game>            Analyze trace outcomes and game-owned metrics
-  serve                         Serve the embedded web viewer
   game        <action> [<game>] Per-game helpers (rules, trace, serialize, list)
 
 Use "arena help <command>" for more information about a command.

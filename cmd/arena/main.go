@@ -151,11 +151,6 @@ var registry = map[string]commandSpec{
 		argsSpec:     "<game>",
 		usage:        commands.AnalyzeUsage,
 	},
-	"serve": {
-		addFlags: commands.AddServeFlags,
-		handler:  commands.Serve,
-		usage:    commands.ServeUsage,
-	},
 	"game": {
 		subcommands: map[string]commandSpec{
 			"serialize": {

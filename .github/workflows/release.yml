@@ -15,24 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6.0.9
-        with:
-          version: 10
-
-      - uses: actions/setup-node@v7.0.0
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: viewer/pnpm-lock.yaml
-
-      - name: Install frontend dependencies
-        working-directory: viewer
-        run: pnpm install --frozen-lockfile
-
-      - name: Build frontend
-        working-directory: viewer
-        run: pnpm run build
-
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod

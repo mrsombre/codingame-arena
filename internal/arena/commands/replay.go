@@ -69,8 +69,8 @@ func ReplayUsage(fs *pflag.FlagSet) string {
     <game>      engine slug (e.g. winter2026, spring2020); selects which
                 CodinGame leaderboard slug + puzzleId to use.
     <username>  CodinGame nickname we are playing for. Stamped into every
-                saved replay as the top-level "blue" field so analyze and
-                the viewer know which side is "us".
+                saved replay as the top-level "blue" field so analyze
+                knows which side is "us".
     <id|url>    optional: zero or more replay ids (numeric) or full replay
                 URLs ending in an id. Pass them as separate args, comma-
                 separated within one arg, or both.
@@ -120,7 +120,7 @@ Output (per replay):
 Files:
   --out      → replays/<gameId>.json (raw replay payload + arena annotations)
   --trace-dir → traces/replay-<gameId>.json (the verified trace)
-  Both feed into ` + "`arena analyze <game>`" + ` and the web viewer (` + "`arena serve`" + `).`
+  Both feed into ` + "`arena analyze <game>`" + `.`
 	return arena.CommandUsage(
 		"replay <game> <username> [<id|url>...]",
 		"Download CodinGame replays for a player and auto-convert each to a verified arena trace.",

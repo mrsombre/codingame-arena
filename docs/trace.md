@@ -1,13 +1,13 @@
 # Trace files
 
-A **trace** is the canonical per-match JSON record arena produces. It bundles the metadata downstream tools need (analyze, the web viewer, training pipelines) without forcing them to re-read CodinGame's bulky replay payload.
+A **trace** is the canonical per-match JSON record arena produces. It bundles the metadata downstream tools need (analyze, training pipelines) without forcing them to re-read CodinGame's bulky replay payload.
 
 Two commands write traces:
 
 - [`arena run --trace`](run.md) — self-play matches → `traces/trace-<traceId>-<matchId>.json` (`type: "trace"`)
 - [`arena replay`](replay.md) — converted CodinGame replays → `traces/replay-<replayId>.json` (`type: "replay"`)
 
-[`arena analyze`](analyze.md) and [`arena serve`](serve.md) read whatever `*.json` files live under `--trace-dir`; the `type` field and filename let consumers tell self-play apart from replay-derived traces.
+[`arena analyze`](analyze.md) reads whatever `*.json` files live under `--trace-dir`; the `type` field and filename let consumers tell self-play apart from replay-derived traces.
 
 ## Per-game trace docs
 

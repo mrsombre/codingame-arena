@@ -76,7 +76,7 @@ Output channels:
 
 Tracing:
   --trace writes one JSON file per match to --trace-dir (default ./traces).
-  Trace files feed ` + "`arena analyze`" + ` and the web viewer (` + "`arena serve`" + `).`
+  Trace files feed ` + "`arena analyze`" + `.`
 	return arena.CommandUsage("run <game>", "Play a batch of head-to-head matches between two bot binaries.", fs, extra)
 }
 

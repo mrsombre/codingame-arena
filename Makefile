@@ -12,7 +12,7 @@ reset:
 	rm -rf replays/* traces/*
 
 # backend
-.PHONY: test-arena test-games lint-arena build-arena build-viewer clean
+.PHONY: test-arena test-games lint-arena build-arena
 
 test-arena:
 	go test ./cmd/arena ./internal/...
@@ -26,19 +26,6 @@ lint-arena:
 build-arena:
 	mkdir -p $(BIN_DIR)
 	go build -ldflags="-w -s" -o $(BIN_DIR)/arena ./cmd/arena
-
-# frontend
-.PHONY: type-check-viewer lint-viewer build-viewer
-VIEWER_DIR := viewer
-
-type-check-viewer:
-	cd $(VIEWER_DIR) && pnpm run type-check
-
-bundle-viewer:
-	cd $(VIEWER_DIR) && pnpm run bundle
-
-build-viewer:
-	cd $(VIEWER_DIR) && pnpm run build
 
 # match runner
 .PHONY: build-summer2026-agents match-summer2026

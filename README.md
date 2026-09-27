@@ -1,14 +1,11 @@
 # CodinGame Arena
 
-Local game engine runner for [CodinGame](https://www.codingame.com/) bot programming challenges. Run bot-vs-bot matches offline, analyze results, and watch replays in a built-in web viewer — all without the CodinGame platform.
-
-![Match View](docs/img/match-view.png)
+Local game engine runner for [CodinGame](https://www.codingame.com/) bot programming challenges. Run bot-vs-bot matches offline, download replays, and analyze results — all without the CodinGame platform.
 
 ## Features
 
 - **Offline match runner** — execute thousands of matches locally with parallel workers
 - **Match tracing** — save per-match JSON traces for replay and analysis
-- **Built-in web viewer** — React + PixiJS viewer served from the binary, no extra setup
 - **Replay downloader** — fetch replays from codingame.com
 - **Replay conversion** — convert downloaded replay JSON into arena trace format
 - **Trace analysis** — aggregate stats across batches of traces
@@ -23,8 +20,6 @@ Summary: 100 matches played (3.15s)
 Stats: wins=29% losses=32% draws=39% avg_score=16.4x17.0 avg_turns=155
 Timing: avg_first_response=29msx198ms avg_turn_response=0msx0ms
 ```
-
-![Batch View](docs/img/batch-view.png)
 
 ## Supported Games
 
@@ -42,7 +37,6 @@ The game slug is the first positional argument for top-level commands that need 
 | `run`     | Run one or more match simulations against a player      |
 | `replay`  | Download replay JSON (`get`, `leaderboard` subcommands) |
 | `analyze` | Analyze trace outcomes and game-owned metrics           |
-| `serve`   | Serve the embedded web viewer                           |
 | `game`    | Per-game helpers: `rules`, `trace`, `serialize`, `list` |
 
 Run `arena help <command>` for full flag listings.
@@ -76,14 +70,6 @@ make build-arena
 make build-winter2026-agents
 make match-winter2026
 ```
-
-### Web Viewer
-
-```shell
-bin/arena serve
-```
-
-Opens a web UI at `http://localhost:5757` where you can select bots, run matches, and watch replays.
 
 ## Configuration
 
